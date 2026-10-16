@@ -23,6 +23,8 @@ jobs:
 
       - name: Generate all code
         run: |
+          cat > /tmp/gen.sh << 'GENEOF'
+          #!/bin/bash
           set -e
 
           mkdir -p shared/lib/models shared/lib/services
@@ -120,7 +122,7 @@ export 'models/chat_message.dart';
 export 'services/signature.dart';
 SHARED
 
-          flutter create --org com.platinum --project-name admin_app --platforms android,ios admin_app
+          flutter create --org com.platinum --project-name admin_app --platforms=android,ios admin_app
           mkdir -p admin_app/lib/screens
 
           cat > admin_app/pubspec.yaml << 'ADMINPUB'
@@ -442,7 +444,7 @@ class ComingSoonScreen extends StatelessWidget {
 }
 CS
 
-          flutter create --org com.platinum --project-name student_app --platforms android,ios student_app
+          flutter create --org com.platinum --project-name student_app --platforms=android,ios student_app
           mkdir -p student_app/lib/screens
 
           cat > student_app/pubspec.yaml << 'STUPUB'
@@ -757,6 +759,10 @@ class ComingSoonScreen extends StatelessWidget {
 CSSTU
 
           echo "All code generated."
+          GENEOF
+
+          chmod +x /tmp/gen.sh
+          /tmp/gen.sh
 
       - name: Build Admin Android APK
         run: |
@@ -783,19 +789,11 @@ CSSTU
         with:
           name: platinum-source
           retention-days: 1
+          if-no-files-found: ignore
           path: |
-            shared/pubspec.yaml
-            shared/lib/
-            admin_app/pubspec.yaml
-            admin_app/lib/
-            admin_app/ios/
-            admin_app/android/
-            admin_app/analysis_options.yaml
-            student_app/pubspec.yaml
-            student_app/lib/
-            student_app/ios/
-            student_app/android/
-            student_app/analysis_options.yaml
+            shared/
+            admin_app/
+            student_app/
 
   ios-build:
     runs-on: macos-latest
