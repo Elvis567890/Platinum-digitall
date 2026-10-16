@@ -25,7 +25,6 @@ jobs:
         run: |
           set -e
 
-          # ========== SHARED PACKAGE ==========
           mkdir -p shared/lib/models shared/lib/services
 
           cat > shared/pubspec.yaml << 'SHAREDPUBSPEC'
@@ -121,9 +120,7 @@ export 'models/chat_message.dart';
 export 'services/signature.dart';
 SHARED
 
-          # ========== ADMIN APP ==========
           flutter create --org com.platinum --project-name admin_app --platforms android,ios admin_app
-
           mkdir -p admin_app/lib/screens
 
           cat > admin_app/pubspec.yaml << 'ADMINPUB'
@@ -445,9 +442,7 @@ class ComingSoonScreen extends StatelessWidget {
 }
 CS
 
-          # ========== STUDENT APP ==========
           flutter create --org com.platinum --project-name student_app --platforms android,ios student_app
-
           mkdir -p student_app/lib/screens
 
           cat > student_app/pubspec.yaml << 'STUPUB'
@@ -783,14 +778,24 @@ CSSTU
             admin_app/build/app/outputs/flutter-apk/app-release.apk
             student_app/build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Upload source code for iOS job
+      - name: Upload source for iOS job
         uses: actions/upload-artifact@v4
         with:
           name: platinum-source
+          retention-days: 1
           path: |
-            shared/
-            admin_app/
-            student_app/
+            shared/pubspec.yaml
+            shared/lib/
+            admin_app/pubspec.yaml
+            admin_app/lib/
+            admin_app/ios/
+            admin_app/android/
+            admin_app/analysis_options.yaml
+            student_app/pubspec.yaml
+            student_app/lib/
+            student_app/ios/
+            student_app/android/
+            student_app/analysis_options.yaml
 
   ios-build:
     runs-on: macos-latest
