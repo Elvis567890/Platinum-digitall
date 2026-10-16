@@ -6,7 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  # JOB 1: Build the Admin App
+  build-admin:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,37 +22,28 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate all code
+      - name: Generate Shared and Admin Code
         run: |
-          # Create base Flutter projects first
-          flutter create --org com.platinum --project-name admin_app admin_app
-          flutter create --org com.platinum --project-name student_app student_app
-
-          # Run Python script to generate all custom files
-          python3 -c "
-          import os
-
-          files = {
-              'shared/pubspec.yaml': '''name: shared
+          mkdir -p shared/lib/models
+          cat > shared/pubspec.yaml << 'EOF'
+          name: shared
           description: Shared
           version: 1.0.0
           environment:
-            sdk: \">=3.0.0 <4.0.0\"
+            sdk: ">=3.0.0 <4.0.0"
           dependencies:
             crypto: ^3.0.3
-          ''',
-              'shared/lib/announcement.dart': '''class Announcement {
-            final String id;
-            final String title;
-            final String body;
-            Announcement({required this.id, required this.title, required this.body});
-          }
-          ''',
-              'admin_app/pubspec.yaml': '''name: admin_app
+          EOF
+
+          flutter create --org com.platinum --project-name admin_app admin_app
+          mkdir -p admin_app/lib/screens
+
+          cat > admin_app/pubspec.yaml << 'EOF'
+          name: admin_app
           description: Platinum Admin
           version: 1.0.0+1
           environment:
-            sdk: \">=3.0.0 <4.0.0\"
+            sdk: ">=3.0.0 <4.0.0"
           dependencies:
             flutter:
               sdk: flutter
@@ -59,8 +51,10 @@ jobs:
               path: ../shared
           flutter:
             uses-material-design: true
-          ''',
-              'admin_app/lib/main.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > admin_app/lib/main.dart << 'EOF'
+          import 'package:flutter/material.dart';
           import 'screens/login.dart';
 
           void main() => runApp(const PlatinumAdminApp());
@@ -83,8 +77,10 @@ jobs:
               );
             }
           }
-          ''',
-              'admin_app/lib/screens/login.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > admin_app/lib/screens/login.dart << 'EOF'
+          import 'package:flutter/material.dart';
           import 'dashboard.dart';
 
           class LoginScreen extends StatefulWidget {
@@ -157,8 +153,10 @@ jobs:
               );
             }
           }
-          ''',
-              'admin_app/lib/screens/dashboard.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > admin_app/lib/screens/dashboard.dart << 'EOF'
+          import 'package:flutter/material.dart';
           import 'announcements.dart';
           import 'coming_soon.dart';
 
@@ -218,8 +216,10 @@ jobs:
               );
             }
           }
-          ''',
-              'admin_app/lib/screens/announcements.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > admin_app/lib/screens/announcements.dart << 'EOF'
+          import 'package:flutter/material.dart';
 
           class AnnouncementsScreen extends StatefulWidget {
             const AnnouncementsScreen({super.key});
@@ -282,8 +282,10 @@ jobs:
               );
             }
           }
-          ''',
-              'admin_app/lib/screens/coming_soon.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > admin_app/lib/screens/coming_soon.dart << 'EOF'
+          import 'package:flutter/material.dart';
 
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -317,12 +319,59 @@ jobs:
               );
             }
           }
-          ''',
-              'student_app/pubspec.yaml': '''name: student_app
+          EOF
+
+      - name: Build Admin APK
+        run: |
+          cd admin_app
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload Admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-app-apk
+          path: admin_app/build/app/outputs/flutter-apk/app-release.apk
+
+
+  # JOB 2: Build the Student App
+  build-student:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Shared and Student Code
+        run: |
+          mkdir -p shared/lib/models
+          cat > shared/pubspec.yaml << 'EOF'
+          name: shared
+          description: Shared
+          version: 1.0.0
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+          dependencies:
+            crypto: ^3.0.3
+          EOF
+
+          flutter create --org com.platinum --project-name student_app student_app
+          mkdir -p student_app/lib/screens
+
+          cat > student_app/pubspec.yaml << 'EOF'
+          name: student_app
           description: Platinum Student
           version: 1.0.0+1
           environment:
-            sdk: \">=3.0.0 <4.0.0\"
+            sdk: ">=3.0.0 <4.0.0"
           dependencies:
             flutter:
               sdk: flutter
@@ -330,8 +379,10 @@ jobs:
               path: ../shared
           flutter:
             uses-material-design: true
-          ''',
-              'student_app/lib/main.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > student_app/lib/main.dart << 'EOF'
+          import 'package:flutter/material.dart';
           import 'screens/home.dart';
 
           void main() => runApp(const PlatinumStudentApp());
@@ -354,8 +405,10 @@ jobs:
               );
             }
           }
-          ''',
-              'student_app/lib/screens/home.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > student_app/lib/screens/home.dart << 'EOF'
+          import 'package:flutter/material.dart';
           import 'announcements.dart';
           import 'reports.dart';
           import 'chat.dart';
@@ -399,8 +452,10 @@ jobs:
               );
             }
           }
-          ''',
-              'student_app/lib/screens/announcements.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > student_app/lib/screens/announcements.dart << 'EOF'
+          import 'package:flutter/material.dart';
 
           class AnnouncementsScreen extends StatelessWidget {
             const AnnouncementsScreen({super.key});
@@ -445,8 +500,10 @@ jobs:
               );
             }
           }
-          ''',
-              'student_app/lib/screens/reports.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > student_app/lib/screens/reports.dart << 'EOF'
+          import 'package:flutter/material.dart';
 
           class ReportsScreen extends StatefulWidget {
             const ReportsScreen({super.key});
@@ -503,8 +560,10 @@ jobs:
               );
             }
           }
-          ''',
-              'student_app/lib/screens/chat.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > student_app/lib/screens/chat.dart << 'EOF'
+          import 'package:flutter/material.dart';
 
           class ChatScreen extends StatelessWidget {
             const ChatScreen({super.key});
@@ -531,8 +590,10 @@ jobs:
               );
             }
           }
-          ''',
-              'student_app/lib/screens/clubs.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > student_app/lib/screens/clubs.dart << 'EOF'
+          import 'package:flutter/material.dart';
 
           class ClubsScreen extends StatelessWidget {
             const ClubsScreen({super.key});
@@ -565,8 +626,10 @@ jobs:
               );
             }
           }
-          ''',
-              'student_app/lib/screens/coming_soon.dart': '''import 'package:flutter/material.dart';
+          EOF
+
+          cat > student_app/lib/screens/coming_soon.dart << 'EOF'
+          import 'package:flutter/material.dart';
 
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -600,20 +663,7 @@ jobs:
               );
             }
           }
-          '''
-          }
-
-          for path, content in files.items():
-              os.makedirs(os.path.dirname(path), exist_ok=True)
-              with open(path, 'w') as f:
-                  f.write(content.strip() + '\n')
-          "
-
-      - name: Build Admin APK
-        run: |
-          cd admin_app
-          flutter pub get
-          flutter build apk --release
+          EOF
 
       - name: Build Student APK
         run: |
@@ -621,10 +671,8 @@ jobs:
           flutter pub get
           flutter build apk --release
 
-      - name: Upload APKs
+      - name: Upload Student APK
         uses: actions/upload-artifact@v4
         with:
-          name: platinum-apps
-          path: |
-            admin_app/build/app/outputs/flutter-apk/app-release.apk
-            student_app/build/app/outputs/flutter-apk/app-release.apk
+          name: student-app-apk
+          path: student_app/build/app/outputs/flutter-apk/app-release.apk
