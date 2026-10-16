@@ -23,9 +23,10 @@ jobs:
 
       - name: Generate all code
         run: |
+          cat > /tmp/gen.sh << 'GENEOF'
+          #!/bin/bash
           set -e
 
-          # ========== SHARED PACKAGE ==========
           mkdir -p shared/lib/models shared/lib/services
 
           cat > shared/pubspec.yaml << 'SHAREDPUBSPEC'
@@ -121,9 +122,7 @@ export 'models/chat_message.dart';
 export 'services/signature.dart';
 SHARED
 
-          # ========== ADMIN APP ==========
-          flutter create --org com.platinum --project-name admin_app --platforms android,ios admin_app
-
+          flutter create --org com.platinum --project-name admin_app --platforms=android,ios admin_app
           mkdir -p admin_app/lib/screens
 
           cat > admin_app/pubspec.yaml << 'ADMINPUB'
@@ -445,9 +444,7 @@ class ComingSoonScreen extends StatelessWidget {
 }
 CS
 
-          # ========== STUDENT APP ==========
-          flutter create --org com.platinum --project-name student_app --platforms android,ios student_app
-
+          flutter create --org com.platinum --project-name student_app --platforms=android,ios student_app
           mkdir -p student_app/lib/screens
 
           cat > student_app/pubspec.yaml << 'STUPUB'
@@ -625,205 +622,4 @@ class _ReportsScreenState extends State<ReportsScreen> {
           : Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.lock, size: 64, color: Color(0xFFCC0000)),
-                const SizedBox(height: 16),
-                const Text('Reports Released',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                const Text('Enter your secret code to view your report',
-                  style: TextStyle(color: Colors.grey)),
-                const SizedBox(height: 24),
-                TextField(controller: _code,
-                  decoration: const InputDecoration(labelText: 'Secret Code',
-                    border: OutlineInputBorder()),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 24, letterSpacing: 8)),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFCC0000),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                  ),
-                  onPressed: _unlock,
-                  child: const Text('Unlock Report', style: TextStyle(fontSize: 18)),
-                ),
-              ],
-            ),
-      ),
-    );
-  }
-}
-REP
-
-          cat > student_app/lib/screens/chat.dart << 'CHATSCREEN'
-import 'package:flutter/material.dart';
-
-class ChatScreen extends StatelessWidget {
-  const ChatScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Chat')),
-      body: ListView(
-        children: const [
-          ListTile(
-            leading: CircleAvatar(child: Icon(Icons.groups)),
-            title: Text('Senior Four Group'),
-            subtitle: Text('12 new messages'),
-            trailing: Icon(Icons.chevron_right),
-          ),
-          ListTile(
-            leading: CircleAvatar(child: Icon(Icons.groups)),
-            title: Text('Whole School'),
-            subtitle: Text('3 new messages'),
-            trailing: Icon(Icons.chevron_right),
-          ),
-        ],
-      ),
-    );
-  }
-}
-CHATSCREEN
-
-          cat > student_app/lib/screens/clubs.dart << 'CLUBS'
-import 'package:flutter/material.dart';
-
-class ClubsScreen extends StatelessWidget {
-  const ClubsScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Clubs')),
-      body: ListView(
-        children: const [
-          ListTile(
-            leading: CircleAvatar(child: Icon(Icons.edit)),
-            title: Text('Writers Club'),
-            subtitle: Text('3 new announcements'),
-            trailing: Icon(Icons.chevron_right),
-          ),
-          ListTile(
-            leading: CircleAvatar(child: Icon(Icons.mic)),
-            title: Text('Debate Club'),
-            subtitle: Text('1 new announcement'),
-            trailing: Icon(Icons.chevron_right),
-          ),
-          ListTile(
-            leading: CircleAvatar(child: Icon(Icons.science)),
-            title: Text('Science Club'),
-            subtitle: Text('No new announcements'),
-            trailing: Icon(Icons.chevron_right),
-          ),
-        ],
-      ),
-    );
-  }
-}
-CLUBS
-
-          cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
-import 'package:flutter/material.dart';
-
-class ComingSoonScreen extends StatelessWidget {
-  final String featureName;
-  const ComingSoonScreen({super.key, required this.featureName});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(featureName)),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('⭐', style: TextStyle(fontSize: 64)),
-              const SizedBox(height: 16),
-              const Text('Coming Soon',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold,
-                  color: Color(0xFFCC0000))),
-              const SizedBox(height: 12),
-              Text('$featureName is being built for\nPlatinum Secondary School Kiteezi.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16, color: Colors.black54)),
-              const SizedBox(height: 24),
-              const Text('Excellence Is Our Culture',
-                style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic,
-                  color: Color(0xFFCC0000))),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-CSSTU
-
-          echo "All code generated."
-
-      - name: Build Admin Android APK
-        run: |
-          cd admin_app
-          flutter pub get
-          flutter build apk --release
-
-      - name: Build Student Android APK
-        run: |
-          cd student_app
-          flutter pub get
-          flutter build apk --release
-
-      - name: Upload Android APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: platinum-android-apps
-          path: |
-            admin_app/build/app/outputs/flutter-apk/app-release.apk
-            student_app/build/app/outputs/flutter-apk/app-release.apk
-
-      - name: Upload source code for iOS job
-        uses: actions/upload-artifact@v4
-        with:
-          name: platinum-source
-          path: |
-            shared/
-            admin_app/
-            student_app/
-
-  ios-build:
-    runs-on: macos-latest
-    needs: android-build
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Download generated source
-        uses: actions/download-artifact@v4
-        with:
-          name: platinum-source
-
-      - name: Build Admin iOS
-        run: |
-          cd admin_app
-          flutter pub get
-          flutter build ios --release --no-codesign
-
-      - name: Build Student iOS
-        run: |
-          cd student_app
-          flutter pub get
-          flutter build ios --release --no-codesign
-
-      - name: Upload iOS Apps
-        uses: actions/upload-artifact@v4
-        with:
-          name: platinum-ios-apps
-          path: |
-            admin_app/build/ios/iphoneos/Runner.app
-            student_app/build/ios/iphoneos/Runner.app
+        
