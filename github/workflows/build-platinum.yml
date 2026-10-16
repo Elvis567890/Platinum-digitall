@@ -24,8 +24,23 @@ jobs:
 
       - name: Generate Shared and Admin Code
         run: |
+          # Smartly find the uploaded logo in the root directory
+          mkdir -p admin_app/assets
+          LOGO_SOURCE=$(find . -maxdepth 1 -name "InShot*.png" | head -n 1)
+          if [ -z "$LOGO_SOURCE" ]; then
+            LOGO_SOURCE=$(find . -maxdepth 1 -name "*.png" | head -n 1)
+          fi
+
+          if [ -n "$LOGO_SOURCE" ]; then
+            echo "Found logo source: $LOGO_SOURCE"
+            cp "$LOGO_SOURCE" admin_app/assets/logo.png
+          else
+            echo "Warning: No logo found. Using placeholder."
+            echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
+          fi
+
           mkdir -p shared/lib/models
-          cat > shared/pubspec.yaml << 'EOF'
+          cat > shared/pubspec.yaml << 'SHAREDPUB'
           name: shared
           description: Shared
           version: 1.0.0
@@ -33,12 +48,31 @@ jobs:
             sdk: ">=3.0.0 <4.0.0"
           dependencies:
             crypto: ^3.0.3
-          EOF
+          SHAREDPUB
+
+          cat > shared/lib/announcement.dart << 'ANN'
+          class Announcement {
+            final String id;
+            final String title;
+            final String body;
+            final String audience;
+            final String animationType;
+            final DateTime createdAt;
+            Announcement({
+              required this.id,
+              required this.title,
+              required this.body,
+              required this.audience,
+              required this.animationType,
+              required this.createdAt,
+            });
+          }
+          ANN
 
           flutter create --org com.platinum --project-name admin_app admin_app
           mkdir -p admin_app/lib/screens
 
-          cat > admin_app/pubspec.yaml << 'EOF'
+          cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
           description: Platinum Admin
           version: 1.0.0+1
@@ -49,11 +83,14 @@ jobs:
               sdk: flutter
             shared:
               path: ../shared
+            intl: ^0.19.0
           flutter:
             uses-material-design: true
-          EOF
+            assets:
+              - assets/
+          ADMINPUB
 
-          cat > admin_app/lib/main.dart << 'EOF'
+          cat > admin_app/lib/main.dart << 'ADMINMAIN'
           import 'package:flutter/material.dart';
           import 'screens/login.dart';
 
@@ -67,9 +104,9 @@ jobs:
                 title: 'Platinum Admin',
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData(
-                  primaryColor: const Color(0xFFCC0000),
+                  primaryColor: const Color(0xFF0A3D91),
                   appBarTheme: const AppBarTheme(
-                    backgroundColor: Color(0xFFCC0000),
+                    backgroundColor: Color(0xFF0A3D91),
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -77,9 +114,9 @@ jobs:
               );
             }
           }
-          EOF
+          ADMINMAIN
 
-          cat > admin_app/lib/screens/login.dart << 'EOF'
+          cat > admin_app/lib/screens/login.dart << 'LOGIN'
           import 'package:flutter/material.dart';
           import 'dashboard.dart';
 
@@ -104,60 +141,68 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                body: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('Platinum Digital App',
-                        style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold,
-                          color: Color(0xFFCC0000))),
-                      const SizedBox(height: 8),
-                      const Text('Admin Portal',
-                        style: TextStyle(fontSize: 16, color: Colors.grey)),
-                      const SizedBox(height: 32),
-                      TextField(controller: _id,
-                        decoration: const InputDecoration(labelText: 'Staff ID',
-                          border: OutlineInputBorder())),
-                      const SizedBox(height: 16),
-                      TextField(controller: _pin, obscureText: true,
-                        decoration: const InputDecoration(labelText: 'PIN',
-                          border: OutlineInputBorder())),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: _role,
-                        decoration: const InputDecoration(labelText: 'Role',
-                          border: OutlineInputBorder()),
-                        items: const [
-                          DropdownMenuItem(value: 'super_admin', child: Text('Super Admin')),
-                          DropdownMenuItem(value: 'release_admin', child: Text('Release Admin')),
-                          DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                          DropdownMenuItem(value: 'teacher', child: Text('Teacher')),
-                        ],
-                        onChanged: (v) => setState(() => _role = v!),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFCC0000),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          onPressed: _login,
-                          child: const Text('Login', style: TextStyle(fontSize: 18)),
-                        )),
-                    ],
+                backgroundColor: const Color(0xFFF5F7FA),
+                body: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset('assets/logo.png', height: 120, width: 120, fit: BoxFit.contain),
+                        const SizedBox(height: 16),
+                        const Text('Welcome Back',
+                          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold,
+                            color: Color(0xFF0A3D91))),
+                        const SizedBox(height: 8),
+                        const Text('Select your role to continue',
+                          style: TextStyle(fontSize: 16, color: Colors.grey)),
+                        const SizedBox(height: 32),
+                        TextField(controller: _id,
+                          decoration: const InputDecoration(labelText: 'Staff ID',
+                            border: OutlineInputBorder())),
+                        const SizedBox(height: 16),
+                        TextField(controller: _pin, obscureText: true,
+                          decoration: const InputDecoration(labelText: 'PIN',
+                            border: OutlineInputBorder())),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: _role,
+                          decoration: const InputDecoration(labelText: 'Role',
+                            border: OutlineInputBorder()),
+                          items: const [
+                            DropdownMenuItem(value: 'super_admin', child: Text('Super Admin')),
+                            DropdownMenuItem(value: 'release_admin', child: Text('Release Admin')),
+                            DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                            DropdownMenuItem(value: 'teacher', child: Text('Teacher')),
+                          ],
+                          onChanged: (v) => setState(() => _role = v!),
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0A3D91),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: _login,
+                            child: const Text('Continue', style: TextStyle(fontSize: 18)),
+                          )),
+                      ],
+                    ),
                   ),
                 ),
               );
             }
           }
-          EOF
+          LOGIN
 
-          cat > admin_app/lib/screens/dashboard.dart << 'EOF'
+          cat > admin_app/lib/screens/dashboard.dart << 'DASH'
           import 'package:flutter/material.dart';
           import 'announcements.dart';
+          import 'marks_submission.dart';
+          import 'validation_engine.dart';
           import 'coming_soon.dart';
 
           class DashboardScreen extends StatelessWidget {
@@ -177,9 +222,9 @@ jobs:
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
                   children: [
-                    _tile(context, 'Post Announcement', Icons.campaign, const AnnouncementsScreen()),
-                    _tile(context, 'Submit Marks', Icons.edit_note, const ComingSoonScreen(featureName: 'Marks Submission')),
-                    _tile(context, 'Generate Reports', Icons.description, const ComingSoonScreen(featureName: 'Report Generation')),
+                    _tile(context, 'Broadcast', Icons.campaign, const AnnouncementsScreen()),
+                    _tile(context, 'Marks Submission', Icons.edit_note, const MarksSubmissionScreen()),
+                    _tile(context, 'Validation Engine', Icons.checklist, const ValidationEngineScreen()),
                     _tile(context, 'Release Reports', Icons.lock_open,
                       isRelease ? const ComingSoonScreen(featureName: 'Release Reports') : const ComingSoonScreen(featureName: 'Release Admin Only')),
                     _tile(context, 'Fee Management', Icons.payments, const ComingSoonScreen(featureName: 'Fee Management')),
@@ -203,7 +248,7 @@ jobs:
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(icon, size: 40, color: const Color(0xFFCC0000)),
+                      Icon(icon, size: 40, color: const Color(0xFF0A3D91)),
                       const SizedBox(height: 12),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -216,9 +261,9 @@ jobs:
               );
             }
           }
-          EOF
+          DASH
 
-          cat > admin_app/lib/screens/announcements.dart << 'EOF'
+          cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
           import 'package:flutter/material.dart';
 
           class AnnouncementsScreen extends StatefulWidget {
@@ -231,10 +276,11 @@ jobs:
             final _title = TextEditingController();
             final _body = TextEditingController();
             String _audience = 'Whole School';
+            String _animationType = 'Normal';
 
             void _post() {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Posted to $_audience')));
+                SnackBar(content: Text('Broadcast sent to $_audience with $_animationType animation')));
               _title.clear();
               _body.clear();
             }
@@ -242,20 +288,16 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Post Announcement')),
+                appBar: AppBar(title: const Text('Broadcast Announcement')),
                 body: Padding(
                   padding: const EdgeInsets.all(16),
                   child: ListView(
                     children: [
-                      TextField(controller: _title,
-                        decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                      TextField(controller: _body, maxLines: 5,
-                        decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
+                      const Text('Audience Selection', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         value: _audience,
-                        decoration: const InputDecoration(labelText: 'Audience', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(border: OutlineInputBorder()),
                         items: const [
                           DropdownMenuItem(value: 'Whole School', child: Text('Whole School')),
                           DropdownMenuItem(value: 'Senior Four', child: Text('Senior Four')),
@@ -266,15 +308,34 @@ jobs:
                         ],
                         onChanged: (v) => setState(() => _audience = v!),
                       ),
+                      const SizedBox(height: 16),
+                      const Text('Animation Picker', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _animationType,
+                        decoration: const InputDecoration(border: OutlineInputBorder()),
+                        items: const [
+                          DropdownMenuItem(value: 'Normal', child: Text('Normal (Slide-in)')),
+                          DropdownMenuItem(value: 'Urgent', child: Text('Urgent (Red Pulse)')),
+                          DropdownMenuItem(value: 'Celebration', child: Text('Celebration (Confetti)')),
+                        ],
+                        onChanged: (v) => setState(() => _animationType = v!),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(controller: _title,
+                        decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
+                      const SizedBox(height: 12),
+                      TextField(controller: _body, maxLines: 4,
+                        decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFCC0000),
+                          backgroundColor: const Color(0xFF0A3D91),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: _post,
-                        child: const Text('Post to Students', style: TextStyle(fontSize: 18)),
+                        child: const Text('Broadcast Now', style: TextStyle(fontSize: 18)),
                       ),
                     ],
                   ),
@@ -282,9 +343,142 @@ jobs:
               );
             }
           }
-          EOF
+          ANNSCR
 
-          cat > admin_app/lib/screens/coming_soon.dart << 'EOF'
+          cat > admin_app/lib/screens/marks_submission.dart << 'MARKSUB'
+          import 'package:flutter/material.dart';
+
+          class MarksSubmissionScreen extends StatefulWidget {
+            const MarksSubmissionScreen({super.key});
+            @override
+            State<MarksSubmissionScreen> createState() => _MarksSubmissionScreenState();
+          }
+
+          class _MarksSubmissionScreenState extends State<MarksSubmissionScreen> {
+            bool _ocrEnabled = false;
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Teacher Marks Submission')),
+                body: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ListView(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey, style: BorderStyle.solid),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.photo_camera, size: 48, color: Color(0xFF0A3D91)),
+                            const SizedBox(height: 8),
+                            const Text('Photo Upload of Mark Sheet', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            const Text('Tap to upload or take a photo', style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('OCR Auto-Entry', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Switch(value: _ocrEnabled, onChanged: (v) => setState(() => _ocrEnabled = v)),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder())),
+                      const SizedBox(height: 12),
+                      TextField(decoration: const InputDecoration(labelText: 'Class', border: OutlineInputBorder())),
+                      const SizedBox(height: 12),
+                      TextField(decoration: const InputDecoration(labelText: 'Student Name', border: OutlineInputBorder())),
+                      const SizedBox(height: 12),
+                      TextField(decoration: const InputDecoration(labelText: 'Mark (e.g. 78/100)', border: OutlineInputBorder())),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0A3D91),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () {},
+                        child: const Text('Submit Marks', style: TextStyle(fontSize: 18)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+          MARKSUB
+
+          cat > admin_app/lib/screens/validation_engine.dart << 'VALENG'
+          import 'package:flutter/material.dart';
+
+          class ValidationEngineScreen extends StatelessWidget {
+            const ValidationEngineScreen({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Report Validation Engine')),
+                body: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.red[100], borderRadius: BorderRadius.circular(8)),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.error, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('2 Errors Detected', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.warning, color: Colors.orange),
+                          title: const Text('Missing marks: Biology'),
+                          subtitle: const Text('S4 East • 5 students missing'),
+                          trailing: const Icon(Icons.chevron_right),
+                        ),
+                      ),
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.warning, color: Colors.orange),
+                          title: const Text('Mark 150 exceeds 100'),
+                          subtitle: const Text('Student: Kato J. • Mathematics • Row 12'),
+                          trailing: const Icon(Icons.chevron_right),
+                        ),
+                      ),
+                      const Spacer(),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0A3D91),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          onPressed: () {},
+                          child: const Text('Batch Generate Reports', style: TextStyle(fontSize: 18)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+          VALENG
+
+          cat > admin_app/lib/screens/coming_soon.dart << 'CS'
           import 'package:flutter/material.dart';
 
           class ComingSoonScreen extends StatelessWidget {
@@ -303,7 +497,7 @@ jobs:
                       children: [
                         const Text('Coming Soon',
                           style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold,
-                            color: Color(0xFFCC0000))),
+                            color: Color(0xFF0A3D91))),
                         const SizedBox(height: 12),
                         Text('$featureName is coming soon for Platinum Secondary School Kiteezi.',
                           textAlign: TextAlign.center,
@@ -311,7 +505,7 @@ jobs:
                         const SizedBox(height: 24),
                         const Text('Excellence Is Our Culture',
                           style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic,
-                            color: Color(0xFFCC0000))),
+                            color: Color(0xFF0A3D91))),
                       ],
                     ),
                   ),
@@ -319,7 +513,7 @@ jobs:
               );
             }
           }
-          EOF
+          CS
 
       - name: Build Admin APK
         run: |
@@ -352,8 +546,23 @@ jobs:
 
       - name: Generate Shared and Student Code
         run: |
+          # Smartly find the uploaded logo in the root directory
+          mkdir -p student_app/assets
+          LOGO_SOURCE=$(find . -maxdepth 1 -name "InShot*.png" | head -n 1)
+          if [ -z "$LOGO_SOURCE" ]; then
+            LOGO_SOURCE=$(find . -maxdepth 1 -name "*.png" | head -n 1)
+          fi
+
+          if [ -n "$LOGO_SOURCE" ]; then
+            echo "Found logo source: $LOGO_SOURCE"
+            cp "$LOGO_SOURCE" student_app/assets/logo.png
+          else
+            echo "Warning: No logo found. Using placeholder."
+            echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
+          fi
+
           mkdir -p shared/lib/models
-          cat > shared/pubspec.yaml << 'EOF'
+          cat > shared/pubspec.yaml << 'SHAREDPUB'
           name: shared
           description: Shared
           version: 1.0.0
@@ -361,12 +570,32 @@ jobs:
             sdk: ">=3.0.0 <4.0.0"
           dependencies:
             crypto: ^3.0.3
-          EOF
+          SHAREDPUB
+
+          cat > shared/lib/announcement.dart << 'ANN'
+          class Announcement {
+            final String id;
+            final String title;
+            final String body;
+            final String audience;
+            final String animationType;
+            final DateTime createdAt;
+            Announcement({
+              required this.id,
+              required this.title,
+              required this.body,
+              required this.audience,
+              required this.animationType,
+              required this.createdAt,
+            });
+          }
+          ANN
 
           flutter create --org com.platinum --project-name student_app student_app
           mkdir -p student_app/lib/screens
+          mkdir -p student_app/lib/services
 
-          cat > student_app/pubspec.yaml << 'EOF'
+          cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
           description: Platinum Student
           version: 1.0.0+1
@@ -377,13 +606,66 @@ jobs:
               sdk: flutter
             shared:
               path: ../shared
+            sqflite: ^2.3.0
+            path: ^1.8.3
+            confetti: ^0.7.0
+            intl: ^0.19.0
           flutter:
             uses-material-design: true
-          EOF
+            assets:
+              - assets/
+          STUPUB
 
-          cat > student_app/lib/main.dart << 'EOF'
+          cat > student_app/lib/services/database_helper.dart << 'DBHELP'
+          import 'package:sqflite/sqflite.dart';
+          import 'package:path/path.dart';
+
+          class DatabaseHelper {
+            static final DatabaseHelper instance = DatabaseHelper._init();
+            static Database? _database;
+
+            DatabaseHelper._init();
+
+            Future<Database> get database async {
+              if (_database != null) return _database!;
+              _database = await _initDB('platinum_student.db');
+              return _database!;
+            }
+
+            Future<Database> _initDB(String filePath) async {
+              final dbPath = await getDatabasesPath();
+              final path = join(dbPath, filePath);
+              return await openDatabase(path, version: 1, onCreate: _createDB);
+            }
+
+            Future _createDB(Database db, int version) async {
+              await db.execute('''
+                CREATE TABLE students (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  fullName TEXT NOT NULL,
+                  classLevel TEXT NOT NULL,
+                  registeredAt TEXT NOT NULL
+                )
+              ''');
+              await db.execute('''
+                CREATE TABLE announcements (
+                  id TEXT PRIMARY KEY,
+                  title TEXT NOT NULL,
+                  body TEXT NOT NULL,
+                  audience TEXT NOT NULL,
+                  animationType TEXT NOT NULL,
+                  createdAt TEXT NOT NULL
+                )
+              ''');
+            }
+          }
+          DBHELP
+
+          cat > student_app/lib/main.dart << 'STUMAIN'
           import 'package:flutter/material.dart';
+          import 'screens/registration.dart';
           import 'screens/home.dart';
+          import 'services/database_helper.dart';
 
           void main() => runApp(const PlatinumStudentApp());
 
@@ -395,19 +677,149 @@ jobs:
                 title: 'Platinum Digital App',
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData(
-                  primaryColor: const Color(0xFFCC0000),
+                  primaryColor: const Color(0xFF0A3D91),
                   appBarTheme: const AppBarTheme(
-                    backgroundColor: Color(0xFFCC0000),
+                    backgroundColor: Color(0xFF0A3D91),
                     foregroundColor: Colors.white,
                   ),
                 ),
-                home: const HomeScreen(),
+                home: const StartupScreen(),
               );
             }
           }
-          EOF
 
-          cat > student_app/lib/screens/home.dart << 'EOF'
+          class StartupScreen extends StatefulWidget {
+            const StartupScreen({super.key});
+            @override
+            State<StartupScreen> createState() => _StartupScreenState();
+          }
+
+          class _StartupScreenState extends State<StartupScreen> {
+            @override
+            void initState() {
+              super.initState();
+              _checkRegistration();
+            }
+
+            Future<void> _checkRegistration() async {
+              final db = await DatabaseHelper.instance.database;
+              final result = await db.query('students', limit: 1);
+              if (mounted) {
+                if (result.isEmpty) {
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RegistrationScreen()));
+                } else {
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+                }
+              }
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
+          }
+          STUMAIN
+
+          cat > student_app/lib/screens/registration.dart << 'REG'
+          import 'package:flutter/material.dart';
+          import '../services/database_helper.dart';
+          import 'home.dart';
+
+          class RegistrationScreen extends StatefulWidget {
+            const RegistrationScreen({super.key});
+            @override
+            State<RegistrationScreen> createState() => _RegistrationScreenState();
+          }
+
+          class _RegistrationScreenState extends State<RegistrationScreen> {
+            final _nameController = TextEditingController();
+            String _selectedClass = 'S1';
+
+            void _register() async {
+              if (_nameController.text.isEmpty) return;
+              final db = await DatabaseHelper.instance.database;
+              await db.insert('students', {
+                'fullName': _nameController.text,
+                'classLevel': _selectedClass,
+                'registeredAt': DateTime.now().toIso8601String(),
+              });
+              if (mounted) {
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+              }
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: const Color(0xFFF5F7FA),
+                body: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        Center(
+                          child: Column(
+                            children: [
+                              Image.asset('assets/logo.png', height: 100, width: 100, fit: BoxFit.contain),
+                              const SizedBox(height: 16),
+                              const Text('Student Registration',
+                                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
+                              const SizedBox(height: 8),
+                              Text('Platinum Secondary School Kiteezi', style: TextStyle(color: Colors.grey[600])),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                        const Text('Full Name', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _nameController,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. Nambi Aisha',
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text('Class', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: _selectedClass,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          items: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                          onChanged: (v) => setState(() => _selectedClass = v!),
+                        ),
+                        const Spacer(),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0A3D91),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: _register,
+                            child: const Text('Register & Continue', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+          REG
+
+          cat > student_app/lib/screens/home.dart << 'HOME'
           import 'package:flutter/material.dart';
           import 'announcements.dart';
           import 'reports.dart';
@@ -438,7 +850,7 @@ jobs:
                 bottomNavigationBar: BottomNavigationBar(
                   currentIndex: _index,
                   onTap: (i) => setState(() => _index = i),
-                  selectedItemColor: const Color(0xFFCC0000),
+                  selectedItemColor: const Color(0xFF0A3D91),
                   unselectedItemColor: Colors.grey,
                   type: BottomNavigationBarType.fixed,
                   items: const [
@@ -452,45 +864,45 @@ jobs:
               );
             }
           }
-          EOF
+          HOME
 
-          cat > student_app/lib/screens/announcements.dart << 'EOF'
+          cat > student_app/lib/screens/announcements.dart << 'SAN'
           import 'package:flutter/material.dart';
 
           class AnnouncementsScreen extends StatelessWidget {
             const AnnouncementsScreen({super.key});
             static const _messages = [
-              {'title': 'Welcome to Platinum Digital App',
-               'body': 'This app is your official school communication tool.',
-               'time': 'Just now'},
-              {'title': 'Sports Day Friday',
-               'body': 'All students report to the main field at 8am.',
-               'time': '2 hours ago'},
-              {'title': 'Exams Begin',
-               'body': 'End of term exams begin next Monday.',
-               'time': '1 day ago'},
+              {'title': 'Urgent: Assembly at 8:30am', 'body': 'Bring sports kit tomorrow.', 'audience': 'S4', 'animation': 'Urgent'},
+              {'title': 'Term 2 Reports Released', 'body': 'Tap to unlock with your secret code.', 'audience': 'Whole School', 'animation': 'Celebration'},
+              {'title': 'Holiday: Independence Day', 'body': '9th Oct, No classes.', 'audience': 'Whole School', 'animation': 'Normal'},
             ];
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Platinum Digital App')),
+                appBar: AppBar(title: const Text('Home Feed')),
                 body: ListView.builder(
                   padding: const EdgeInsets.all(12),
                   itemCount: _messages.length,
                   itemBuilder: (_, i) {
                     final m = _messages[i];
+                    final isUrgent = m['animation'] == 'Urgent';
+                    final isCelebration = m['animation'] == 'Celebration';
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
+                      color: isUrgent ? Colors.red[50] : (isCelebration ? Colors.amber[50] : Colors.white),
                       child: ListTile(
-                        leading: const Icon(Icons.campaign, color: Color(0xFFCC0000)),
+                        leading: Icon(
+                          isUrgent ? Icons.warning : (isCelebration ? Icons.star : Icons.campaign),
+                          color: isUrgent ? Colors.red : (isCelebration ? Colors.amber[700] : const Color(0xFF0A3D91)),
+                        ),
                         title: Text(m['title']!, style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(m['body']!),
                             const SizedBox(height: 4),
-                            Text(m['time']!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text('${m['audience']} • 2 mins ago', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                           ],
                         ),
                       ),
@@ -500,9 +912,9 @@ jobs:
               );
             }
           }
-          EOF
+          SAN
 
-          cat > student_app/lib/screens/reports.dart << 'EOF'
+          cat > student_app/lib/screens/reports.dart << 'REP'
           import 'package:flutter/material.dart';
 
           class ReportsScreen extends StatefulWidget {
@@ -526,28 +938,24 @@ jobs:
                 body: Padding(
                   padding: const EdgeInsets.all(16),
                   child: _unlocked
-                    ? const Center(child: Text('Report loaded! (Coming soon)',
-                        textAlign: TextAlign.center, style: TextStyle(fontSize: 18)))
+                    ? const Center(child: Text('Report loaded! (Coming soon)', textAlign: TextAlign.center, style: TextStyle(fontSize: 18)))
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.lock, size: 64, color: Color(0xFFCC0000)),
+                          const Icon(Icons.lock, size: 64, color: Color(0xFF0A3D91)),
                           const SizedBox(height: 16),
-                          const Text('Reports Released',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          const Text('Reports Released', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
-                          const Text('Enter your secret code',
-                            style: TextStyle(color: Colors.grey)),
+                          const Text('Enter your secret code', style: TextStyle(color: Colors.grey)),
                           const SizedBox(height: 24),
                           TextField(controller: _code,
-                            decoration: const InputDecoration(labelText: 'Secret Code',
-                              border: OutlineInputBorder()),
+                            decoration: const InputDecoration(labelText: 'Secret Code', border: OutlineInputBorder()),
                             textAlign: TextAlign.center,
                             style: const TextStyle(fontSize: 24, letterSpacing: 8)),
                           const SizedBox(height: 24),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFCC0000),
+                              backgroundColor: const Color(0xFF0A3D91),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
                             ),
@@ -560,9 +968,9 @@ jobs:
               );
             }
           }
-          EOF
+          REP
 
-          cat > student_app/lib/screens/chat.dart << 'EOF'
+          cat > student_app/lib/screens/chat.dart << 'CHAT'
           import 'package:flutter/material.dart';
 
           class ChatScreen extends StatelessWidget {
@@ -570,29 +978,61 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Chat')),
-                body: ListView(
-                  children: const [
-                    ListTile(
-                      leading: CircleAvatar(child: Icon(Icons.groups)),
-                      title: Text('Senior Four Group'),
-                      subtitle: Text('12 new messages'),
-                      trailing: Icon(Icons.chevron_right),
+                appBar: AppBar(title: const Text('S4 Group'), actions: [
+                  TextButton(onPressed: () {}, child: const Text('Block', style: TextStyle(color: Colors.white))),
+                  TextButton(onPressed: () {}, child: const Text('Report', style: TextStyle(color: Colors.red))),
+                ]),
+                body: Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.all(12),
+                        children: [
+                          _msg('Mr. Okello (Teacher)', 'Good morning S4 — remember science revision at 4pm in Lab 2', true),
+                          _msg('Trevor', 'Noted sir, will be there 👍', false),
+                          _msg('Grace', 'Can someone share notes for History?', false),
+                        ],
+                      ),
                     ),
-                    ListTile(
-                      leading: CircleAvatar(child: Icon(Icons.groups)),
-                      title: Text('Whole School'),
-                      subtitle: Text('3 new messages'),
-                      trailing: Icon(Icons.chevron_right),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        children: [
+                          Expanded(child: TextField(decoration: InputDecoration(hintText: 'Message S4 Group...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24))))),
+                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF0A3D91)), onPressed: () {}),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               );
             }
-          }
-          EOF
 
-          cat > student_app/lib/screens/clubs.dart << 'EOF'
+            Widget _msg(String name, String text, bool isTeacher) {
+              return Align(
+                alignment: isTeacher ? Alignment.centerLeft : Alignment.centerRight,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isTeacher ? Colors.blue[50] : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: isTeacher ? Color(0xFF0A3D91) : Colors.black54)),
+                      const SizedBox(height: 4),
+                      Text(text),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+          CHAT
+
+          cat > student_app/lib/screens/clubs.dart << 'CLUBS'
           import 'package:flutter/material.dart';
 
           class ClubsScreen extends StatelessWidget {
@@ -602,33 +1042,45 @@ jobs:
               return Scaffold(
                 appBar: AppBar(title: const Text('Clubs')),
                 body: ListView(
+                  padding: const EdgeInsets.all(12),
                   children: const [
-                    ListTile(
-                      leading: CircleAvatar(child: Icon(Icons.edit)),
-                      title: Text('Writers Club'),
-                      subtitle: Text('3 new announcements'),
-                      trailing: Icon(Icons.chevron_right),
-                    ),
-                    ListTile(
-                      leading: CircleAvatar(child: Icon(Icons.mic)),
-                      title: Text('Debate Club'),
-                      subtitle: Text('1 new announcement'),
-                      trailing: Icon(Icons.chevron_right),
-                    ),
-                    ListTile(
-                      leading: CircleAvatar(child: Icon(Icons.science)),
-                      title: Text('Science Club'),
-                      subtitle: Text('No new announcements'),
-                      trailing: Icon(Icons.chevron_right),
-                    ),
+                    _ClubTile(name: 'Writers Club', desc: 'Poetry • Stories • Monthly challenge', icon: Icons.edit, subscribed: true),
+                    _ClubTile(name: 'Debate Club', desc: 'Thurs 4pm • Public speaking', icon: Icons.mic, subscribed: false),
+                    _ClubTile(name: 'Science Club', desc: 'Lab Projects • STEM', icon: Icons.science, subscribed: false),
                   ],
                 ),
               );
             }
           }
-          EOF
 
-          cat > student_app/lib/screens/coming_soon.dart << 'EOF'
+          class _ClubTile extends StatelessWidget {
+            final String name, desc;
+            final IconData icon;
+            final bool subscribed;
+            const _ClubTile({required this.name, required this.desc, required this.icon, required this.subscribed});
+            @override
+            Widget build(BuildContext context) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: CircleAvatar(backgroundColor: const Color(0xFF0A3D91), child: Icon(icon, color: Colors.white)),
+                  title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(desc),
+                  trailing: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: subscribed ? Colors.grey[300] : const Color(0xFF0A3D91),
+                      foregroundColor: subscribed ? Colors.black : Colors.white,
+                    ),
+                    onPressed: () {},
+                    child: Text(subscribed ? 'Subscribed' : '+ Subscribe'),
+                  ),
+                ),
+              );
+            }
+          }
+          CLUBS
+
+          cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
           import 'package:flutter/material.dart';
 
           class ComingSoonScreen extends StatelessWidget {
@@ -646,16 +1098,13 @@ jobs:
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text('Coming Soon',
-                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold,
-                            color: Color(0xFFCC0000))),
+                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
                         const SizedBox(height: 12),
                         Text('$featureName is coming soon for Platinum Secondary School Kiteezi.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 16, color: Colors.black54)),
+                          textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Colors.black54)),
                         const SizedBox(height: 24),
                         const Text('Excellence Is Our Culture',
-                          style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic,
-                            color: Color(0xFFCC0000))),
+                          style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Color(0xFF0A3D91))),
                       ],
                     ),
                   ),
@@ -663,7 +1112,7 @@ jobs:
               );
             }
           }
-          EOF
+          CSSTU
 
       - name: Build Student APK
         run: |
