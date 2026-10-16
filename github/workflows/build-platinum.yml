@@ -23,39 +23,35 @@ jobs:
 
       - name: Generate all code
         run: |
-          set -e
+          # Create base Flutter projects first
+          flutter create --org com.platinum --project-name admin_app admin_app
+          flutter create --org com.platinum --project-name student_app student_app
 
-          # Create shared package
-          mkdir -p shared/lib/models
-          cat > shared/pubspec.yaml << 'SHAREDPUB'
-          name: shared
+          # Run Python script to generate all custom files
+          python3 -c "
+          import os
+
+          files = {
+              'shared/pubspec.yaml': '''name: shared
           description: Shared
           version: 1.0.0
           environment:
-            sdk: ">=3.0.0 <4.0.0"
+            sdk: \">=3.0.0 <4.0.0\"
           dependencies:
             crypto: ^3.0.3
-          SHAREDPUB
-
-          cat > shared/lib/announcement.dart << 'ANN'
-          class Announcement {
+          ''',
+              'shared/lib/announcement.dart': '''class Announcement {
             final String id;
             final String title;
             final String body;
             Announcement({required this.id, required this.title, required this.body});
           }
-          ANN
-
-          # Create Admin App
-          flutter create --org com.platinum --project-name admin_app admin_app
-          mkdir -p admin_app/lib/screens
-
-          cat > admin_app/pubspec.yaml << 'ADMINPUB'
-          name: admin_app
+          ''',
+              'admin_app/pubspec.yaml': '''name: admin_app
           description: Platinum Admin
           version: 1.0.0+1
           environment:
-            sdk: ">=3.0.0 <4.0.0"
+            sdk: \">=3.0.0 <4.0.0\"
           dependencies:
             flutter:
               sdk: flutter
@@ -63,10 +59,8 @@ jobs:
               path: ../shared
           flutter:
             uses-material-design: true
-          ADMINPUB
-
-          cat > admin_app/lib/main.dart << 'ADMINMAIN'
-          import 'package:flutter/material.dart';
+          ''',
+              'admin_app/lib/main.dart': '''import 'package:flutter/material.dart';
           import 'screens/login.dart';
 
           void main() => runApp(const PlatinumAdminApp());
@@ -89,10 +83,8 @@ jobs:
               );
             }
           }
-          ADMINMAIN
-
-          cat > admin_app/lib/screens/login.dart << 'LOGIN'
-          import 'package:flutter/material.dart';
+          ''',
+              'admin_app/lib/screens/login.dart': '''import 'package:flutter/material.dart';
           import 'dashboard.dart';
 
           class LoginScreen extends StatefulWidget {
@@ -165,10 +157,8 @@ jobs:
               );
             }
           }
-          LOGIN
-
-          cat > admin_app/lib/screens/dashboard.dart << 'DASH'
-          import 'package:flutter/material.dart';
+          ''',
+              'admin_app/lib/screens/dashboard.dart': '''import 'package:flutter/material.dart';
           import 'announcements.dart';
           import 'coming_soon.dart';
 
@@ -228,10 +218,8 @@ jobs:
               );
             }
           }
-          DASH
-
-          cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
-          import 'package:flutter/material.dart';
+          ''',
+              'admin_app/lib/screens/announcements.dart': '''import 'package:flutter/material.dart';
 
           class AnnouncementsScreen extends StatefulWidget {
             const AnnouncementsScreen({super.key});
@@ -294,10 +282,8 @@ jobs:
               );
             }
           }
-          ANNSCR
-
-          cat > admin_app/lib/screens/coming_soon.dart << 'CS'
-          import 'package:flutter/material.dart';
+          ''',
+              'admin_app/lib/screens/coming_soon.dart': '''import 'package:flutter/material.dart';
 
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -331,18 +317,12 @@ jobs:
               );
             }
           }
-          CS
-
-          # Create Student App
-          flutter create --org com.platinum --project-name student_app student_app
-          mkdir -p student_app/lib/screens
-
-          cat > student_app/pubspec.yaml << 'STUPUB'
-          name: student_app
+          ''',
+              'student_app/pubspec.yaml': '''name: student_app
           description: Platinum Student
           version: 1.0.0+1
           environment:
-            sdk: ">=3.0.0 <4.0.0"
+            sdk: \">=3.0.0 <4.0.0\"
           dependencies:
             flutter:
               sdk: flutter
@@ -350,10 +330,8 @@ jobs:
               path: ../shared
           flutter:
             uses-material-design: true
-          STUPUB
-
-          cat > student_app/lib/main.dart << 'STUMAIN'
-          import 'package:flutter/material.dart';
+          ''',
+              'student_app/lib/main.dart': '''import 'package:flutter/material.dart';
           import 'screens/home.dart';
 
           void main() => runApp(const PlatinumStudentApp());
@@ -376,10 +354,8 @@ jobs:
               );
             }
           }
-          STUMAIN
-
-          cat > student_app/lib/screens/home.dart << 'HOME'
-          import 'package:flutter/material.dart';
+          ''',
+              'student_app/lib/screens/home.dart': '''import 'package:flutter/material.dart';
           import 'announcements.dart';
           import 'reports.dart';
           import 'chat.dart';
@@ -423,10 +399,8 @@ jobs:
               );
             }
           }
-          HOME
-
-          cat > student_app/lib/screens/announcements.dart << 'SAN'
-          import 'package:flutter/material.dart';
+          ''',
+              'student_app/lib/screens/announcements.dart': '''import 'package:flutter/material.dart';
 
           class AnnouncementsScreen extends StatelessWidget {
             const AnnouncementsScreen({super.key});
@@ -471,10 +445,8 @@ jobs:
               );
             }
           }
-          SAN
-
-          cat > student_app/lib/screens/reports.dart << 'REP'
-          import 'package:flutter/material.dart';
+          ''',
+              'student_app/lib/screens/reports.dart': '''import 'package:flutter/material.dart';
 
           class ReportsScreen extends StatefulWidget {
             const ReportsScreen({super.key});
@@ -531,10 +503,8 @@ jobs:
               );
             }
           }
-          REP
-
-          cat > student_app/lib/screens/chat.dart << 'CHAT'
-          import 'package:flutter/material.dart';
+          ''',
+              'student_app/lib/screens/chat.dart': '''import 'package:flutter/material.dart';
 
           class ChatScreen extends StatelessWidget {
             const ChatScreen({super.key});
@@ -561,10 +531,8 @@ jobs:
               );
             }
           }
-          CHAT
-
-          cat > student_app/lib/screens/clubs.dart << 'CLUBS'
-          import 'package:flutter/material.dart';
+          ''',
+              'student_app/lib/screens/clubs.dart': '''import 'package:flutter/material.dart';
 
           class ClubsScreen extends StatelessWidget {
             const ClubsScreen({super.key});
@@ -597,10 +565,8 @@ jobs:
               );
             }
           }
-          CLUBS
-
-          cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
-          import 'package:flutter/material.dart';
+          ''',
+              'student_app/lib/screens/coming_soon.dart': '''import 'package:flutter/material.dart';
 
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -634,9 +600,14 @@ jobs:
               );
             }
           }
-          CSSTU
+          '''
+          }
 
-          echo "===== Code generated ====="
+          for path, content in files.items():
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              with open(path, 'w') as f:
+                  f.write(content.strip() + '\n')
+          "
 
       - name: Build Admin APK
         run: |
