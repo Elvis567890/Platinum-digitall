@@ -28,16 +28,14 @@ jobs:
           flutter create --org com.platinum --project-name student_app student_app
 
           # Run Python script to generate all custom files
-          python3 - << 'PYEOF'
+          python3 -c "
           import os
-
           files = {
-              # Shared Package
               'shared/pubspec.yaml': '''name: shared
           description: Shared
           version: 1.0.0
           environment:
-            sdk: ">=3.0.0 <4.0.0"
+            sdk: \">=3.0.0 <4.0.0\"
           dependencies:
             crypto: ^3.0.3
           ''',
@@ -48,13 +46,11 @@ jobs:
             Announcement({required this.id, required this.title, required this.body});
           }
           ''',
-
-              # Admin App
               'admin_app/pubspec.yaml': '''name: admin_app
           description: Platinum Admin
           version: 1.0.0+1
           environment:
-            sdk: ">=3.0.0 <4.0.0"
+            sdk: \">=3.0.0 <4.0.0\"
           dependencies:
             flutter:
               sdk: flutter
@@ -321,13 +317,11 @@ jobs:
             }
           }
           ''',
-
-              # Student App
               'student_app/pubspec.yaml': '''name: student_app
           description: Platinum Student
           version: 1.0.0+1
           environment:
-            sdk: ">=3.0.0 <4.0.0"
+            sdk: \">=3.0.0 <4.0.0\"
           dependencies:
             flutter:
               sdk: flutter
@@ -607,14 +601,11 @@ jobs:
           }
           '''
           }
-
           for path, content in files.items():
               os.makedirs(os.path.dirname(path), exist_ok=True)
               with open(path, 'w') as f:
                   f.write(content.strip() + '\n')
-          PYEOF
-
-          echo "===== Code generated successfully ====="
+          "
 
       - name: Build Admin APK
         run: |
