@@ -25,9 +25,8 @@ jobs:
         run: |
           set -e
 
+          # Create shared package structure
           mkdir -p shared/lib/models
-          mkdir -p admin_app/lib/screens
-          mkdir -p student_app/lib/screens
 
           cat > shared/pubspec.yaml << 'SHAREDPUB'
           name: shared
@@ -48,7 +47,9 @@ jobs:
           }
           ANN
 
+          # Create Admin App
           flutter create --org com.platinum --project-name admin_app admin_app
+          mkdir -p admin_app/lib/screens
 
           cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
@@ -333,7 +334,9 @@ jobs:
           }
           CS
 
+          # Create Student App
           flutter create --org com.platinum --project-name student_app student_app
+          mkdir -p student_app/lib/screens
 
           cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
