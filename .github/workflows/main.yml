@@ -68,11 +68,11 @@ jobs:
           # 5. UPDATE GRADLE TO 9.3.1
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-9.3.1-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
 
-          # 🔴 6. SET GRADLE PROPERTIES FOR AGP 9.0 COMPATIBILITY 🔴
+          # 6. SET GRADLE PROPERTIES FOR AGP 9.0 COMPATIBILITY
           echo "android.newDsl=false" >> admin_app/android/gradle.properties
           echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
 
-          # 🔴 7. OVERWRITE BUILD.GRADLE.KTS WITH NEW DSL 🔴
+          # 7. OVERWRITE BUILD.GRADLE.KTS WITH SDK 36
           cat > admin_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
@@ -81,7 +81,7 @@ jobs:
 
           configure<com.android.build.api.dsl.ApplicationExtension> {
               namespace = "com.platinum.admin_app"
-              compileSdk = 34
+              compileSdk = 36
               ndkVersion = "27.0.12077973"
 
               lint {
@@ -97,7 +97,7 @@ jobs:
               defaultConfig {
                   applicationId = "com.platinum.admin_app"
                   minSdk = 21
-                  targetSdk = 34
+                  targetSdk = 36
                   versionCode = flutter.versionCode
                   versionName = flutter.versionName
               }
@@ -685,11 +685,11 @@ jobs:
           # 5. UPDATE GRADLE TO 9.3.1
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-9.3.1-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
 
-          # 🔴 6. SET GRADLE PROPERTIES FOR AGP 9.0 COMPATIBILITY 🔴
+          # 6. SET GRADLE PROPERTIES FOR AGP 9.0 COMPATIBILITY
           echo "android.newDsl=false" >> student_app/android/gradle.properties
           echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
 
-          # 🔴 7. OVERWRITE BUILD.GRADLE.KTS WITH NEW DSL 🔴
+          # 7. OVERWRITE BUILD.GRADLE.KTS WITH SDK 36
           cat > student_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
@@ -698,7 +698,7 @@ jobs:
 
           configure<com.android.build.api.dsl.ApplicationExtension> {
               namespace = "com.platinum.student_app"
-              compileSdk = 34
+              compileSdk = 36
               ndkVersion = "27.0.12077973"
 
               lint {
@@ -714,7 +714,7 @@ jobs:
               defaultConfig {
                   applicationId = "com.platinum.student_app"
                   minSdk = 21
-                  targetSdk = 34
+                  targetSdk = 36
                   versionCode = flutter.versionCode
                   versionName = flutter.versionName
               }
