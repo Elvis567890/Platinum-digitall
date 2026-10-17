@@ -89,23 +89,10 @@ jobs:
             uses-material-design: true
             assets:
               - assets/
-          
-          flutter_launcher_icons:
-            android: "launcher_icon"
-            ios: true
-            image_path: "assets/logo.png"
-            min_sdk_android: 21
-          
-          flutter_native_splash:
-            color: "#0A3D91"
-            image: assets/logo.png
-            web: false
-            android_12:
-              image: assets/logo.png
-              color: "#0A3D91"
           ADMINPUB
           fi
 
+          # 4. ADMIN APP SOURCE CODE
           if [ ! -f "admin_app/lib/main.dart" ]; then
             cat > admin_app/lib/main.dart << 'ADMINMAIN'
           import 'package:flutter/material.dart';
@@ -593,13 +580,32 @@ jobs:
           CS
           fi
 
-      # 🔴 FIX: Add dependencies via CLI and run with correct command
       - name: Generate Icons and Splash
         run: |
           cd admin_app
+          # Create dedicated config files to prevent NoConfigFoundException
+          cat > flutter_launcher_icons.yaml << 'ICONS'
+          flutter_launcher_icons:
+            android: "launcher_icon"
+            ios: true
+            image_path: "assets/logo.png"
+            min_sdk_android: 21
+          ICONS
+          
+          cat > flutter_native_splash.yaml << 'SPLASH'
+          flutter_native_splash:
+            color: "#0A3D91"
+            image: assets/logo.png
+            web: false
+            android_12:
+              image: assets/logo.png
+              color: "#0A3D91"
+          SPLASH
+          
+          flutter pub get
           flutter pub add flutter_launcher_icons flutter_native_splash
-          flutter pub run flutter_launcher_icons:main
-          flutter pub run flutter_native_splash:create
+          flutter pub run flutter_launcher_icons:main -f flutter_launcher_icons.yaml
+          flutter pub run flutter_native_splash:create -f flutter_native_splash.yaml
 
       - name: Build Admin APK
         run: |
@@ -671,20 +677,6 @@ jobs:
             uses-material-design: true
             assets:
               - assets/
-
-          flutter_launcher_icons:
-            android: "launcher_icon"
-            ios: true
-            image_path: "assets/logo.png"
-            min_sdk_android: 21
-          
-          flutter_native_splash:
-            color: "#0A3D91"
-            image: assets/logo.png
-            web: false
-            android_12:
-              image: assets/logo.png
-              color: "#0A3D91"
           STUPUB
           fi
 
@@ -1027,13 +1019,32 @@ jobs:
           CSSTU
           fi
 
-      # 🔴 FIX: Add dependencies via CLI and run with correct command
       - name: Generate Icons and Splash
         run: |
           cd student_app
+          # Create dedicated config files to prevent NoConfigFoundException
+          cat > flutter_launcher_icons.yaml << 'ICONS'
+          flutter_launcher_icons:
+            android: "launcher_icon"
+            ios: true
+            image_path: "assets/logo.png"
+            min_sdk_android: 21
+          ICONS
+          
+          cat > flutter_native_splash.yaml << 'SPLASH'
+          flutter_native_splash:
+            color: "#0A3D91"
+            image: assets/logo.png
+            web: false
+            android_12:
+              image: assets/logo.png
+              color: "#0A3D91"
+          SPLASH
+          
+          flutter pub get
           flutter pub add flutter_launcher_icons flutter_native_splash
-          flutter pub run flutter_launcher_icons:main
-          flutter pub run flutter_native_splash:create
+          flutter pub run flutter_launcher_icons:main -f flutter_launcher_icons.yaml
+          flutter pub run flutter_native_splash:create -f flutter_native_splash.yaml
 
       - name: Build Student APK
         run: |
