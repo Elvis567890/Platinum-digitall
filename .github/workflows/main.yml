@@ -583,7 +583,7 @@ jobs:
       - name: Generate Icons and Splash
         run: |
           cd admin_app
-          # Create dedicated config files to prevent NoConfigFoundException
+          # Create dedicated config files
           cat > flutter_launcher_icons.yaml << 'ICONS'
           flutter_launcher_icons:
             android: "launcher_icon"
@@ -604,8 +604,9 @@ jobs:
           
           flutter pub get
           flutter pub add flutter_launcher_icons flutter_native_splash
+          # Corrected commands: use -f only for icons, let native_splash find its default file
           flutter pub run flutter_launcher_icons:main -f flutter_launcher_icons.yaml
-          flutter pub run flutter_native_splash:create -f flutter_native_splash.yaml
+          flutter pub run flutter_native_splash:create
 
       - name: Build Admin APK
         run: |
@@ -1022,7 +1023,7 @@ jobs:
       - name: Generate Icons and Splash
         run: |
           cd student_app
-          # Create dedicated config files to prevent NoConfigFoundException
+          # Create dedicated config files
           cat > flutter_launcher_icons.yaml << 'ICONS'
           flutter_launcher_icons:
             android: "launcher_icon"
@@ -1043,8 +1044,9 @@ jobs:
           
           flutter pub get
           flutter pub add flutter_launcher_icons flutter_native_splash
+          # Corrected commands: use -f only for icons, let native_splash find its default file
           flutter pub run flutter_launcher_icons:main -f flutter_launcher_icons.yaml
-          flutter pub run flutter_native_splash:create -f flutter_native_splash.yaml
+          flutter pub run flutter_native_splash:create
 
       - name: Build Student APK
         run: |
