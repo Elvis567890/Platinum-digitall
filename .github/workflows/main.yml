@@ -593,11 +593,11 @@ jobs:
           CS
           fi
 
+      # 🔴 FIX: Add dependencies via CLI and run with correct command
       - name: Generate Icons and Splash
         run: |
           cd admin_app
-          flutter clean
-          flutter pub get
+          flutter pub add flutter_launcher_icons flutter_native_splash
           flutter pub run flutter_launcher_icons:main
           flutter pub run flutter_native_splash:create
 
@@ -1027,11 +1027,11 @@ jobs:
           CSSTU
           fi
 
+      # 🔴 FIX: Add dependencies via CLI and run with correct command
       - name: Generate Icons and Splash
         run: |
           cd student_app
-          flutter clean
-          flutter pub get
+          flutter pub add flutter_launcher_icons flutter_native_splash
           flutter pub run flutter_launcher_icons:main
           flutter pub run flutter_native_splash:create
 
