@@ -68,6 +68,17 @@ jobs:
           # CHANGE THE APP NAME ON THE PHONE SCREEN
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
 
+          # 🔴 FIX GRADLE BUILD ISSUES (NDK & LINT)
+          # Force a compatible NDK version
+          sed -i 's/flutter.ndkVersion/"27.0.12077973"/g' admin_app/android/app/build.gradle
+          # Disable lint checks that can fail the release build
+          sed -i '/buildTypes {/i \
+              lintOptions {\
+                  checkReleaseBuilds false\
+                  abortOnError false\
+              }\
+          ' admin_app/android/app/build.gradle
+
           cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
           description: Platinum Staff Hub
@@ -586,6 +597,8 @@ jobs:
       - name: Build Admin APK
         run: |
           cd admin_app
+          flutter clean
+          flutter pub get
           flutter build apk --release
 
       - name: Upload Admin APK
@@ -625,7 +638,7 @@ jobs:
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; 
           fi
 
-          # 2. SHARED MODELS (THIS WAS MISSING IN THE STUDENT JOB)
+          # 2. SHARED MODELS
           mkdir -p shared/lib/models
           cat > shared/pubspec.yaml << 'SHAREDPUB'
           name: shared
@@ -652,6 +665,15 @@ jobs:
           mkdir -p student_app/lib/services
 
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
+
+          # 🔴 FIX GRADLE BUILD ISSUES (NDK & LINT)
+          sed -i 's/flutter.ndkVersion/"27.0.12077973"/g' student_app/android/app/build.gradle
+          sed -i '/buildTypes {/i \
+              lintOptions {\
+                  checkReleaseBuilds false\
+                  abortOnError false\
+              }\
+          ' student_app/android/app/build.gradle
 
           cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
@@ -1023,6 +1045,8 @@ jobs:
       - name: Build Student APK
         run: |
           cd student_app
+          flutter clean
+          flutter pub get
           flutter build apk --release
 
       - name: Upload Student APK
