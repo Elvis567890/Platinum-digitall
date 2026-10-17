@@ -12,6 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -30,11 +33,7 @@ jobs:
           
           if [ -n "$LOGO_SOURCE" ] && [ -f "$LOGO_SOURCE" ]; then
             echo "✅ Found school badge: $LOGO_SOURCE"
-            if command -v convert &> /dev/null; then
-              convert "$LOGO_SOURCE" -resize 1024x1024 admin_app/assets/logo.png
-            else
-              cp "$LOGO_SOURCE" admin_app/assets/logo.png
-            fi
+            convert "$LOGO_SOURCE" -resize 1024x1024 admin_app/assets/logo.png
           else 
             echo "⚠️ No badge found. Creating placeholder."
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png; 
@@ -65,15 +64,19 @@ jobs:
           flutter create --org com.platinum --project-name admin_app admin_app
           mkdir -p admin_app/lib/screens
 
-          # CHANGE THE APP NAME ON THE PHONE SCREEN
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
+          
+          # Add INTERNET permission for Admin App
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>' admin_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FORCE GRADLE VERSIONS (Ensure Java 17 Compatibility)
+          # 🔴 FORCE GRADLE VERSIONS
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
           sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' admin_app/android/settings.gradle.kts 2>/dev/null || true
+          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' admin_app/android/settings.gradle.kts 2>/dev/null || true
           sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' admin_app/android/settings.gradle 2>/dev/null || true
+          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' admin_app/android/settings.gradle 2>/dev/null || true
 
-          # 🔴 WRITE A CLEAN build.gradle.kts FROM SCRATCH
+          # 🔴 WRITE A CLEAN build.gradle.kts FROM SCRATCH (No hardcoded NDK)
           cat > admin_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
@@ -84,12 +87,6 @@ jobs:
           android {
               namespace = "com.platinum.admin_app"
               compileSdk = 34
-              ndkVersion = "27.0.12077973"
-
-              lint {
-                  checkReleaseBuilds = false
-                  abortOnError = false
-              }
 
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -132,7 +129,7 @@ jobs:
             shared:
               path: ../shared
             intl: ^0.19.0
-            image_picker: ^1.0.7
+            image_picker: ^1.1.2
           dev_dependencies:
             flutter_launcher_icons: "^0.13.1"
             flutter_native_splash: "^2.4.0"
@@ -646,10 +643,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
+          
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -662,11 +664,7 @@ jobs:
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
           
           if [ -n "$LOGO_SOURCE" ] && [ -f "$LOGO_SOURCE" ]; then
-            if command -v convert &> /dev/null; then
-              convert "$LOGO_SOURCE" -resize 1024x1024 student_app/assets/logo.png
-            else
-              cp "$LOGO_SOURCE" student_app/assets/logo.png
-            fi
+            convert "$LOGO_SOURCE" -resize 1024x1024 student_app/assets/logo.png
           else 
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; 
           fi
@@ -698,13 +696,18 @@ jobs:
           mkdir -p student_app/lib/services
 
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
+          
+          # 🔴 ADD INTERNET PERMISSION (Needed for http and url_launcher)
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>' student_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FORCE GRADLE VERSIONS (Ensure Java 17 Compatibility)
+          # 🔴 FORCE GRADLE AND KOTLIN VERSIONS (Ensure Java 17 & AGP 8 Compatibility)
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' student_app/android/settings.gradle.kts 2>/dev/null || true
+          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' student_app/android/settings.gradle.kts 2>/dev/null || true
           sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' student_app/android/settings.gradle 2>/dev/null || true
+          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' student_app/android/settings.gradle 2>/dev/null || true
 
-          # 🔴 WRITE A CLEAN build.gradle.kts FROM SCRATCH
+          # 🔴 WRITE A CLEAN build.gradle.kts FROM SCRATCH (Removed hardcoded NDK)
           cat > student_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
@@ -715,12 +718,6 @@ jobs:
           android {
               namespace = "com.platinum.student_app"
               compileSdk = 34
-              ndkVersion = "27.0.12077973"
-
-              lint {
-                  checkReleaseBuilds = false
-                  abortOnError = false
-              }
 
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -751,6 +748,7 @@ jobs:
           }
           GRADLEKTS
 
+          # 🔴 UPDATED PLUGINS TO LATEST VERSIONS (Fixes AGP 8 namespace issues)
           cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
           description: Platinum Digital App
@@ -762,11 +760,11 @@ jobs:
               sdk: flutter
             shared:
               path: ../shared
-            sqflite: ^2.3.0
-            path: ^1.8.3
-            package_info_plus: ^5.0.1
-            http: ^1.2.0
-            url_launcher: ^6.2.5
+            sqflite: ^2.3.3+1
+            path: ^1.9.0
+            package_info_plus: ^8.0.0
+            http: ^1.2.1
+            url_launcher: ^6.3.0
           dev_dependencies:
             flutter_launcher_icons: "^0.13.1"
             flutter_native_splash: "^2.4.0"
