@@ -39,19 +39,36 @@ jobs:
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png; 
           fi
 
-          # 2. CREATE PROJECT
+          # 2. CREATE SHARED PACKAGE
+          mkdir -p shared/lib
+          cat > shared/pubspec.yaml << 'SHAREDPUB'
+          name: shared
+          description: Shared
+          version: 1.0.0
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+          SHAREDPUB
+
+          cat > shared/lib/club.dart << 'CLUB'
+          class Club {
+            final String id;
+            final String name;
+            String? headStudentName; 
+            Club({required this.id, required this.name, this.headStudentName});
+          }
+          CLUB
+
+          # 3. CREATE PROJECT
           flutter create --org com.platinum --project-name admin_app admin_app
 
-          # 3. CONFIGURE APP NAME AND INTERNET
+          # 4. CONFIGURE APP NAME AND INTERNET
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>' admin_app/android/app/src/main/AndroidManifest.xml
 
-          # 4. FORCE GRADLE AND KOTLIN VERSIONS
-          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.5-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
-          sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' admin_app/android/settings.gradle.kts 2>/dev/null || true
-          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' admin_app/android/settings.gradle.kts 2>/dev/null || true
+          # 5. UPDATE GRADLE TO 9.3.1 (REQUIRED FOR AGP 9.x)
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-9.3.1-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
 
-          # 🔴 5. OVERWRITE BUILD.GRADLE.KTS TO FORCE NDK & SDK 🔴
+          # 6. OVERWRITE BUILD.GRADLE.KTS TO FORCE NDK & SDK
           cat > admin_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
@@ -98,12 +115,13 @@ jobs:
           }
           GRADLEKTS
 
-          # 6. ADD DEPENDENCIES
+          # 7. ADD DEPENDENCIES (INCLUDING SHARED)
           cd admin_app
           flutter pub add intl image_picker
+          flutter pub add --path ../shared shared
           flutter pub add --dev flutter_launcher_icons flutter_native_splash
 
-          # 7. WRITE ICON & SPLASH CONFIG
+          # 8. WRITE ICON & SPLASH CONFIG
           cat >> pubspec.yaml << 'ADMINPUB'
 
           flutter_launcher_icons:
@@ -121,7 +139,7 @@ jobs:
               color: "#0A3D91"
           ADMINPUB
 
-          # 8. WRITE DART CODE
+          # 9. WRITE DART CODE
           mkdir -p lib/screens
           cat > lib/main.dart << 'ADMINMAIN'
           import 'package:flutter/material.dart';
@@ -638,20 +656,37 @@ jobs:
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; 
           fi
 
-          # 2. CREATE PROJECT
+          # 2. CREATE SHARED PACKAGE (Required for shared folder structure)
+          mkdir -p shared/lib
+          cat > shared/pubspec.yaml << 'SHAREDPUB'
+          name: shared
+          description: Shared
+          version: 1.0.0
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+          SHAREDPUB
+
+          cat > shared/lib/club.dart << 'CLUB'
+          class Club {
+            final String id;
+            final String name;
+            String? headStudentName; 
+            Club({required this.id, required this.name, this.headStudentName});
+          }
+          CLUB
+
+          # 3. CREATE PROJECT
           flutter create --org com.platinum --project-name student_app student_app
           mkdir -p student_app/lib/services
 
-          # 3. CONFIGURE APP NAME AND INTERNET
+          # 4. CONFIGURE APP NAME AND INTERNET
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>' student_app/android/app/src/main/AndroidManifest.xml
 
-          # 4. FORCE GRADLE AND KOTLIN VERSIONS
-          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.5-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
-          sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' student_app/android/settings.gradle.kts 2>/dev/null || true
-          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' student_app/android/settings.gradle.kts 2>/dev/null || true
+          # 5. UPDATE GRADLE TO 9.3.1 (REQUIRED FOR AGP 9.x)
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-9.3.1-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
 
-          # 🔴 5. OVERWRITE BUILD.GRADLE.KTS TO FORCE NDK & SDK 🔴
+          # 6. OVERWRITE BUILD.GRADLE.KTS TO FORCE NDK & SDK
           cat > student_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
@@ -698,12 +733,12 @@ jobs:
           }
           GRADLEKTS
 
-          # 6. ADD DEPENDENCIES
+          # 7. ADD DEPENDENCIES
           cd student_app
           flutter pub add sqflite path package_info_plus http url_launcher
           flutter pub add --dev flutter_launcher_icons flutter_native_splash
 
-          # 7. WRITE ICON & SPLASH CONFIG
+          # 8. WRITE ICON & SPLASH CONFIG
           cat >> pubspec.yaml << 'STUPUB'
 
           flutter_launcher_icons:
@@ -721,7 +756,7 @@ jobs:
               color: "#0A3D91"
           STUPUB
 
-          # 8. WRITE DART CODE
+          # 9. WRITE DART CODE
           mkdir -p lib/screens
           cat > lib/services/database_helper.dart << 'DBHELP'
           import 'package:sqflite/sqflite.dart';
