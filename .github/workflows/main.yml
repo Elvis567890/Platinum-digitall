@@ -30,14 +30,16 @@ jobs:
           if [ -z "$LOGO_SOURCE" ]; then LOGO_SOURCE=$(find . -maxdepth 1 -iname "*.png" | head -n 1); fi
           if [ -n "$LOGO_SOURCE" ]; then 
             cp "$LOGO_SOURCE" admin_app/assets/logo.png;
-            echo "Found badge: $LOGO_SOURCE and copied to assets!"
+            echo "✅ Found school badge: $LOGO_SOURCE and copied to assets!"
           else 
+            echo "⚠️ No badge found. Using placeholder."
             echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png; 
           fi
 
           # 2. SHARED MODELS
           mkdir -p shared/lib/models
-          cat > shared/pubspec.yaml << 'SHAREDPUB'
+          if [ ! -f "shared/pubspec.yaml" ]; then
+            cat > shared/pubspec.yaml << 'SHAREDPUB'
           name: shared
           description: Shared
           version: 1.0.0
@@ -46,8 +48,10 @@ jobs:
           dependencies:
             crypto: ^3.0.3
           SHAREDPUB
+          fi
 
-          cat > shared/lib/club.dart << 'CLUB'
+          if [ ! -f "shared/lib/club.dart" ]; then
+            cat > shared/lib/club.dart << 'CLUB'
           class Club {
             final String id;
             final String name;
@@ -55,6 +59,7 @@ jobs:
             Club({required this.id, required this.name, this.headStudentName});
           }
           CLUB
+          fi
 
           # 3. ADMIN APP WIRING
           flutter create --org com.platinum --project-name admin_app admin_app
@@ -63,7 +68,8 @@ jobs:
           # CHANGE THE APP NAME ON THE PHONE SCREEN
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
 
-          cat > admin_app/pubspec.yaml << 'ADMINPUB'
+          if [ ! -f "admin_app/pubspec.yaml" ]; then
+            cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
           description: Platinum Staff Hub
           version: 1.0.3+4
@@ -93,12 +99,15 @@ jobs:
           flutter_native_splash:
             color: "#0A3D91"
             image: assets/logo.png
+            web: false
             android_12:
               image: assets/logo.png
               color: "#0A3D91"
           ADMINPUB
+          fi
 
-          cat > admin_app/lib/main.dart << 'ADMINMAIN'
+          if [ ! -f "admin_app/lib/main.dart" ]; then
+            cat > admin_app/lib/main.dart << 'ADMINMAIN'
           import 'package:flutter/material.dart';
           import 'screens/login.dart';
 
@@ -123,8 +132,10 @@ jobs:
             }
           }
           ADMINMAIN
+          fi
 
-          cat > admin_app/lib/screens/login.dart << 'LOGIN'
+          if [ ! -f "admin_app/lib/screens/login.dart" ]; then
+            cat > admin_app/lib/screens/login.dart << 'LOGIN'
           import 'package:flutter/material.dart';
           import 'dashboard.dart';
 
@@ -184,8 +195,10 @@ jobs:
             }
           }
           LOGIN
+          fi
 
-          cat > admin_app/lib/screens/dashboard.dart << 'DASH'
+          if [ ! -f "admin_app/lib/screens/dashboard.dart" ]; then
+            cat > admin_app/lib/screens/dashboard.dart << 'DASH'
           import 'package:flutter/material.dart';
           import 'announcements.dart';
           import 'marks_submission.dart';
@@ -245,8 +258,10 @@ jobs:
             }
           }
           DASH
+          fi
 
-          cat > admin_app/lib/screens/manage_admins.dart << 'MNGADMIN'
+          if [ ! -f "admin_app/lib/screens/manage_admins.dart" ]; then
+            cat > admin_app/lib/screens/manage_admins.dart << 'MNGADMIN'
           import 'package:flutter/material.dart';
 
           class ManageAdminsScreen extends StatefulWidget {
@@ -368,8 +383,10 @@ jobs:
             }
           }
           MNGADMIN
+          fi
 
-          cat > admin_app/lib/screens/manage_clubs.dart << 'MNGCLUB'
+          if [ ! -f "admin_app/lib/screens/manage_clubs.dart" ]; then
+            cat > admin_app/lib/screens/manage_clubs.dart << 'MNGCLUB'
           import 'package:flutter/material.dart';
           import 'package:shared/club.dart';
 
@@ -461,8 +478,10 @@ jobs:
             }
           }
           MNGCLUB
+          fi
 
-          cat > admin_app/lib/screens/marks_submission.dart << 'MARKSUB'
+          if [ ! -f "admin_app/lib/screens/marks_submission.dart" ]; then
+            cat > admin_app/lib/screens/marks_submission.dart << 'MARKSUB'
           import 'package:flutter/material.dart';
           import 'package:image_picker/image_picker.dart';
           import 'dart:io';
@@ -534,8 +553,10 @@ jobs:
             }
           }
           MARKSUB
+          fi
 
-          cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
+          if [ ! -f "admin_app/lib/screens/announcements.dart" ]; then
+            cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
           import 'package:flutter/material.dart';
           class AnnouncementsScreen extends StatefulWidget {
             const AnnouncementsScreen({super.key});
@@ -547,8 +568,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Broadcast')), body: const Center(child: Text('Broadcast Form Here')));
           }
           ANNSCR
+          fi
 
-          cat > admin_app/lib/screens/validation_engine.dart << 'VALENG'
+          if [ ! -f "admin_app/lib/screens/validation_engine.dart" ]; then
+            cat > admin_app/lib/screens/validation_engine.dart << 'VALENG'
           import 'package:flutter/material.dart';
           class ValidationEngineScreen extends StatelessWidget {
             const ValidationEngineScreen({super.key});
@@ -556,8 +579,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Validation')), body: const Center(child: Text('Validation Engine')));
           }
           VALENG
+          fi
 
-          cat > admin_app/lib/screens/coming_soon.dart << 'CS'
+          if [ ! -f "admin_app/lib/screens/coming_soon.dart" ]; then
+            cat > admin_app/lib/screens/coming_soon.dart << 'CS'
           import 'package:flutter/material.dart';
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -566,11 +591,12 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(featureName)), body: Center(child: Text('$featureName coming soon.')));
           }
           CS
+          fi
 
-      # 🔴 THIS IS THE FIX FOR THE ICON ERROR 🔴
       - name: Generate Icons and Splash
         run: |
           cd admin_app
+          flutter clean
           flutter pub get
           flutter pub run flutter_launcher_icons:main
           flutter pub run flutter_native_splash:create
@@ -609,8 +635,9 @@ jobs:
           if [ -z "$LOGO_SOURCE" ]; then LOGO_SOURCE=$(find . -maxdepth 1 -iname "*.png" | head -n 1); fi
           if [ -n "$LOGO_SOURCE" ]; then 
             cp "$LOGO_SOURCE" student_app/assets/logo.png;
-            echo "Found badge: $LOGO_SOURCE and copied to assets!"
+            echo "✅ Found school badge: $LOGO_SOURCE and copied to assets!"
           else 
+            echo "⚠️ No badge found. Using placeholder."
             echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; 
           fi
 
@@ -620,7 +647,8 @@ jobs:
 
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
 
-          cat > student_app/pubspec.yaml << 'STUPUB'
+          if [ ! -f "student_app/pubspec.yaml" ]; then
+            cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
           description: Platinum Digital App
           version: 1.0.3+4
@@ -653,12 +681,15 @@ jobs:
           flutter_native_splash:
             color: "#0A3D91"
             image: assets/logo.png
+            web: false
             android_12:
               image: assets/logo.png
               color: "#0A3D91"
           STUPUB
+          fi
 
-          cat > student_app/lib/services/database_helper.dart << 'DBHELP'
+          if [ ! -f "student_app/lib/services/database_helper.dart" ]; then
+            cat > student_app/lib/services/database_helper.dart << 'DBHELP'
           import 'package:sqflite/sqflite.dart';
           import 'package:path/path.dart';
 
@@ -691,8 +722,10 @@ jobs:
             }
           }
           DBHELP
+          fi
 
-          cat > student_app/lib/main.dart << 'STUMAIN'
+          if [ ! -f "student_app/lib/main.dart" ]; then
+            cat > student_app/lib/main.dart << 'STUMAIN'
           import 'package:flutter/material.dart';
           import 'screens/registration.dart';
           import 'screens/home.dart';
@@ -766,8 +799,10 @@ jobs:
             Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
           STUMAIN
+          fi
 
-          cat > student_app/lib/screens/registration.dart << 'REG'
+          if [ ! -f "student_app/lib/screens/registration.dart" ]; then
+            cat > student_app/lib/screens/registration.dart << 'REG'
           import 'package:flutter/material.dart';
           import '../services/database_helper.dart';
           import 'home.dart';
@@ -845,8 +880,10 @@ jobs:
             }
           }
           REG
+          fi
 
-          cat > student_app/lib/screens/home.dart << 'HOME'
+          if [ ! -f "student_app/lib/screens/home.dart" ]; then
+            cat > student_app/lib/screens/home.dart << 'HOME'
           import 'package:flutter/material.dart';
           import 'reports.dart';
           import 'chat.dart';
@@ -894,8 +931,10 @@ jobs:
             }
           }
           HOME
+          fi
 
-          cat > student_app/lib/screens/platinum_pulse.dart << 'PULSE'
+          if [ ! -f "student_app/lib/screens/platinum_pulse.dart" ]; then
+            cat > student_app/lib/screens/platinum_pulse.dart << 'PULSE'
           import 'package:flutter/material.dart';
           class PlatinumPulseScreen extends StatelessWidget {
             const PlatinumPulseScreen({super.key});
@@ -905,8 +944,10 @@ jobs:
             }
           }
           PULSE
+          fi
 
-          cat > student_app/lib/screens/suggestion_box.dart << 'SUGG'
+          if [ ! -f "student_app/lib/screens/suggestion_box.dart" ]; then
+            cat > student_app/lib/screens/suggestion_box.dart << 'SUGG'
           import 'package:flutter/material.dart';
           class SuggestionBoxScreen extends StatelessWidget {
             const SuggestionBoxScreen({super.key});
@@ -914,8 +955,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Suggestion Box')), body: Padding(padding: const EdgeInsets.all(16), child: Column(children: [const TextField(maxLines: 6, decoration: InputDecoration(hintText: 'Type your suggestion here...', border: OutlineInputBorder())), const SizedBox(height: 16), SwitchListTile(title: const Text('Submit Anonymously'), value: true, onChanged: (v) {}), const Spacer(), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Submit')))])));
           }
           SUGG
+          fi
 
-          cat > student_app/lib/screens/clubs.dart << 'CLUBS'
+          if [ ! -f "student_app/lib/screens/clubs.dart" ]; then
+            cat > student_app/lib/screens/clubs.dart << 'CLUBS'
           import 'package:flutter/material.dart';
           class ClubsScreen extends StatelessWidget {
             const ClubsScreen({super.key});
@@ -923,8 +966,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Clubs')), body: ListView(padding: const EdgeInsets.all(12), children: [const Card(child: ListTile(leading: CircleAvatar(backgroundColor: Color(0xFF0A3D91), child: Icon(Icons.edit, color: Colors.white)), title: Text('Writers Club'), subtitle: Text('Head: Nambi Aisha')))]));
           }
           CLUBS
+          fi
 
-          cat > student_app/lib/screens/reports.dart << 'REP'
+          if [ ! -f "student_app/lib/screens/reports.dart" ]; then
+            cat > student_app/lib/screens/reports.dart << 'REP'
           import 'package:flutter/material.dart';
           class ReportsScreen extends StatefulWidget {
             const ReportsScreen({super.key});
@@ -957,8 +1002,10 @@ jobs:
             }
           }
           REP
+          fi
 
-          cat > student_app/lib/screens/chat.dart << 'CHAT'
+          if [ ! -f "student_app/lib/screens/chat.dart" ]; then
+            cat > student_app/lib/screens/chat.dart << 'CHAT'
           import 'package:flutter/material.dart';
           class ChatScreen extends StatelessWidget {
             const ChatScreen({super.key});
@@ -966,8 +1013,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('S4 Group')), body: const Center(child: Text('Class Group Chat')));
           }
           CHAT
+          fi
 
-          cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
+          if [ ! -f "student_app/lib/screens/coming_soon.dart" ]; then
+            cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
           import 'package:flutter/material.dart';
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -976,11 +1025,12 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(featureName)), body: Center(child: Text('$featureName coming soon.')));
           }
           CSSTU
+          fi
 
-      # 🔴 THIS IS THE FIX FOR THE ICON ERROR 🔴
       - name: Generate Icons and Splash
         run: |
           cd student_app
+          flutter clean
           flutter pub get
           flutter pub run flutter_launcher_icons:main
           flutter pub run flutter_native_splash:create
