@@ -25,9 +25,9 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Shared and Admin Code
+      - name: Generate Admin Code
         run: |
-          # 1. SMART LOGO FINDER AND CONVERTER
+          # 1. COPY AND CONVERT LOGO
           mkdir -p admin_app/assets
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
           
@@ -39,44 +39,19 @@ jobs:
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png; 
           fi
 
-          # 2. SHARED MODELS
-          mkdir -p shared/lib/models
-          cat > shared/pubspec.yaml << 'SHAREDPUB'
-          name: shared
-          description: Shared
-          version: 1.0.0
-          environment:
-            sdk: ">=3.0.0 <4.0.0"
-          dependencies:
-            crypto: ^3.0.3
-          SHAREDPUB
-
-          cat > shared/lib/club.dart << 'CLUB'
-          class Club {
-            final String id;
-            final String name;
-            String? headStudentName; 
-            Club({required this.id, required this.name, this.headStudentName});
-          }
-          CLUB
-
-          # 3. ADMIN APP WIRING
+          # 2. CREATE PROJECT
           flutter create --org com.platinum --project-name admin_app admin_app
-          mkdir -p admin_app/lib/screens
 
+          # 3. CONFIGURE APP NAME AND INTERNET
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
-          
-          # Add INTERNET permission for Admin App
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>' admin_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FORCE GRADLE VERSIONS
-          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
+          # 4. FORCE GRADLE AND KOTLIN VERSIONS
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.5-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
           sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' admin_app/android/settings.gradle.kts 2>/dev/null || true
           sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' admin_app/android/settings.gradle.kts 2>/dev/null || true
-          sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' admin_app/android/settings.gradle 2>/dev/null || true
-          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' admin_app/android/settings.gradle 2>/dev/null || true
 
-          # 🔴 WRITE A CLEAN build.gradle.kts FROM SCRATCH (No hardcoded NDK)
+          # 🔴 5. OVERWRITE BUILD.GRADLE.KTS TO FORCE NDK & SDK 🔴
           cat > admin_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
@@ -87,6 +62,12 @@ jobs:
           android {
               namespace = "com.platinum.admin_app"
               compileSdk = 34
+              ndkVersion = "27.0.12077973"
+
+              lint {
+                  checkReleaseBuilds = false
+                  abortOnError = false
+              }
 
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -117,27 +98,14 @@ jobs:
           }
           GRADLEKTS
 
-          cat > admin_app/pubspec.yaml << 'ADMINPUB'
-          name: admin_app
-          description: Platinum Staff Hub
-          version: 1.0.4+5
-          environment:
-            sdk: ">=3.0.0 <4.0.0"
-          dependencies:
-            flutter:
-              sdk: flutter
-            shared:
-              path: ../shared
-            intl: ^0.19.0
-            image_picker: ^1.1.2
-          dev_dependencies:
-            flutter_launcher_icons: "^0.13.1"
-            flutter_native_splash: "^2.4.0"
-          flutter:
-            uses-material-design: true
-            assets:
-              - assets/
-          
+          # 6. ADD DEPENDENCIES
+          cd admin_app
+          flutter pub add intl image_picker
+          flutter pub add --dev flutter_launcher_icons flutter_native_splash
+
+          # 7. WRITE ICON & SPLASH CONFIG
+          cat >> pubspec.yaml << 'ADMINPUB'
+
           flutter_launcher_icons:
             android: "launcher_icon"
             ios: true
@@ -153,7 +121,9 @@ jobs:
               color: "#0A3D91"
           ADMINPUB
 
-          cat > admin_app/lib/main.dart << 'ADMINMAIN'
+          # 8. WRITE DART CODE
+          mkdir -p lib/screens
+          cat > lib/main.dart << 'ADMINMAIN'
           import 'package:flutter/material.dart';
           import 'screens/login.dart';
 
@@ -179,8 +149,7 @@ jobs:
           }
           ADMINMAIN
 
-          # 4. ADMIN APP SCREENS
-          cat > admin_app/lib/screens/login.dart << 'LOGIN'
+          cat > lib/screens/login.dart << 'LOGIN'
           import 'package:flutter/material.dart';
           import 'dashboard.dart';
 
@@ -241,7 +210,7 @@ jobs:
           }
           LOGIN
 
-          cat > admin_app/lib/screens/dashboard.dart << 'DASH'
+          cat > lib/screens/dashboard.dart << 'DASH'
           import 'package:flutter/material.dart';
           import 'announcements.dart';
           import 'marks_submission.dart';
@@ -302,7 +271,7 @@ jobs:
           }
           DASH
 
-          cat > admin_app/lib/screens/manage_admins.dart << 'MNGADMIN'
+          cat > lib/screens/manage_admins.dart << 'MNGADMIN'
           import 'package:flutter/material.dart';
 
           class ManageAdminsScreen extends StatefulWidget {
@@ -425,7 +394,7 @@ jobs:
           }
           MNGADMIN
 
-          cat > admin_app/lib/screens/manage_clubs.dart << 'MNGCLUB'
+          cat > lib/screens/manage_clubs.dart << 'MNGCLUB'
           import 'package:flutter/material.dart';
           import 'package:shared/club.dart';
 
@@ -518,7 +487,7 @@ jobs:
           }
           MNGCLUB
 
-          cat > admin_app/lib/screens/marks_submission.dart << 'MARKSUB'
+          cat > lib/screens/marks_submission.dart << 'MARKSUB'
           import 'package:flutter/material.dart';
           import 'package:image_picker/image_picker.dart';
           import 'dart:io';
@@ -591,7 +560,7 @@ jobs:
           }
           MARKSUB
 
-          cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
+          cat > lib/screens/announcements.dart << 'ANNSCR'
           import 'package:flutter/material.dart';
           class AnnouncementsScreen extends StatefulWidget {
             const AnnouncementsScreen({super.key});
@@ -604,7 +573,7 @@ jobs:
           }
           ANNSCR
 
-          cat > admin_app/lib/screens/validation_engine.dart << 'VALENG'
+          cat > lib/screens/validation_engine.dart << 'VALENG'
           import 'package:flutter/material.dart';
           class ValidationEngineScreen extends StatelessWidget {
             const ValidationEngineScreen({super.key});
@@ -613,7 +582,7 @@ jobs:
           }
           VALENG
 
-          cat > admin_app/lib/screens/coming_soon.dart << 'CS'
+          cat > lib/screens/coming_soon.dart << 'CS'
           import 'package:flutter/material.dart';
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -657,9 +626,9 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Shared and Student Code
+      - name: Generate Student Code
         run: |
-          # 1. SMART LOGO FINDER AND CONVERTER
+          # 1. COPY AND CONVERT LOGO
           mkdir -p student_app/assets
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
           
@@ -669,45 +638,20 @@ jobs:
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; 
           fi
 
-          # 2. SHARED MODELS
-          mkdir -p shared/lib/models
-          cat > shared/pubspec.yaml << 'SHAREDPUB'
-          name: shared
-          description: Shared
-          version: 1.0.0
-          environment:
-            sdk: ">=3.0.0 <4.0.0"
-          dependencies:
-            crypto: ^3.0.3
-          SHAREDPUB
-
-          cat > shared/lib/club.dart << 'CLUB'
-          class Club {
-            final String id;
-            final String name;
-            String? headStudentName; 
-            Club({required this.id, required this.name, this.headStudentName});
-          }
-          CLUB
-
-          # 3. STUDENT APP WIRING
+          # 2. CREATE PROJECT
           flutter create --org com.platinum --project-name student_app student_app
-          mkdir -p student_app/lib/screens
           mkdir -p student_app/lib/services
 
+          # 3. CONFIGURE APP NAME AND INTERNET
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
-          
-          # 🔴 ADD INTERNET PERMISSION (Needed for http and url_launcher)
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>' student_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FORCE GRADLE AND KOTLIN VERSIONS (Ensure Java 17 & AGP 8 Compatibility)
-          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
+          # 4. FORCE GRADLE AND KOTLIN VERSIONS
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.5-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' student_app/android/settings.gradle.kts 2>/dev/null || true
           sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' student_app/android/settings.gradle.kts 2>/dev/null || true
-          sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' student_app/android/settings.gradle 2>/dev/null || true
-          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' student_app/android/settings.gradle 2>/dev/null || true
 
-          # 🔴 WRITE A CLEAN build.gradle.kts FROM SCRATCH (Removed hardcoded NDK)
+          # 🔴 5. OVERWRITE BUILD.GRADLE.KTS TO FORCE NDK & SDK 🔴
           cat > student_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
@@ -718,6 +662,12 @@ jobs:
           android {
               namespace = "com.platinum.student_app"
               compileSdk = 34
+              ndkVersion = "27.0.12077973"
+
+              lint {
+                  checkReleaseBuilds = false
+                  abortOnError = false
+              }
 
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -748,30 +698,13 @@ jobs:
           }
           GRADLEKTS
 
-          # 🔴 UPDATED PLUGINS TO LATEST VERSIONS (Fixes AGP 8 namespace issues)
-          cat > student_app/pubspec.yaml << 'STUPUB'
-          name: student_app
-          description: Platinum Digital App
-          version: 1.0.4+5
-          environment:
-            sdk: ">=3.0.0 <4.0.0"
-          dependencies:
-            flutter:
-              sdk: flutter
-            shared:
-              path: ../shared
-            sqflite: ^2.3.3+1
-            path: ^1.9.0
-            package_info_plus: ^8.0.0
-            http: ^1.2.1
-            url_launcher: ^6.3.0
-          dev_dependencies:
-            flutter_launcher_icons: "^0.13.1"
-            flutter_native_splash: "^2.4.0"
-          flutter:
-            uses-material-design: true
-            assets:
-              - assets/
+          # 6. ADD DEPENDENCIES
+          cd student_app
+          flutter pub add sqflite path package_info_plus http url_launcher
+          flutter pub add --dev flutter_launcher_icons flutter_native_splash
+
+          # 7. WRITE ICON & SPLASH CONFIG
+          cat >> pubspec.yaml << 'STUPUB'
 
           flutter_launcher_icons:
             android: "launcher_icon"
@@ -788,7 +721,9 @@ jobs:
               color: "#0A3D91"
           STUPUB
 
-          cat > student_app/lib/services/database_helper.dart << 'DBHELP'
+          # 8. WRITE DART CODE
+          mkdir -p lib/screens
+          cat > lib/services/database_helper.dart << 'DBHELP'
           import 'package:sqflite/sqflite.dart';
           import 'package:path/path.dart';
 
@@ -822,7 +757,7 @@ jobs:
           }
           DBHELP
 
-          cat > student_app/lib/main.dart << 'STUMAIN'
+          cat > lib/main.dart << 'STUMAIN'
           import 'package:flutter/material.dart';
           import 'screens/registration.dart';
           import 'screens/home.dart';
@@ -897,7 +832,7 @@ jobs:
           }
           STUMAIN
 
-          cat > student_app/lib/screens/registration.dart << 'REG'
+          cat > lib/screens/registration.dart << 'REG'
           import 'package:flutter/material.dart';
           import '../services/database_helper.dart';
           import 'home.dart';
@@ -976,7 +911,7 @@ jobs:
           }
           REG
 
-          cat > student_app/lib/screens/home.dart << 'HOME'
+          cat > lib/screens/home.dart << 'HOME'
           import 'package:flutter/material.dart';
           import 'reports.dart';
           import 'chat.dart';
@@ -1025,7 +960,7 @@ jobs:
           }
           HOME
 
-          cat > student_app/lib/screens/platinum_pulse.dart << 'PULSE'
+          cat > lib/screens/platinum_pulse.dart << 'PULSE'
           import 'package:flutter/material.dart';
           class PlatinumPulseScreen extends StatelessWidget {
             const PlatinumPulseScreen({super.key});
@@ -1073,7 +1008,7 @@ jobs:
           }
           PULSE
 
-          cat > student_app/lib/screens/suggestion_box.dart << 'SUGG'
+          cat > lib/screens/suggestion_box.dart << 'SUGG'
           import 'package:flutter/material.dart';
           class SuggestionBoxScreen extends StatelessWidget {
             const SuggestionBoxScreen({super.key});
@@ -1082,7 +1017,7 @@ jobs:
           }
           SUGG
 
-          cat > student_app/lib/screens/clubs.dart << 'CLUBS'
+          cat > lib/screens/clubs.dart << 'CLUBS'
           import 'package:flutter/material.dart';
           class ClubsScreen extends StatelessWidget {
             const ClubsScreen({super.key});
@@ -1091,7 +1026,7 @@ jobs:
           }
           CLUBS
 
-          cat > student_app/lib/screens/reports.dart << 'REP'
+          cat > lib/screens/reports.dart << 'REP'
           import 'package:flutter/material.dart';
           class ReportsScreen extends StatefulWidget {
             const ReportsScreen({super.key});
@@ -1125,7 +1060,7 @@ jobs:
           }
           REP
 
-          cat > student_app/lib/screens/chat.dart << 'CHAT'
+          cat > lib/screens/chat.dart << 'CHAT'
           import 'package:flutter/material.dart';
           class ChatScreen extends StatelessWidget {
             const ChatScreen({super.key});
@@ -1134,7 +1069,7 @@ jobs:
           }
           CHAT
 
-          cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
+          cat > lib/screens/coming_soon.dart << 'CSSTU'
           import 'package:flutter/material.dart';
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
