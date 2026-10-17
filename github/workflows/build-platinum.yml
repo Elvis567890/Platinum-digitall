@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # JOB 1: Build the Admin App
+  # JOB 1: Build the Admin App (Platinum Staff Hub)
   build-admin:
     runs-on: ubuntu-latest
     steps:
@@ -27,17 +27,9 @@ jobs:
           # 1. SMART LOGO FINDER
           mkdir -p admin_app/assets
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*.png" | head -n 1)
-          if [ -z "$LOGO_SOURCE" ]; then
-            LOGO_SOURCE=$(find . -maxdepth 1 -iname "*.png" | head -n 1)
-          fi
-
-          if [ -n "$LOGO_SOURCE" ]; then
-            echo "Found logo: $LOGO_SOURCE"
-            cp "$LOGO_SOURCE" admin_app/assets/logo.png
-          else
-            echo "Warning: No logo found. Using placeholder."
-            echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
-          fi
+          if [ -z "$LOGO_SOURCE" ]; then LOGO_SOURCE=$(find . -maxdepth 1 -iname "*.png" | head -n 1); fi
+          if [ -n "$LOGO_SOURCE" ]; then cp "$LOGO_SOURCE" admin_app/assets/logo.png;
+          else echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png; fi
 
           # 2. SHARED MODELS
           mkdir -p shared/lib/models
@@ -51,33 +43,26 @@ jobs:
             crypto: ^3.0.3
           SHAREDPUB
 
-          cat > shared/lib/announcement.dart << 'ANN'
-          class Announcement {
+          cat > shared/lib/club.dart << 'CLUB'
+          class Club {
             final String id;
-            final String title;
-            final String body;
-            final String audience;
-            final String animationType;
-            final DateTime createdAt;
-            Announcement({
-              required this.id,
-              required this.title,
-              required this.body,
-              required this.audience,
-              required this.animationType,
-              required this.createdAt,
-            });
+            final String name;
+            String? headStudentName; 
+            Club({required this.id, required this.name, this.headStudentName});
           }
-          ANN
+          CLUB
 
           # 3. ADMIN APP WIRING
           flutter create --org com.platinum --project-name admin_app admin_app
           mkdir -p admin_app/lib/screens
 
+          # CHANGE THE APP NAME ON THE PHONE SCREEN TO "Platinum Staff Hub"
+          sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
+
           cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
-          description: Platinum Admin
-          version: 1.0.0+1
+          description: Platinum Staff Hub
+          version: 1.0.3+4
           environment:
             sdk: ">=3.0.0 <4.0.0"
           dependencies:
@@ -86,10 +71,27 @@ jobs:
             shared:
               path: ../shared
             intl: ^0.19.0
+            image_picker: ^1.0.7
+          dev_dependencies:
+            flutter_launcher_icons: "^0.13.1"
+            flutter_native_splash: "^2.4.0"
           flutter:
             uses-material-design: true
             assets:
               - assets/
+          
+          flutter_launcher_icons:
+            android: "launcher_icon"
+            ios: true
+            image_path: "assets/logo.png"
+            min_sdk_android: 21
+          
+          flutter_native_splash:
+            color: "#0A3D91"
+            image: assets/logo.png
+            android_12:
+              image: assets/logo.png
+              color: "#0A3D91"
           ADMINPUB
 
           cat > admin_app/lib/main.dart << 'ADMINMAIN'
@@ -103,7 +105,7 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
-                title: 'Platinum Admin',
+                title: 'Platinum Staff Hub',
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData(
                   primaryColor: const Color(0xFF0A3D91),
@@ -135,6 +137,16 @@ jobs:
 
             void _login() {
               if (_id.text.isEmpty || _pin.text.isEmpty) return;
+
+              // HARDCODED SUPER ADMIN TEST ACCOUNT
+              if (_id.text.toUpperCase() == 'SUPER' && _pin.text == '1234') {
+                _role = 'super_admin';
+              } else if (_id.text.toUpperCase() == 'TEACHER' && _pin.text == '1234') {
+                _role = 'teacher';
+              } else if (_id.text.toUpperCase() == 'ADMIN' && _pin.text == '1234') {
+                _role = 'admin';
+              }
+
               Navigator.pushReplacement(context, MaterialPageRoute(
                 builder: (_) => DashboardScreen(role: _role, name: _id.text),
               ));
@@ -152,44 +164,19 @@ jobs:
                       children: [
                         Image.asset('assets/logo.png', height: 120, width: 120, fit: BoxFit.contain),
                         const SizedBox(height: 16),
-                        const Text('Welcome Back',
-                          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold,
-                            color: Color(0xFF0A3D91))),
+                        const Text('Platinum Staff Hub', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
                         const SizedBox(height: 8),
-                        const Text('Select your role to continue',
-                          style: TextStyle(fontSize: 16, color: Colors.grey)),
-                        const SizedBox(height: 32),
-                        TextField(controller: _id,
-                          decoration: const InputDecoration(labelText: 'Staff ID',
-                            border: OutlineInputBorder())),
+                        const Text('Test Login: SUPER / 1234', style: TextStyle(fontSize: 14, color: Colors.red, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 24),
+                        TextField(controller: _id, decoration: const InputDecoration(labelText: 'Staff ID', border: OutlineInputBorder())),
                         const SizedBox(height: 16),
-                        TextField(controller: _pin, obscureText: true,
-                          decoration: const InputDecoration(labelText: 'PIN',
-                            border: OutlineInputBorder())),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          value: _role,
-                          decoration: const InputDecoration(labelText: 'Role',
-                            border: OutlineInputBorder()),
-                          items: const [
-                            DropdownMenuItem(value: 'super_admin', child: Text('Super Admin')),
-                            DropdownMenuItem(value: 'release_admin', child: Text('Release Admin')),
-                            DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                            DropdownMenuItem(value: 'teacher', child: Text('Teacher')),
-                          ],
-                          onChanged: (v) => setState(() => _role = v!),
-                        ),
+                        TextField(controller: _pin, obscureText: true, decoration: const InputDecoration(labelText: 'PIN', border: OutlineInputBorder())),
                         const SizedBox(height: 24),
                         SizedBox(width: double.infinity,
                           child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0A3D91),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91), padding: const EdgeInsets.symmetric(vertical: 16)),
                             onPressed: _login,
-                            child: const Text('Continue', style: TextStyle(fontSize: 18)),
+                            child: const Text('Continue', style: TextStyle(fontSize: 18, color: Colors.white)),
                           )),
                       ],
                     ),
@@ -205,6 +192,8 @@ jobs:
           import 'announcements.dart';
           import 'marks_submission.dart';
           import 'validation_engine.dart';
+          import 'manage_clubs.dart';
+          import 'manage_admins.dart';
           import 'coming_soon.dart';
 
           class DashboardScreen extends StatelessWidget {
@@ -216,9 +205,10 @@ jobs:
             Widget build(BuildContext context) {
               final isSuper = role == 'super_admin';
               final isRelease = role == 'release_admin';
+              final isTeacher = role == 'teacher';
               
               return Scaffold(
-                appBar: AppBar(title: Text('Admin - $name')),
+                appBar: AppBar(title: Text('Staff Hub ($role)')),
                 body: GridView.count(
                   crossAxisCount: 2,
                   padding: const EdgeInsets.all(16),
@@ -227,13 +217,12 @@ jobs:
                   children: [
                     _tile(context, 'Broadcast', Icons.campaign, const AnnouncementsScreen()),
                     _tile(context, 'Marks Submission', Icons.edit_note, const MarksSubmissionScreen()),
-                    _tile(context, 'Validation Engine', Icons.checklist, const ValidationEngineScreen()),
-                    _tile(context, 'Release Reports', Icons.lock_open,
-                      isRelease ? const ComingSoonScreen(featureName: 'Release Reports') : const ComingSoonScreen(featureName: 'Release Admin Only')),
-                    _tile(context, 'Fee Management', Icons.payments, const ComingSoonScreen(featureName: 'Fee Management')),
-                    _tile(context, 'Chat Moderation', Icons.chat, const ComingSoonScreen(featureName: 'Chat Moderation')),
-                    if (isSuper) _tile(context, 'Manage Admins', Icons.admin_panel_settings, const ComingSoonScreen(featureName: 'Manage Admins')),
-                    if (isSuper) _tile(context, 'Manage Clubs', Icons.groups, const ComingSoonScreen(featureName: 'Manage Clubs')),
+                    
+                    if (!isTeacher) _tile(context, 'Validation Engine', Icons.checklist, const ValidationEngineScreen()),
+                    if (isRelease) _tile(context, 'Release Reports', Icons.lock_open, const ComingSoonScreen(featureName: 'Release Reports')),
+                    
+                    if (isSuper) _tile(context, 'Manage Clubs', Icons.groups, const ManageClubsScreen()),
+                    if (isSuper) _tile(context, 'Manage Staff', Icons.admin_panel_settings, const ManageAdminsScreen()),
                   ],
                 ),
               );
@@ -243,11 +232,7 @@ jobs:
               return InkWell(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => screen)),
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
-                  ),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)]),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -255,8 +240,7 @@ jobs:
                       const SizedBox(height: 12),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Text(title, textAlign: TextAlign.center,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                        child: Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ),
@@ -266,88 +250,237 @@ jobs:
           }
           DASH
 
-          cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
+          cat > admin_app/lib/screens/manage_admins.dart << 'MNGADMIN'
           import 'package:flutter/material.dart';
 
-          class AnnouncementsScreen extends StatefulWidget {
-            const AnnouncementsScreen({super.key});
+          class ManageAdminsScreen extends StatefulWidget {
+            const ManageAdminsScreen({super.key});
             @override
-            State<AnnouncementsScreen> createState() => _AnnouncementsScreenState();
+            State<ManageAdminsScreen> createState() => _ManageAdminsScreenState();
           }
 
-          class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
-            final _title = TextEditingController();
-            final _body = TextEditingController();
-            String _audience = 'Whole School';
-            String _animationType = 'Normal';
+          class _ManageAdminsScreenState extends State<ManageAdminsScreen> {
+            final List<Map<String, String>> _staff = [
+              {'id': 'SUPER', 'role': 'Super Admin'},
+              {'id': 'TEACHER1', 'role': 'Teacher'},
+            ];
 
-            void _post() {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Broadcast sent to $_audience')));
-              _title.clear();
-              _body.clear();
+            void _addStaff() {
+              final idController = TextEditingController();
+              String selectedRole = 'Teacher';
+
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Register New Staff'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(controller: idController, decoration: const InputDecoration(labelText: 'Staff ID')),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedRole,
+                        decoration: const InputDecoration(labelText: 'Role'),
+                        items: const [
+                          DropdownMenuItem(value: 'Admin', child: Text('Admin')),
+                          DropdownMenuItem(value: 'Teacher', child: Text('Teacher')),
+                          DropdownMenuItem(value: 'Release Admin', child: Text('Release Admin')),
+                        ],
+                        onChanged: (v) => selectedRole = v!,
+                      )
+                    ],
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (idController.text.isNotEmpty) {
+                          setState(() {
+                            _staff.add({'id': idController.text.toUpperCase(), 'role': selectedRole});
+                          });
+                          Navigator.pop(ctx);
+                        }
+                      },
+                      child: const Text('Create'),
+                    )
+                  ],
+                ),
+              );
             }
 
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Broadcast Announcement')),
-                body: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: ListView(
-                    children: [
-                      const Text('Audience Selection', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: _audience,
-                        decoration: const InputDecoration(border: OutlineInputBorder()),
-                        items: const [
-                          DropdownMenuItem(value: 'Whole School', child: Text('Whole School')),
-                          DropdownMenuItem(value: 'Senior Four', child: Text('Senior Four')),
-                          DropdownMenuItem(value: 'Senior Three', child: Text('Senior Three')),
-                          DropdownMenuItem(value: 'Staff Only', child: Text('Staff Only')),
-                        ],
-                        onChanged: (v) => setState(() => _audience = v!),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Animation Picker', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: _animationType,
-                        decoration: const InputDecoration(border: OutlineInputBorder()),
-                        items: const [
-                          DropdownMenuItem(value: 'Normal', child: Text('Normal (Slide-in)')),
-                          DropdownMenuItem(value: 'Urgent', child: Text('Urgent (Red Pulse)')),
-                          DropdownMenuItem(value: 'Celebration', child: Text('Celebration (Confetti)')),
-                        ],
-                        onChanged: (v) => setState(() => _animationType = v!),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(controller: _title,
-                        decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                      TextField(controller: _body, maxLines: 4,
-                        decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
-                      const SizedBox(height: 24),
+            // PROMOTE / DEMOTE STAFF FUNCTION
+            void _changeRole(Map<String, String> staff) {
+              String newRole = staff['role']!;
+              showDialog(
+                context: context,
+                builder: (ctx) => StatefulBuilder(
+                  builder: (context, setDialogState) => AlertDialog(
+                    title: Text('Change Role for ${staff['id']}'),
+                    content: DropdownButtonFormField<String>(
+                      value: newRole,
+                      decoration: const InputDecoration(labelText: 'Select New Role'),
+                      items: const [
+                        DropdownMenuItem(value: 'Admin', child: Text('Admin (Promote)')),
+                        DropdownMenuItem(value: 'Teacher', child: Text('Teacher (Demote)')),
+                        DropdownMenuItem(value: 'Release Admin', child: Text('Release Admin')),
+                      ],
+                      onChanged: (v) => setDialogState(() => newRole = v!),
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
                       ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A3D91),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        onPressed: _post,
-                        child: const Text('Broadcast Now', style: TextStyle(fontSize: 18)),
+                        onPressed: () {
+                          setState(() { staff['role'] = newRole; });
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('Save Changes'),
                       ),
                     ],
                   ),
                 ),
               );
             }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Manage Staff')),
+                body: ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _staff.length,
+                  itemBuilder: (context, index) {
+                    final s = _staff[index];
+                    return Card(
+                      child: ListTile(
+                        leading: const CircleAvatar(backgroundColor: Color(0xFF0A3D91), child: Icon(Icons.person, color: Colors.white)),
+                        title: Text(s['id']!, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(s['role']!),
+                        trailing: s['id'] == 'SUPER' ? null : PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'role') _changeRole(s);
+                            if (value == 'delete') setState(() => _staff.removeAt(index));
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(value: 'role', child: Text('Change Role / Promote')),
+                            const PopupMenuItem(value: 'delete', child: Text('Remove Staff', style: TextStyle(color: Colors.red))),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                floatingActionButton: FloatingActionButton.extended(
+                  backgroundColor: const Color(0xFF0A3D91),
+                  onPressed: _addStaff,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('Add Staff', style: TextStyle(color: Colors.white)),
+                ),
+              );
+            }
           }
-          ANNSCR
+          MNGADMIN
+
+          cat > admin_app/lib/screens/manage_clubs.dart << 'MNGCLUB'
+          import 'package:flutter/material.dart';
+          import 'package:shared/club.dart';
+
+          class ManageClubsScreen extends StatefulWidget {
+            const ManageClubsScreen({super.key});
+            @override
+            State<ManageClubsScreen> createState() => _ManageClubsScreenState();
+          }
+
+          class _ManageClubsScreenState extends State<ManageClubsScreen> {
+            final List<Club> _clubs = [Club(id: '1', name: 'Writers Club', headStudentName: 'Nambi Aisha')];
+
+            void _createClub() {
+              final controller = TextEditingController();
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Create New Club'),
+                  content: TextField(controller: controller, decoration: const InputDecoration(labelText: 'Club Name')),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                    ElevatedButton(
+                      onPressed: () { if (controller.text.isNotEmpty) { setState(() { _clubs.add(Club(id: DateTime.now().toString(), name: controller.text)); }); Navigator.pop(ctx); } },
+                      child: const Text('Create'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            void _appointHead(Club club) {
+              final searchController = TextEditingController();
+              showDialog(
+                context: context,
+                builder: (ctx) => StatefulBuilder(
+                  builder: (context, setDialogState) {
+                    final searchResults = ['Nambi Aisha', 'Trevor Okello', 'Grace Namubiru'].where((name) => name.toLowerCase().contains(searchController.text.toLowerCase())).toList();
+                    return AlertDialog(
+                      title: Text('Manage Head for ${club.name}'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(controller: searchController, decoration: const InputDecoration(labelText: 'Search Student to Promote', prefixIcon: Icon(Icons.search)), onChanged: (v) => setDialogState(() {})),
+                          if (searchController.text.isNotEmpty)
+                            ...searchResults.map((name) => ListTile(
+                              title: Text(name),
+                              trailing: const Icon(Icons.arrow_upward, color: Colors.green),
+                              onTap: () { setState(() { club.headStudentName = name; }); Navigator.pop(ctx); },
+                            )),
+                        ],
+                      ),
+                      actions: [
+                        // DEMOTE BUTTON
+                        if (club.headStudentName != null)
+                          TextButton(
+                            onPressed: () {
+                              setState(() { club.headStudentName = null; });
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('Demote Head to Student', style: TextStyle(color: Colors.red)),
+                          ),
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+                      ],
+                    );
+                  }
+                ),
+              );
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Manage Clubs')),
+                body: ListView.builder(
+                  itemCount: _clubs.length,
+                  itemBuilder: (context, index) {
+                    final club = _clubs[index];
+                    final hasHead = club.headStudentName != null;
+                    return Card(
+                      child: ListTile(
+                        title: Text(club.name),
+                        subtitle: Text(hasHead ? 'Head: ${club.headStudentName}' : 'No head assigned'),
+                        trailing: TextButton(
+                          onPressed: () => _appointHead(club),
+                          child: Text(hasHead ? 'Manage' : 'Appoint Head'),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                floatingActionButton: FloatingActionButton(onPressed: _createClub, child: const Icon(Icons.add)),
+              );
+            }
+          }
+          MNGCLUB
 
           cat > admin_app/lib/screens/marks_submission.dart << 'MARKSUB'
           import 'package:flutter/material.dart';
+          import 'package:image_picker/image_picker.dart';
+          import 'dart:io';
 
           class MarksSubmissionScreen extends StatefulWidget {
             const MarksSubmissionScreen({super.key});
@@ -356,58 +489,66 @@ jobs:
           }
 
           class _MarksSubmissionScreenState extends State<MarksSubmissionScreen> {
-            bool _ocrEnabled = false;
+            File? _image;
+            bool _isProcessing = false;
+            bool _hasResult = false;
+
+            final String _ocrSubject = 'Biology';
+            final String _ocrStudent = 'John Doe';
+            final String _ocrScore = '85/100';
+
+            Future<void> _pickImage(ImageSource source) async {
+              try {
+                final pickedFile = await ImagePicker().pickImage(source: source);
+                if (pickedFile != null) {
+                  setState(() { _image = File(pickedFile.path); _isProcessing = true; _hasResult = false; });
+                  await Future.delayed(const Duration(seconds: 2)); // Simulate OCR
+                  if (mounted) setState(() { _isProcessing = false; _hasResult = true; });
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            }
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Teacher Marks Submission')),
+                appBar: AppBar(title: const Text('Submit Marks (OCR)')),
                 body: Padding(
                   padding: const EdgeInsets.all(16),
                   child: ListView(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey, style: BorderStyle.solid),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.photo_camera, size: 48, color: Color(0xFF0A3D91)),
-                            const SizedBox(height: 8),
-                            const Text('Photo Upload of Mark Sheet', style: TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
-                            const Text('Tap to upload or take a photo', style: TextStyle(color: Colors.grey)),
-                          ],
+                      GestureDetector(
+                        onTap: () => _pickImage(ImageSource.camera),
+                        child: Container(
+                          height: 150,
+                          decoration: BoxDecoration(color: Colors.grey[200], border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(12)),
+                          child: _image != null ? Image.file(_image!, fit: BoxFit.cover) : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.photo_camera, size: 48, color: Color(0xFF0A3D91)), SizedBox(height: 8), Text('Tap to capture Mark Sheet')]),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('OCR Auto-Entry', style: TextStyle(fontWeight: FontWeight.bold)),
-                          Switch(value: _ocrEnabled, onChanged: (v) => setState(() => _ocrEnabled = v)),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                      TextField(decoration: const InputDecoration(labelText: 'Class', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                      TextField(decoration: const InputDecoration(labelText: 'Student Name', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                      TextField(decoration: const InputDecoration(labelText: 'Mark (e.g. 78/100)', border: OutlineInputBorder())),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A3D91),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        onPressed: () {},
-                        child: const Text('Submit Marks', style: TextStyle(fontSize: 18)),
-                      ),
+                      if (_isProcessing) const Center(child: CircularProgressIndicator()),
+                      if (_hasResult)
+                        Card(
+                          color: Colors.blue[50],
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('OCR Detected:', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
+                                const SizedBox(height: 8),
+                                Text('Subject: $_ocrSubject'), Text('Student: $_ocrStudent'), Text('Score: $_ocrScore'),
+                                const SizedBox(height: 12),
+                                TextFormField(initialValue: _ocrSubject, decoration: const InputDecoration(labelText: 'Subject')),
+                                TextFormField(initialValue: _ocrStudent, decoration: const InputDecoration(labelText: 'Student Name')),
+                                TextFormField(initialValue: _ocrScore, decoration: const InputDecoration(labelText: 'Score')),
+                                const SizedBox(height: 16),
+                                SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () { Navigator.pop(context); }, child: const Text('Confirm & Submit')))
+                              ],
+                            ),
+                          ),
+                        )
                     ],
                   ),
                 ),
@@ -416,127 +557,66 @@ jobs:
           }
           MARKSUB
 
+          cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
+          import 'package:flutter/material.dart';
+          class AnnouncementsScreen extends StatefulWidget {
+            const AnnouncementsScreen({super.key});
+            @override
+            State<AnnouncementsScreen> createState() => _AnnouncementsScreenState();
+          }
+          class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
+            @override
+            Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Broadcast')), body: const Center(child: Text('Broadcast Form Here')));
+          }
+          ANNSCR
+
           cat > admin_app/lib/screens/validation_engine.dart << 'VALENG'
           import 'package:flutter/material.dart';
-
           class ValidationEngineScreen extends StatelessWidget {
             const ValidationEngineScreen({super.key});
-
             @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Report Validation Engine')),
-                body: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.red[100], borderRadius: BorderRadius.circular(8)),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.error, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('2 Errors Detected', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.warning, color: Colors.orange),
-                          title: const Text('Missing marks: Biology'),
-                          subtitle: const Text('S4 East • 5 students missing'),
-                          trailing: const Icon(Icons.chevron_right),
-                        ),
-                      ),
-                      Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.warning, color: Colors.orange),
-                          title: const Text('Mark 150 exceeds 100'),
-                          subtitle: const Text('Student: Kato J. • Mathematics • Row 12'),
-                          trailing: const Icon(Icons.chevron_right),
-                        ),
-                      ),
-                      const Spacer(),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A3D91),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          onPressed: () {},
-                          child: const Text('Batch Generate Reports', style: TextStyle(fontSize: 18)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
+            Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Validation')), body: const Center(child: Text('Validation Engine')));
           }
           VALENG
 
           cat > admin_app/lib/screens/coming_soon.dart << 'CS'
           import 'package:flutter/material.dart';
-
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
             const ComingSoonScreen({super.key, required this.featureName});
-
             @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: Text(featureName)),
-                body: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Coming Soon',
-                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
-                        const SizedBox(height: 12),
-                        Text('$featureName is coming soon for Platinum Secondary School Kiteezi.',
-                          textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Colors.black54)),
-                        const SizedBox(height: 24),
-                        const Text('Excellence Is Our Culture',
-                          style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Color(0xFF0A3D91))),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
+            Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(featureName)), body: Center(child: Text('$featureName coming soon.')));
           }
           CS
+
+      - name: Generate Icons and Splash
+        run: |
+          cd admin_app
+          flutter pub get
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
 
       - name: Build Admin APK
         run: |
           cd admin_app
-          flutter pub get
           flutter build apk --release
 
       - name: Upload Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: admin-app-apk
+          name: staff-hub-apk
           path: admin_app/build/app/outputs/flutter-apk/app-release.apk
 
 
-  # JOB 2: Build the Student App
+  # JOB 2: Build the Student App (Platinum Digital App)
   build-student:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -544,61 +624,23 @@ jobs:
 
       - name: Generate Shared and Student Code
         run: |
-          # 1. SMART LOGO FINDER
           mkdir -p student_app/assets
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*.png" | head -n 1)
-          if [ -z "$LOGO_SOURCE" ]; then
-            LOGO_SOURCE=$(find . -maxdepth 1 -iname "*.png" | head -n 1)
-          fi
+          if [ -z "$LOGO_SOURCE" ]; then LOGO_SOURCE=$(find . -maxdepth 1 -iname "*.png" | head -n 1); fi
+          if [ -n "$LOGO_SOURCE" ]; then cp "$LOGO_SOURCE" student_app/assets/logo.png;
+          else echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; fi
 
-          if [ -n "$LOGO_SOURCE" ]; then
-            echo "Found logo: $LOGO_SOURCE"
-            cp "$LOGO_SOURCE" student_app/assets/logo.png
-          else
-            echo "Warning: No logo found. Using placeholder."
-            echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
-          fi
-
-          # 2. SHARED MODELS
-          mkdir -p shared/lib/models
-          cat > shared/pubspec.yaml << 'SHAREDPUB'
-          name: shared
-          description: Shared
-          version: 1.0.0
-          environment:
-            sdk: ">=3.0.0 <4.0.0"
-          dependencies:
-            crypto: ^3.0.3
-          SHAREDPUB
-
-          cat > shared/lib/announcement.dart << 'ANN'
-          class Announcement {
-            final String id;
-            final String title;
-            final String body;
-            final String audience;
-            final String animationType;
-            final DateTime createdAt;
-            Announcement({
-              required this.id,
-              required this.title,
-              required this.body,
-              required this.audience,
-              required this.animationType,
-              required this.createdAt,
-            });
-          }
-          ANN
-
-          # 3. STUDENT APP WIRING
           flutter create --org com.platinum --project-name student_app student_app
           mkdir -p student_app/lib/screens
           mkdir -p student_app/lib/services
 
+          # CHANGE THE APP NAME ON THE PHONE SCREEN TO "Platinum Digital App"
+          sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
+
           cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
-          description: Platinum Student
-          version: 1.0.0+1
+          description: Platinum Digital App
+          version: 1.0.3+4
           environment:
             sdk: ">=3.0.0 <4.0.0"
           dependencies:
@@ -608,12 +650,29 @@ jobs:
               path: ../shared
             sqflite: ^2.3.0
             path: ^1.8.3
-            confetti: ^0.7.0
-            intl: ^0.19.0
+            package_info_plus: ^5.0.1
+            http: ^1.2.0
+            url_launcher: ^6.2.5
+          dev_dependencies:
+            flutter_launcher_icons: "^0.13.1"
+            flutter_native_splash: "^2.4.0"
           flutter:
             uses-material-design: true
             assets:
               - assets/
+
+          flutter_launcher_icons:
+            android: "launcher_icon"
+            ios: true
+            image_path: "assets/logo.png"
+            min_sdk_android: 21
+          
+          flutter_native_splash:
+            color: "#0A3D91"
+            image: assets/logo.png
+            android_12:
+              image: assets/logo.png
+              color: "#0A3D91"
           STUPUB
 
           cat > student_app/lib/services/database_helper.dart << 'DBHELP'
@@ -623,7 +682,6 @@ jobs:
           class DatabaseHelper {
             static final DatabaseHelper instance = DatabaseHelper._init();
             static Database? _database;
-
             DatabaseHelper._init();
 
             Future<Database> get database async {
@@ -635,7 +693,7 @@ jobs:
             Future<Database> _initDB(String filePath) async {
               final dbPath = await getDatabasesPath();
               final path = join(dbPath, filePath);
-              return await openDatabase(path, version: 1, onCreate: _createDB);
+              return await openDatabase(path, version: 2, onCreate: _createDB, onUpgrade: (db, oldV, newV) async {});
             }
 
             Future _createDB(Database db, int version) async {
@@ -647,16 +705,6 @@ jobs:
                   registeredAt TEXT NOT NULL
                 )
               ''');
-              await db.execute('''
-                CREATE TABLE announcements (
-                  id TEXT PRIMARY KEY,
-                  title TEXT NOT NULL,
-                  body TEXT NOT NULL,
-                  audience TEXT NOT NULL,
-                  animationType TEXT NOT NULL,
-                  createdAt TEXT NOT NULL
-                )
-              ''');
             }
           }
           DBHELP
@@ -666,6 +714,10 @@ jobs:
           import 'screens/registration.dart';
           import 'screens/home.dart';
           import 'services/database_helper.dart';
+          import 'package:package_info_plus/package_info_plus.dart';
+          import 'package:http/http.dart' as http;
+          import 'dart:convert';
+          import 'package:url_launcher/url_launcher.dart';
 
           void main() => runApp(const PlatinumStudentApp());
 
@@ -676,13 +728,7 @@ jobs:
               return MaterialApp(
                 title: 'Platinum Digital App',
                 debugShowCheckedModeBanner: false,
-                theme: ThemeData(
-                  primaryColor: const Color(0xFF0A3D91),
-                  appBarTheme: const AppBarTheme(
-                    backgroundColor: Color(0xFF0A3D91),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
+                theme: ThemeData(primaryColor: const Color(0xFF0A3D91)),
                 home: const StartupScreen(),
               );
             }
@@ -693,30 +739,63 @@ jobs:
             @override
             State<StartupScreen> createState() => _StartupScreenState();
           }
-
           class _StartupScreenState extends State<StartupScreen> {
             @override
             void initState() {
               super.initState();
+              _initApp();
+            }
+
+            Future<void> _initApp() async {
+              await _checkForUpdates();
               _checkRegistration();
+            }
+
+            Future<void> _checkForUpdates() async {
+              try {
+                final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+                final currentVersion = packageInfo.version; 
+                const String updateUrl = 'https://raw.githubusercontent.com/Elvis567890/Platinum-Digital/main/version.json';
+                final response = await http.get(Uri.parse(updateUrl));
+                if (response.statusCode == 200) {
+                  final data = jsonDecode(response.body);
+                  final String latestVersion = data['version'];
+                  final String apkUrl = data['url'];
+                  if (latestVersion != currentVersion && mounted) _showUpdateDialog(apkUrl, latestVersion);
+                }
+              } catch (e) { print("Update check failed: $e"); }
+            }
+
+            void _showUpdateDialog(String apkUrl, String version) {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Update Available 🚀'),
+                  content: Text('A new version ($version) of Platinum Digital App is available. Update now!'),
+                  actions: [
+                    ElevatedButton(
+                      onPressed: () async {
+                        final uri = Uri.parse(apkUrl);
+                        if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      },
+                      child: const Text('Download Update'),
+                    )
+                  ],
+                ),
+              );
             }
 
             Future<void> _checkRegistration() async {
               final db = await DatabaseHelper.instance.database;
               final result = await db.query('students', limit: 1);
               if (mounted) {
-                if (result.isEmpty) {
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RegistrationScreen()));
-                } else {
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-                }
+                if (result.isEmpty) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RegistrationScreen()));
+                else Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
               }
             }
-
             @override
-            Widget build(BuildContext context) {
-              return const Scaffold(body: Center(child: CircularProgressIndicator()));
-            }
+            Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
           STUMAIN
 
@@ -743,9 +822,7 @@ jobs:
                 'classLevel': _selectedClass,
                 'registeredAt': DateTime.now().toIso8601String(),
               });
-              if (mounted) {
-                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-              }
+              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
             }
 
             @override
@@ -764,8 +841,7 @@ jobs:
                             children: [
                               Image.asset('assets/logo.png', height: 100, width: 100, fit: BoxFit.contain),
                               const SizedBox(height: 16),
-                              const Text('Student Registration',
-                                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
+                              const Text('Platinum Digital App', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
                               const SizedBox(height: 8),
                               Text('Platinum Secondary School Kiteezi', style: TextStyle(color: Colors.grey[600])),
                             ],
@@ -774,25 +850,13 @@ jobs:
                         const SizedBox(height: 30),
                         const Text('Full Name', style: TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 8),
-                        TextField(
-                          controller: _nameController,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. Nambi Aisha',
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
+                        TextField(controller: _nameController, decoration: InputDecoration(hintText: 'e.g. Nambi Aisha', filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
                         const SizedBox(height: 20),
                         const Text('Class', style: TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
                           value: _selectedClass,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
+                          decoration: InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
                           items: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                           onChanged: (v) => setState(() => _selectedClass = v!),
                         ),
@@ -800,14 +864,9 @@ jobs:
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0A3D91),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91), padding: const EdgeInsets.symmetric(vertical: 16)),
                             onPressed: _register,
-                            child: const Text('Register & Continue', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            child: const Text('Register & Continue', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ],
@@ -821,40 +880,42 @@ jobs:
 
           cat > student_app/lib/screens/home.dart << 'HOME'
           import 'package:flutter/material.dart';
-          import 'announcements.dart';
           import 'reports.dart';
           import 'chat.dart';
           import 'clubs.dart';
           import 'coming_soon.dart';
+          import 'platinum_pulse.dart';
+          import 'suggestion_box.dart';
 
           class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
             @override
             State<HomeScreen> createState() => _HomeScreenState();
           }
-
           class _HomeScreenState extends State<HomeScreen> {
             int _index = 0;
-            final _pages = const [
-              AnnouncementsScreen(),
-              ReportsScreen(),
-              ChatScreen(),
-              ClubsScreen(),
-              ComingSoonScreen(featureName: 'School Fees Balance'),
-            ];
+            final _pages = const [PlatinumPulseScreen(), ReportsScreen(), ChatScreen(), ClubsScreen(), ComingSoonScreen(featureName: 'School Fees Balance')];
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
+                drawer: Drawer(
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      const DrawerHeader(decoration: BoxDecoration(color: Color(0xFF0A3D91)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.end, children: [Icon(Icons.school, color: Colors.white, size: 48), SizedBox(height: 12), Text('Platinum Extras', style: TextStyle(color: Colors.white, fontSize: 24))])),
+                      ListTile(leading: const Icon(Icons.lightbulb_outline, color: Color(0xFF0A3D91)), title: const Text('Suggestion Box'), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const SuggestionBoxScreen())); }),
+                    ],
+                  ),
+                ),
                 body: _pages[_index],
                 bottomNavigationBar: BottomNavigationBar(
                   currentIndex: _index,
                   onTap: (i) => setState(() => _index = i),
                   selectedItemColor: const Color(0xFF0A3D91),
-                  unselectedItemColor: Colors.grey,
                   type: BottomNavigationBarType.fixed,
                   items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+                    BottomNavigationBarItem(icon: Icon(Icons.forum), label: 'Pulse'),
                     BottomNavigationBarItem(icon: Icon(Icons.description), label: 'Reports'),
                     BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
                     BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Clubs'),
@@ -866,104 +927,63 @@ jobs:
           }
           HOME
 
-          cat > student_app/lib/screens/announcements.dart << 'SAN'
+          cat > student_app/lib/screens/platinum_pulse.dart << 'PULSE'
           import 'package:flutter/material.dart';
-
-          class AnnouncementsScreen extends StatelessWidget {
-            const AnnouncementsScreen({super.key});
-            static const _messages = [
-              {'title': 'Urgent: Assembly at 8:30am', 'body': 'Bring sports kit tomorrow.', 'audience': 'S4', 'animation': 'Urgent'},
-              {'title': 'Term 2 Reports Released', 'body': 'Tap to unlock with your secret code.', 'audience': 'Whole School', 'animation': 'Celebration'},
-              {'title': 'Holiday: Independence Day', 'body': '9th Oct, No classes.', 'audience': 'Whole School', 'animation': 'Normal'},
-            ];
-
+          class PlatinumPulseScreen extends StatelessWidget {
+            const PlatinumPulseScreen({super.key});
             @override
             Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Home Feed')),
-                body: ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _messages.length,
-                  itemBuilder: (_, i) {
-                    final m = _messages[i];
-                    final isUrgent = m['animation'] == 'Urgent';
-                    final isCelebration = m['animation'] == 'Celebration';
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      color: isUrgent ? Colors.red[50] : (isCelebration ? Colors.amber[50] : Colors.white),
-                      child: ListTile(
-                        leading: Icon(
-                          isUrgent ? Icons.warning : (isCelebration ? Icons.star : Icons.campaign),
-                          color: isUrgent ? Colors.red : (isCelebration ? Colors.amber[700] : const Color(0xFF0A3D91)),
-                        ),
-                        title: Text(m['title']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(m['body']!),
-                            const SizedBox(height: 4),
-                            Text('${m['audience']} • 2 mins ago', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
+              return Scaffold(appBar: AppBar(title: const Text('Platinum Pulse')), body: ListView(padding: const EdgeInsets.all(12), children: [Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Row(children: [CircleAvatar(backgroundColor: Color(0xFF0A3D91), child: Icon(Icons.edit, color: Colors.white)), SizedBox(width: 12), Text('Writers Club', style: TextStyle(fontWeight: FontWeight.bold))])), const SizedBox(height: 12), const Text('Our new poetry corner is finally ready! Come check it out. 📚✍️'), const Divider(height: 30), const TextField(decoration: InputDecoration(hintText: 'Write a comment...', border: OutlineInputBorder(), isDense: true))])))]));
             }
           }
-          SAN
+          PULSE
+
+          cat > student_app/lib/screens/suggestion_box.dart << 'SUGG'
+          import 'package:flutter/material.dart';
+          class SuggestionBoxScreen extends StatelessWidget {
+            const SuggestionBoxScreen({super.key});
+            @override
+            Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Suggestion Box')), body: Padding(padding: const EdgeInsets.all(16), child: Column(children: [const TextField(maxLines: 6, decoration: InputDecoration(hintText: 'Type your suggestion here...', border: OutlineInputBorder())), const SizedBox(height: 16), SwitchListTile(title: const Text('Submit Anonymously'), value: true, onChanged: (v) {}), const Spacer(), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Submit')))])));
+          }
+          SUGG
+
+          cat > student_app/lib/screens/clubs.dart << 'CLUBS'
+          import 'package:flutter/material.dart';
+          class ClubsScreen extends StatelessWidget {
+            const ClubsScreen({super.key});
+            @override
+            Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Clubs')), body: ListView(padding: const EdgeInsets.all(12), children: [const Card(child: ListTile(leading: CircleAvatar(backgroundColor: Color(0xFF0A3D91), child: Icon(Icons.edit, color: Colors.white)), title: Text('Writers Club'), subtitle: Text('Head: Nambi Aisha')))]));
+          }
+          CLUBS
 
           cat > student_app/lib/screens/reports.dart << 'REP'
           import 'package:flutter/material.dart';
-
           class ReportsScreen extends StatefulWidget {
             const ReportsScreen({super.key});
             @override
             State<ReportsScreen> createState() => _ReportsScreenState();
           }
-
           class _ReportsScreenState extends State<ReportsScreen> {
             final _code = TextEditingController();
             bool _unlocked = false;
-
-            void _unlock() {
-              if (_code.text.length >= 4) setState(() => _unlocked = true);
-            }
-
             @override
             Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(title: const Text('My Reports')),
                 body: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: _unlocked
-                    ? const Center(child: Text('Report loaded! (Coming soon)', textAlign: TextAlign.center, style: TextStyle(fontSize: 18)))
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.lock, size: 64, color: Color(0xFF0A3D91)),
-                          const SizedBox(height: 16),
-                          const Text('Reports Released', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          const Text('Enter your secret code', style: TextStyle(color: Colors.grey)),
-                          const SizedBox(height: 24),
-                          TextField(controller: _code,
-                            decoration: const InputDecoration(labelText: 'Secret Code', border: OutlineInputBorder()),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 24, letterSpacing: 8)),
-                          const SizedBox(height: 24),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0A3D91),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                            ),
-                            onPressed: _unlock,
-                            child: const Text('Unlock Report', style: TextStyle(fontSize: 18)),
-                          ),
-                        ],
-                      ),
+                  child: _unlocked ? const Center(child: Text('Report Loaded!')) : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.lock, size: 64, color: Color(0xFF0A3D91)),
+                      const SizedBox(height: 16),
+                      const Text('Enter Secret Code', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 24),
+                      TextField(controller: _code, decoration: const InputDecoration(labelText: 'Secret Code', border: OutlineInputBorder()), textAlign: TextAlign.center),
+                      const SizedBox(height: 24),
+                      ElevatedButton(onPressed: () => setState(() => _unlocked = true), child: const Text('Unlock')),
+                    ],
+                  ),
                 ),
               );
             }
@@ -972,156 +992,37 @@ jobs:
 
           cat > student_app/lib/screens/chat.dart << 'CHAT'
           import 'package:flutter/material.dart';
-
           class ChatScreen extends StatelessWidget {
             const ChatScreen({super.key});
             @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('S4 Group'), actions: [
-                  TextButton(onPressed: () {}, child: const Text('Block', style: TextStyle(color: Colors.white))),
-                  TextButton(onPressed: () {}, child: const Text('Report', style: TextStyle(color: Colors.red))),
-                ]),
-                body: Column(
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.all(12),
-                        children: [
-                          _msg('Mr. Okello (Teacher)', 'Good morning S4 — remember science revision at 4pm in Lab 2', true),
-                          _msg('Trevor', 'Noted sir, will be there 👍', false),
-                          _msg('Grace', 'Can someone share notes for History?', false),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          Expanded(child: TextField(decoration: InputDecoration(hintText: 'Message S4 Group...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24))))),
-                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF0A3D91)), onPressed: () {}),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            Widget _msg(String name, String text, bool isTeacher) {
-              return Align(
-                alignment: isTeacher ? Alignment.centerLeft : Alignment.centerRight,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isTeacher ? Colors.blue[50] : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: isTeacher ? Color(0xFF0A3D91) : Colors.black54)),
-                      const SizedBox(height: 4),
-                      Text(text),
-                    ],
-                  ),
-                ),
-              );
-            }
+            Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('S4 Group')), body: const Center(child: Text('Class Group Chat')));
           }
           CHAT
 
-          cat > student_app/lib/screens/clubs.dart << 'CLUBS'
-          import 'package:flutter/material.dart';
-
-          class ClubsScreen extends StatelessWidget {
-            const ClubsScreen({super.key});
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Clubs')),
-                body: ListView(
-                  padding: const EdgeInsets.all(12),
-                  children: const [
-                    _ClubTile(name: 'Writers Club', desc: 'Poetry • Stories • Monthly challenge', icon: Icons.edit, subscribed: true),
-                    _ClubTile(name: 'Debate Club', desc: 'Thurs 4pm • Public speaking', icon: Icons.mic, subscribed: false),
-                    _ClubTile(name: 'Science Club', desc: 'Lab Projects • STEM', icon: Icons.science, subscribed: false),
-                  ],
-                ),
-              );
-            }
-          }
-
-          class _ClubTile extends StatelessWidget {
-            final String name, desc;
-            final IconData icon;
-            final bool subscribed;
-            const _ClubTile({required this.name, required this.desc, required this.icon, required this.subscribed});
-            @override
-            Widget build(BuildContext context) {
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: CircleAvatar(backgroundColor: const Color(0xFF0A3D91), child: Icon(icon, color: Colors.white)),
-                  title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(desc),
-                  trailing: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: subscribed ? Colors.grey[300] : const Color(0xFF0A3D91),
-                      foregroundColor: subscribed ? Colors.black : Colors.white,
-                    ),
-                    onPressed: () {},
-                    child: Text(subscribed ? 'Subscribed' : '+ Subscribe'),
-                  ),
-                ),
-              );
-            }
-          }
-          CLUBS
-
           cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
           import 'package:flutter/material.dart';
-
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
             const ComingSoonScreen({super.key, required this.featureName});
-
             @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: Text(featureName)),
-                body: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Coming Soon',
-                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
-                        const SizedBox(height: 12),
-                        Text('$featureName is coming soon for Platinum Secondary School Kiteezi.',
-                          textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Colors.black54)),
-                        const SizedBox(height: 24),
-                        const Text('Excellence Is Our Culture',
-                          style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Color(0xFF0A3D91))),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
+            Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(featureName)), body: Center(child: Text('$featureName coming soon.')));
           }
           CSSTU
+
+      - name: Generate Icons and Splash
+        run: |
+          cd student_app
+          flutter pub get
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
 
       - name: Build Student APK
         run: |
           cd student_app
-          flutter pub get
           flutter build apk --release
 
       - name: Upload Student APK
         uses: actions/upload-artifact@v4
         with:
-          name: student-app-apk
+          name: platinum-digital-app-apk
           path: student_app/build/app/outputs/flutter-apk/app-release.apk
