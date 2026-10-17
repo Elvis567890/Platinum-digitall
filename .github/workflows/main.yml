@@ -14,7 +14,7 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'zulu'
           java-version: '17'
 
       - uses: subosito/flutter-action@v2
@@ -68,23 +68,57 @@ jobs:
           # CHANGE THE APP NAME ON THE PHONE SCREEN
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FIX: LOCK SDK VERSIONS AND NDK FOR ADMIN APP
-          GRADLE_FILE="admin_app/android/app/build.gradle"
-          if [ -f "admin_app/android/app/build.gradle.kts" ]; then
-            GRADLE_FILE="admin_app/android/app/build.gradle.kts"
-          fi
-          
-          if [[ "$GRADLE_FILE" == *.kts ]]; then
-            sed -i 's/flutter.compileSdkVersion/34/g' "$GRADLE_FILE"
-            sed -i 's/flutter.minSdkVersion/21/g' "$GRADLE_FILE"
-            sed -i 's/flutter.targetSdkVersion/34/g' "$GRADLE_FILE"
-            sed -i 's/android {/android {\n    ndkVersion = "27.0.12077973"\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }/' "$GRADLE_FILE"
-          else
-            sed -i 's/flutter.compileSdkVersion/34/g' "$GRADLE_FILE"
-            sed -i 's/flutter.minSdkVersion/21/g' "$GRADLE_FILE"
-            sed -i 's/flutter.targetSdkVersion/34/g' "$GRADLE_FILE"
-            sed -i 's/android {/android {\n    ndkVersion "27.0.12077973"\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }/' "$GRADLE_FILE"
-          fi
+          # 🔴 FORCE GRADLE VERSIONS (Ensure Java 17 Compatibility)
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' admin_app/android/settings.gradle.kts 2>/dev/null || true
+          sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' admin_app/android/settings.gradle 2>/dev/null || true
+
+          # 🔴 WRITE A CLEAN build.gradle.kts FROM SCRATCH
+          cat > admin_app/android/app/build.gradle.kts << 'GRADLEKTS'
+          plugins {
+              id("com.android.application")
+              id("kotlin-android")
+              id("dev.flutter.flutter-gradle-plugin")
+          }
+
+          android {
+              namespace = "com.platinum.admin_app"
+              compileSdk = 34
+              ndkVersion = "27.0.12077973"
+
+              lint {
+                  checkReleaseBuilds = false
+                  abortOnError = false
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+
+              defaultConfig {
+                  applicationId = "com.platinum.admin_app"
+                  minSdk = 21
+                  targetSdk = 34
+                  versionCode = flutter.versionCode
+                  versionName = flutter.versionName
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig = signingConfigs.getByName("debug")
+                  }
+              }
+          }
+
+          flutter {
+              source = "../.."
+          }
+          GRADLEKTS
 
           cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
@@ -117,6 +151,9 @@ jobs:
             color: "#0A3D91"
             image: assets/logo.png
             web: false
+            android_12:
+              image: assets/logo.png
+              color: "#0A3D91"
           ADMINPUB
 
           cat > admin_app/lib/main.dart << 'ADMINMAIN'
@@ -611,7 +648,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'zulu'
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
@@ -662,23 +699,57 @@ jobs:
 
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FIX: LOCK SDK VERSIONS AND NDK FOR STUDENT APP
-          GRADLE_FILE="student_app/android/app/build.gradle"
-          if [ -f "student_app/android/app/build.gradle.kts" ]; then
-            GRADLE_FILE="student_app/android/app/build.gradle.kts"
-          fi
-          
-          if [[ "$GRADLE_FILE" == *.kts ]]; then
-            sed -i 's/flutter.compileSdkVersion/34/g' "$GRADLE_FILE"
-            sed -i 's/flutter.minSdkVersion/21/g' "$GRADLE_FILE"
-            sed -i 's/flutter.targetSdkVersion/34/g' "$GRADLE_FILE"
-            sed -i 's/android {/android {\n    ndkVersion = "27.0.12077973"\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }/' "$GRADLE_FILE"
-          else
-            sed -i 's/flutter.compileSdkVersion/34/g' "$GRADLE_FILE"
-            sed -i 's/flutter.minSdkVersion/21/g' "$GRADLE_FILE"
-            sed -i 's/flutter.targetSdkVersion/34/g' "$GRADLE_FILE"
-            sed -i 's/android {/android {\n    ndkVersion "27.0.12077973"\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }/' "$GRADLE_FILE"
-          fi
+          # 🔴 FORCE GRADLE VERSIONS (Ensure Java 17 Compatibility)
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' student_app/android/settings.gradle.kts 2>/dev/null || true
+          sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' student_app/android/settings.gradle 2>/dev/null || true
+
+          # 🔴 WRITE A CLEAN build.gradle.kts FROM SCRATCH
+          cat > student_app/android/app/build.gradle.kts << 'GRADLEKTS'
+          plugins {
+              id("com.android.application")
+              id("kotlin-android")
+              id("dev.flutter.flutter-gradle-plugin")
+          }
+
+          android {
+              namespace = "com.platinum.student_app"
+              compileSdk = 34
+              ndkVersion = "27.0.12077973"
+
+              lint {
+                  checkReleaseBuilds = false
+                  abortOnError = false
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+
+              defaultConfig {
+                  applicationId = "com.platinum.student_app"
+                  minSdk = 21
+                  targetSdk = 34
+                  versionCode = flutter.versionCode
+                  versionName = flutter.versionName
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig = signingConfigs.getByName("debug")
+                  }
+              }
+          }
+
+          flutter {
+              source = "../.."
+          }
+          GRADLEKTS
 
           cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
@@ -714,6 +785,9 @@ jobs:
             color: "#0A3D91"
             image: assets/logo.png
             web: false
+            android_12:
+              image: assets/logo.png
+              color: "#0A3D91"
           STUPUB
 
           cat > student_app/lib/services/database_helper.dart << 'DBHELP'
