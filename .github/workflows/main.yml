@@ -68,7 +68,6 @@ jobs:
           # CHANGE THE APP NAME ON THE PHONE SCREEN
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
 
-          # ALWAYS OVERWRITE PUBSPEC AND MAIN
           cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
           description: Platinum Staff Hub
@@ -612,6 +611,7 @@ jobs:
 
       - name: Generate Shared and Student Code
         run: |
+          # 1. SMART LOGO FINDER AND CONVERTER
           mkdir -p student_app/assets
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
           
@@ -625,6 +625,28 @@ jobs:
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; 
           fi
 
+          # 2. SHARED MODELS (THIS WAS MISSING IN THE STUDENT JOB)
+          mkdir -p shared/lib/models
+          cat > shared/pubspec.yaml << 'SHAREDPUB'
+          name: shared
+          description: Shared
+          version: 1.0.0
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+          dependencies:
+            crypto: ^3.0.3
+          SHAREDPUB
+
+          cat > shared/lib/club.dart << 'CLUB'
+          class Club {
+            final String id;
+            final String name;
+            String? headStudentName; 
+            Club({required this.id, required this.name, this.headStudentName});
+          }
+          CLUB
+
+          # 3. STUDENT APP WIRING
           flutter create --org com.platinum --project-name student_app student_app
           mkdir -p student_app/lib/screens
           mkdir -p student_app/lib/services
