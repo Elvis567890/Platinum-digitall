@@ -947,7 +947,44 @@ jobs:
             const PlatinumPulseScreen({super.key});
             @override
             Widget build(BuildContext context) {
-              return Scaffold(appBar: AppBar(title: const Text('Platinum Pulse')), body: ListView(padding: const EdgeInsets.all(12), children: [Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Row(children: [CircleAvatar(backgroundColor: Color(0xFF0A3D91), child: Icon(Icons.edit, color: Colors.white)), SizedBox(width: 12), Text('Writers Club', style: TextStyle(fontWeight: FontWeight.bold))])), const SizedBox(height: 12), const Text('Our new poetry corner is finally ready! Come check it out. 📚✍️'), const Divider(height: 30), const TextField(decoration: InputDecoration(hintText: 'Write a comment...', border: OutlineInputBorder(), isDense: true))])))]));
+              return Scaffold(
+                appBar: AppBar(title: const Text('Platinum Pulse')),
+                body: ListView(
+                  padding: const EdgeInsets.all(12),
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: Color(0xFF0A3D91),
+                                  child: Icon(Icons.edit, color: Colors.white),
+                                ),
+                                SizedBox(width: 12),
+                                Text('Writers Club', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            const Text('Our new poetry corner is finally ready! Come check it out. 📚✍️'),
+                            const Divider(height: 30),
+                            const TextField(
+                              decoration: InputDecoration(
+                                hintText: 'Write a comment...',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
             }
           }
           PULSE
