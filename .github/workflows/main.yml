@@ -68,21 +68,10 @@ jobs:
           # CHANGE THE APP NAME ON THE PHONE SCREEN
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FIX GRADLE BUILD ISSUES (NDK & LINT)
-          # Force a compatible NDK version
-          sed -i 's/flutter.ndkVersion/"27.0.12077973"/g' admin_app/android/app/build.gradle
-          # Disable lint checks that can fail the release build
-          sed -i '/buildTypes {/i \
-              lintOptions {\
-                  checkReleaseBuilds false\
-                  abortOnError false\
-              }\
-          ' admin_app/android/app/build.gradle
-
           cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
           description: Platinum Staff Hub
-          version: 1.0.3+4
+          version: 1.0.4+5
           environment:
             sdk: ">=3.0.0 <4.0.0"
           dependencies:
@@ -99,6 +88,17 @@ jobs:
             uses-material-design: true
             assets:
               - assets/
+          
+          flutter_launcher_icons:
+            android: "launcher_icon"
+            ios: true
+            image_path: "assets/logo.png"
+            min_sdk_android: 21
+          
+          flutter_native_splash:
+            color: "#0A3D91"
+            image: assets/logo.png
+            web: false
           ADMINPUB
 
           cat > admin_app/lib/main.dart << 'ADMINMAIN'
@@ -571,34 +571,12 @@ jobs:
           }
           CS
 
-      - name: Generate Icons and Splash
-        run: |
-          cd admin_app
-          cat > flutter_launcher_icons.yaml << 'ICONS'
-          flutter_launcher_icons:
-            android: "launcher_icon"
-            ios: true
-            image_path: "assets/logo.png"
-            min_sdk_android: 21
-          ICONS
-          
-          cat > flutter_native_splash.yaml << 'SPLASH'
-          flutter_native_splash:
-            color: "#0A3D91"
-            image: assets/logo.png
-            web: false
-          SPLASH
-          
-          flutter pub get
-          flutter pub add flutter_launcher_icons flutter_native_splash
-          flutter pub run flutter_launcher_icons:main -f flutter_launcher_icons.yaml
-          flutter pub run flutter_native_splash:create
-
       - name: Build Admin APK
         run: |
           cd admin_app
-          flutter clean
           flutter pub get
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
           flutter build apk --release
 
       - name: Upload Admin APK
@@ -666,19 +644,10 @@ jobs:
 
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FIX GRADLE BUILD ISSUES (NDK & LINT)
-          sed -i 's/flutter.ndkVersion/"27.0.12077973"/g' student_app/android/app/build.gradle
-          sed -i '/buildTypes {/i \
-              lintOptions {\
-                  checkReleaseBuilds false\
-                  abortOnError false\
-              }\
-          ' student_app/android/app/build.gradle
-
           cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
           description: Platinum Digital App
-          version: 1.0.3+4
+          version: 1.0.4+5
           environment:
             sdk: ">=3.0.0 <4.0.0"
           dependencies:
@@ -698,6 +667,17 @@ jobs:
             uses-material-design: true
             assets:
               - assets/
+
+          flutter_launcher_icons:
+            android: "launcher_icon"
+            ios: true
+            image_path: "assets/logo.png"
+            min_sdk_android: 21
+          
+          flutter_native_splash:
+            color: "#0A3D91"
+            image: assets/logo.png
+            web: false
           STUPUB
 
           cat > student_app/lib/services/database_helper.dart << 'DBHELP'
@@ -1019,34 +999,12 @@ jobs:
           }
           CSSTU
 
-      - name: Generate Icons and Splash
-        run: |
-          cd student_app
-          cat > flutter_launcher_icons.yaml << 'ICONS'
-          flutter_launcher_icons:
-            android: "launcher_icon"
-            ios: true
-            image_path: "assets/logo.png"
-            min_sdk_android: 21
-          ICONS
-          
-          cat > flutter_native_splash.yaml << 'SPLASH'
-          flutter_native_splash:
-            color: "#0A3D91"
-            image: assets/logo.png
-            web: false
-          SPLASH
-          
-          flutter pub get
-          flutter pub add flutter_launcher_icons flutter_native_splash
-          flutter pub run flutter_launcher_icons:main -f flutter_launcher_icons.yaml
-          flutter pub run flutter_native_splash:create
-
       - name: Build Student APK
         run: |
           cd student_app
-          flutter clean
           flutter pub get
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
           flutter build apk --release
 
       - name: Upload Student APK
