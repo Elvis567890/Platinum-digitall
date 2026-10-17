@@ -28,12 +28,19 @@ jobs:
           mkdir -p admin_app/assets
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*.png" | head -n 1)
           if [ -z "$LOGO_SOURCE" ]; then LOGO_SOURCE=$(find . -maxdepth 1 -iname "*.png" | head -n 1); fi
+          
           if [ -n "$LOGO_SOURCE" ]; then 
             cp "$LOGO_SOURCE" admin_app/assets/logo.png;
             echo "✅ Found school badge: $LOGO_SOURCE and copied to assets!"
           else 
             echo "⚠️ No badge found. Using placeholder."
             echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png; 
+          fi
+
+          # 🔴 FIX: VERIFY IMAGE IS NOT EMPTY (0 BYTES)
+          if [ ! -s admin_app/assets/logo.png ]; then
+            echo "❌ ERROR: The logo.png file is empty (0 bytes). Creating a valid placeholder..."
+            echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png;
           fi
 
           # 2. SHARED MODELS
@@ -640,12 +647,19 @@ jobs:
           mkdir -p student_app/assets
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*.png" | head -n 1)
           if [ -z "$LOGO_SOURCE" ]; then LOGO_SOURCE=$(find . -maxdepth 1 -iname "*.png" | head -n 1); fi
+          
           if [ -n "$LOGO_SOURCE" ]; then 
             cp "$LOGO_SOURCE" student_app/assets/logo.png;
             echo "✅ Found school badge: $LOGO_SOURCE and copied to assets!"
           else 
             echo "⚠️ No badge found. Using placeholder."
             echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; 
+          fi
+
+          # 🔴 FIX: VERIFY IMAGE IS NOT EMPTY (0 BYTES)
+          if [ ! -s student_app/assets/logo.png ]; then
+            echo "❌ ERROR: The logo.png file is empty (0 bytes). Creating a valid placeholder..."
+            echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png;
           fi
 
           flutter create --org com.platinum --project-name student_app student_app
