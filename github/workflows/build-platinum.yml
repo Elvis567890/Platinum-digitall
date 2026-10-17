@@ -22,7 +22,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Shared and Admin Code
+      - name: Generate Shared and Admin Code (Smart Check)
         run: |
           # 1. SMART LOGO FINDER
           mkdir -p admin_app/assets
@@ -33,7 +33,9 @@ jobs:
 
           # 2. SHARED MODELS
           mkdir -p shared/lib/models
-          cat > shared/pubspec.yaml << 'SHAREDPUB'
+          if [ ! -f "shared/pubspec.yaml" ]; then
+            echo "Creating shared/pubspec.yaml..."
+            cat > shared/pubspec.yaml << 'SHAREDPUB'
           name: shared
           description: Shared
           version: 1.0.0
@@ -42,8 +44,11 @@ jobs:
           dependencies:
             crypto: ^3.0.3
           SHAREDPUB
+          fi
 
-          cat > shared/lib/club.dart << 'CLUB'
+          if [ ! -f "shared/lib/club.dart" ]; then
+            echo "Creating shared/lib/club.dart..."
+            cat > shared/lib/club.dart << 'CLUB'
           class Club {
             final String id;
             final String name;
@@ -51,15 +56,18 @@ jobs:
             Club({required this.id, required this.name, this.headStudentName});
           }
           CLUB
+          fi
 
           # 3. ADMIN APP WIRING
           flutter create --org com.platinum --project-name admin_app admin_app
           mkdir -p admin_app/lib/screens
 
-          # CHANGE THE APP NAME ON THE PHONE SCREEN TO "Platinum Staff Hub"
+          # CHANGE THE APP NAME ON THE PHONE SCREEN
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
 
-          cat > admin_app/pubspec.yaml << 'ADMINPUB'
+          if [ ! -f "admin_app/pubspec.yaml" ]; then
+            echo "Creating admin_app/pubspec.yaml..."
+            cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
           description: Platinum Staff Hub
           version: 1.0.3+4
@@ -79,13 +87,11 @@ jobs:
             uses-material-design: true
             assets:
               - assets/
-          
           flutter_launcher_icons:
             android: "launcher_icon"
             ios: true
             image_path: "assets/logo.png"
             min_sdk_android: 21
-          
           flutter_native_splash:
             color: "#0A3D91"
             image: assets/logo.png
@@ -93,8 +99,11 @@ jobs:
               image: assets/logo.png
               color: "#0A3D91"
           ADMINPUB
+          fi
 
-          cat > admin_app/lib/main.dart << 'ADMINMAIN'
+          if [ ! -f "admin_app/lib/main.dart" ]; then
+            echo "Creating admin_app/lib/main.dart..."
+            cat > admin_app/lib/main.dart << 'ADMINMAIN'
           import 'package:flutter/material.dart';
           import 'screens/login.dart';
 
@@ -119,8 +128,10 @@ jobs:
             }
           }
           ADMINMAIN
+          fi
 
-          cat > admin_app/lib/screens/login.dart << 'LOGIN'
+          if [ ! -f "admin_app/lib/screens/login.dart" ]; then
+            cat > admin_app/lib/screens/login.dart << 'LOGIN'
           import 'package:flutter/material.dart';
           import 'dashboard.dart';
 
@@ -137,15 +148,9 @@ jobs:
 
             void _login() {
               if (_id.text.isEmpty || _pin.text.isEmpty) return;
-
-              // HARDCODED SUPER ADMIN TEST ACCOUNT
-              if (_id.text.toUpperCase() == 'SUPER' && _pin.text == '1234') {
-                _role = 'super_admin';
-              } else if (_id.text.toUpperCase() == 'TEACHER' && _pin.text == '1234') {
-                _role = 'teacher';
-              } else if (_id.text.toUpperCase() == 'ADMIN' && _pin.text == '1234') {
-                _role = 'admin';
-              }
+              if (_id.text.toUpperCase() == 'SUPER' && _pin.text == '1234') { _role = 'super_admin'; }
+              else if (_id.text.toUpperCase() == 'TEACHER' && _pin.text == '1234') { _role = 'teacher'; }
+              else if (_id.text.toUpperCase() == 'ADMIN' && _pin.text == '1234') { _role = 'admin'; }
 
               Navigator.pushReplacement(context, MaterialPageRoute(
                 builder: (_) => DashboardScreen(role: _role, name: _id.text),
@@ -186,8 +191,10 @@ jobs:
             }
           }
           LOGIN
+          fi
 
-          cat > admin_app/lib/screens/dashboard.dart << 'DASH'
+          if [ ! -f "admin_app/lib/screens/dashboard.dart" ]; then
+            cat > admin_app/lib/screens/dashboard.dart << 'DASH'
           import 'package:flutter/material.dart';
           import 'announcements.dart';
           import 'marks_submission.dart';
@@ -217,10 +224,8 @@ jobs:
                   children: [
                     _tile(context, 'Broadcast', Icons.campaign, const AnnouncementsScreen()),
                     _tile(context, 'Marks Submission', Icons.edit_note, const MarksSubmissionScreen()),
-                    
                     if (!isTeacher) _tile(context, 'Validation Engine', Icons.checklist, const ValidationEngineScreen()),
                     if (isRelease) _tile(context, 'Release Reports', Icons.lock_open, const ComingSoonScreen(featureName: 'Release Reports')),
-                    
                     if (isSuper) _tile(context, 'Manage Clubs', Icons.groups, const ManageClubsScreen()),
                     if (isSuper) _tile(context, 'Manage Staff', Icons.admin_panel_settings, const ManageAdminsScreen()),
                   ],
@@ -249,8 +254,10 @@ jobs:
             }
           }
           DASH
+          fi
 
-          cat > admin_app/lib/screens/manage_admins.dart << 'MNGADMIN'
+          if [ ! -f "admin_app/lib/screens/manage_admins.dart" ]; then
+            cat > admin_app/lib/screens/manage_admins.dart << 'MNGADMIN'
           import 'package:flutter/material.dart';
 
           class ManageAdminsScreen extends StatefulWidget {
@@ -268,7 +275,6 @@ jobs:
             void _addStaff() {
               final idController = TextEditingController();
               String selectedRole = 'Teacher';
-
               showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -295,9 +301,7 @@ jobs:
                     ElevatedButton(
                       onPressed: () {
                         if (idController.text.isNotEmpty) {
-                          setState(() {
-                            _staff.add({'id': idController.text.toUpperCase(), 'role': selectedRole});
-                          });
+                          setState(() { _staff.add({'id': idController.text.toUpperCase(), 'role': selectedRole}); });
                           Navigator.pop(ctx);
                         }
                       },
@@ -308,7 +312,6 @@ jobs:
               );
             }
 
-            // PROMOTE / DEMOTE STAFF FUNCTION
             void _changeRole(Map<String, String> staff) {
               String newRole = staff['role']!;
               showDialog(
@@ -329,10 +332,7 @@ jobs:
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
                       ElevatedButton(
-                        onPressed: () {
-                          setState(() { staff['role'] = newRole; });
-                          Navigator.pop(ctx);
-                        },
+                        onPressed: () { setState(() { staff['role'] = newRole; }); Navigator.pop(ctx); },
                         child: const Text('Save Changes'),
                       ),
                     ],
@@ -379,8 +379,10 @@ jobs:
             }
           }
           MNGADMIN
+          fi
 
-          cat > admin_app/lib/screens/manage_clubs.dart << 'MNGCLUB'
+          if [ ! -f "admin_app/lib/screens/manage_clubs.dart" ]; then
+            cat > admin_app/lib/screens/manage_clubs.dart << 'MNGCLUB'
           import 'package:flutter/material.dart';
           import 'package:shared/club.dart';
 
@@ -433,13 +435,9 @@ jobs:
                         ],
                       ),
                       actions: [
-                        // DEMOTE BUTTON
                         if (club.headStudentName != null)
                           TextButton(
-                            onPressed: () {
-                              setState(() { club.headStudentName = null; });
-                              Navigator.pop(ctx);
-                            },
+                            onPressed: () { setState(() { club.headStudentName = null; }); Navigator.pop(ctx); },
                             child: const Text('Demote Head to Student', style: TextStyle(color: Colors.red)),
                           ),
                         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
@@ -476,8 +474,10 @@ jobs:
             }
           }
           MNGCLUB
+          fi
 
-          cat > admin_app/lib/screens/marks_submission.dart << 'MARKSUB'
+          if [ ! -f "admin_app/lib/screens/marks_submission.dart" ]; then
+            cat > admin_app/lib/screens/marks_submission.dart << 'MARKSUB'
           import 'package:flutter/material.dart';
           import 'package:image_picker/image_picker.dart';
           import 'dart:io';
@@ -489,25 +489,18 @@ jobs:
           }
 
           class _MarksSubmissionScreenState extends State<MarksSubmissionScreen> {
-            File? _image;
-            bool _isProcessing = false;
-            bool _hasResult = false;
-
-            final String _ocrSubject = 'Biology';
-            final String _ocrStudent = 'John Doe';
-            final String _ocrScore = '85/100';
+            File? _image; bool _isProcessing = false; bool _hasResult = false;
+            final String _ocrSubject = 'Biology'; final String _ocrStudent = 'John Doe'; final String _ocrScore = '85/100';
 
             Future<void> _pickImage(ImageSource source) async {
               try {
                 final pickedFile = await ImagePicker().pickImage(source: source);
                 if (pickedFile != null) {
                   setState(() { _image = File(pickedFile.path); _isProcessing = true; _hasResult = false; });
-                  await Future.delayed(const Duration(seconds: 2)); // Simulate OCR
+                  await Future.delayed(const Duration(seconds: 2));
                   if (mounted) setState(() { _isProcessing = false; _hasResult = true; });
                 }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
+              } catch (e) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); }
             }
 
             @override
@@ -556,8 +549,10 @@ jobs:
             }
           }
           MARKSUB
+          fi
 
-          cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
+          if [ ! -f "admin_app/lib/screens/announcements.dart" ]; then
+            cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
           import 'package:flutter/material.dart';
           class AnnouncementsScreen extends StatefulWidget {
             const AnnouncementsScreen({super.key});
@@ -569,8 +564,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Broadcast')), body: const Center(child: Text('Broadcast Form Here')));
           }
           ANNSCR
+          fi
 
-          cat > admin_app/lib/screens/validation_engine.dart << 'VALENG'
+          if [ ! -f "admin_app/lib/screens/validation_engine.dart" ]; then
+            cat > admin_app/lib/screens/validation_engine.dart << 'VALENG'
           import 'package:flutter/material.dart';
           class ValidationEngineScreen extends StatelessWidget {
             const ValidationEngineScreen({super.key});
@@ -578,8 +575,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Validation')), body: const Center(child: Text('Validation Engine')));
           }
           VALENG
+          fi
 
-          cat > admin_app/lib/screens/coming_soon.dart << 'CS'
+          if [ ! -f "admin_app/lib/screens/coming_soon.dart" ]; then
+            cat > admin_app/lib/screens/coming_soon.dart << 'CS'
           import 'package:flutter/material.dart';
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -588,6 +587,7 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(featureName)), body: Center(child: Text('$featureName coming soon.')));
           }
           CS
+          fi
 
       - name: Generate Icons and Splash
         run: |
@@ -622,7 +622,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Shared and Student Code
+      - name: Generate Shared and Student Code (Smart Check)
         run: |
           mkdir -p student_app/assets
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*.png" | head -n 1)
@@ -634,10 +634,10 @@ jobs:
           mkdir -p student_app/lib/screens
           mkdir -p student_app/lib/services
 
-          # CHANGE THE APP NAME ON THE PHONE SCREEN TO "Platinum Digital App"
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
 
-          cat > student_app/pubspec.yaml << 'STUPUB'
+          if [ ! -f "student_app/pubspec.yaml" ]; then
+            cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
           description: Platinum Digital App
           version: 1.0.3+4
@@ -660,13 +660,11 @@ jobs:
             uses-material-design: true
             assets:
               - assets/
-
           flutter_launcher_icons:
             android: "launcher_icon"
             ios: true
             image_path: "assets/logo.png"
             min_sdk_android: 21
-          
           flutter_native_splash:
             color: "#0A3D91"
             image: assets/logo.png
@@ -674,8 +672,10 @@ jobs:
               image: assets/logo.png
               color: "#0A3D91"
           STUPUB
+          fi
 
-          cat > student_app/lib/services/database_helper.dart << 'DBHELP'
+          if [ ! -f "student_app/lib/services/database_helper.dart" ]; then
+            cat > student_app/lib/services/database_helper.dart << 'DBHELP'
           import 'package:sqflite/sqflite.dart';
           import 'package:path/path.dart';
 
@@ -708,8 +708,10 @@ jobs:
             }
           }
           DBHELP
+          fi
 
-          cat > student_app/lib/main.dart << 'STUMAIN'
+          if [ ! -f "student_app/lib/main.dart" ]; then
+            cat > student_app/lib/main.dart << 'STUMAIN'
           import 'package:flutter/material.dart';
           import 'screens/registration.dart';
           import 'screens/home.dart';
@@ -741,15 +743,9 @@ jobs:
           }
           class _StartupScreenState extends State<StartupScreen> {
             @override
-            void initState() {
-              super.initState();
-              _initApp();
-            }
+            void initState() { super.initState(); _initApp(); }
 
-            Future<void> _initApp() async {
-              await _checkForUpdates();
-              _checkRegistration();
-            }
+            Future<void> _initApp() async { await _checkForUpdates(); _checkRegistration(); }
 
             Future<void> _checkForUpdates() async {
               try {
@@ -768,20 +764,11 @@ jobs:
 
             void _showUpdateDialog(String apkUrl, String version) {
               showDialog(
-                context: context,
-                barrierDismissible: false,
+                context: context, barrierDismissible: false,
                 builder: (ctx) => AlertDialog(
                   title: const Text('Update Available 🚀'),
                   content: Text('A new version ($version) of Platinum Digital App is available. Update now!'),
-                  actions: [
-                    ElevatedButton(
-                      onPressed: () async {
-                        final uri = Uri.parse(apkUrl);
-                        if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      },
-                      child: const Text('Download Update'),
-                    )
-                  ],
+                  actions: [ElevatedButton(onPressed: () async { final uri = Uri.parse(apkUrl); if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication); }, child: const Text('Download Update'))],
                 ),
               );
             }
@@ -798,8 +785,10 @@ jobs:
             Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
           STUMAIN
+          fi
 
-          cat > student_app/lib/screens/registration.dart << 'REG'
+          if [ ! -f "student_app/lib/screens/registration.dart" ]; then
+            cat > student_app/lib/screens/registration.dart << 'REG'
           import 'package:flutter/material.dart';
           import '../services/database_helper.dart';
           import 'home.dart';
@@ -877,8 +866,10 @@ jobs:
             }
           }
           REG
+          fi
 
-          cat > student_app/lib/screens/home.dart << 'HOME'
+          if [ ! -f "student_app/lib/screens/home.dart" ]; then
+            cat > student_app/lib/screens/home.dart << 'HOME'
           import 'package:flutter/material.dart';
           import 'reports.dart';
           import 'chat.dart';
@@ -926,8 +917,10 @@ jobs:
             }
           }
           HOME
+          fi
 
-          cat > student_app/lib/screens/platinum_pulse.dart << 'PULSE'
+          if [ ! -f "student_app/lib/screens/platinum_pulse.dart" ]; then
+            cat > student_app/lib/screens/platinum_pulse.dart << 'PULSE'
           import 'package:flutter/material.dart';
           class PlatinumPulseScreen extends StatelessWidget {
             const PlatinumPulseScreen({super.key});
@@ -937,8 +930,10 @@ jobs:
             }
           }
           PULSE
+          fi
 
-          cat > student_app/lib/screens/suggestion_box.dart << 'SUGG'
+          if [ ! -f "student_app/lib/screens/suggestion_box.dart" ]; then
+            cat > student_app/lib/screens/suggestion_box.dart << 'SUGG'
           import 'package:flutter/material.dart';
           class SuggestionBoxScreen extends StatelessWidget {
             const SuggestionBoxScreen({super.key});
@@ -946,8 +941,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Suggestion Box')), body: Padding(padding: const EdgeInsets.all(16), child: Column(children: [const TextField(maxLines: 6, decoration: InputDecoration(hintText: 'Type your suggestion here...', border: OutlineInputBorder())), const SizedBox(height: 16), SwitchListTile(title: const Text('Submit Anonymously'), value: true, onChanged: (v) {}), const Spacer(), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Submit')))])));
           }
           SUGG
+          fi
 
-          cat > student_app/lib/screens/clubs.dart << 'CLUBS'
+          if [ ! -f "student_app/lib/screens/clubs.dart" ]; then
+            cat > student_app/lib/screens/clubs.dart << 'CLUBS'
           import 'package:flutter/material.dart';
           class ClubsScreen extends StatelessWidget {
             const ClubsScreen({super.key});
@@ -955,8 +952,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Clubs')), body: ListView(padding: const EdgeInsets.all(12), children: [const Card(child: ListTile(leading: CircleAvatar(backgroundColor: Color(0xFF0A3D91), child: Icon(Icons.edit, color: Colors.white)), title: Text('Writers Club'), subtitle: Text('Head: Nambi Aisha')))]));
           }
           CLUBS
+          fi
 
-          cat > student_app/lib/screens/reports.dart << 'REP'
+          if [ ! -f "student_app/lib/screens/reports.dart" ]; then
+            cat > student_app/lib/screens/reports.dart << 'REP'
           import 'package:flutter/material.dart';
           class ReportsScreen extends StatefulWidget {
             const ReportsScreen({super.key});
@@ -989,8 +988,10 @@ jobs:
             }
           }
           REP
+          fi
 
-          cat > student_app/lib/screens/chat.dart << 'CHAT'
+          if [ ! -f "student_app/lib/screens/chat.dart" ]; then
+            cat > student_app/lib/screens/chat.dart << 'CHAT'
           import 'package:flutter/material.dart';
           class ChatScreen extends StatelessWidget {
             const ChatScreen({super.key});
@@ -998,8 +999,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('S4 Group')), body: const Center(child: Text('Class Group Chat')));
           }
           CHAT
+          fi
 
-          cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
+          if [ ! -f "student_app/lib/screens/coming_soon.dart" ]; then
+            cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
           import 'package:flutter/material.dart';
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -1008,6 +1011,7 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(featureName)), body: Center(child: Text('$featureName coming soon.')));
           }
           CSSTU
+          fi
 
       - name: Generate Icons and Splash
         run: |
