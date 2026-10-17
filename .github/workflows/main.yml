@@ -65,18 +65,21 @@ jobs:
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>' admin_app/android/app/src/main/AndroidManifest.xml
 
-          # 5. UPDATE GRADLE TO 9.3.1 (REQUIRED FOR AGP 9.x)
+          # 5. UPDATE GRADLE TO 9.3.1
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-9.3.1-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
 
-          # 6. OVERWRITE BUILD.GRADLE.KTS TO FORCE NDK & SDK
+          # 🔴 6. SET GRADLE PROPERTIES FOR AGP 9.0 COMPATIBILITY 🔴
+          echo "android.newDsl=false" >> admin_app/android/gradle.properties
+          echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
+
+          # 🔴 7. OVERWRITE BUILD.GRADLE.KTS WITH NEW DSL 🔴
           cat > admin_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
-              id("kotlin-android")
               id("dev.flutter.flutter-gradle-plugin")
           }
 
-          android {
+          configure<com.android.build.api.dsl.ApplicationExtension> {
               namespace = "com.platinum.admin_app"
               compileSdk = 34
               ndkVersion = "27.0.12077973"
@@ -89,10 +92,6 @@ jobs:
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
-              }
-
-              kotlinOptions {
-                  jvmTarget = "17"
               }
 
               defaultConfig {
@@ -115,13 +114,13 @@ jobs:
           }
           GRADLEKTS
 
-          # 7. ADD DEPENDENCIES (INCLUDING SHARED)
+          # 8. ADD DEPENDENCIES (INCLUDING SHARED)
           cd admin_app
           flutter pub add intl image_picker
           flutter pub add --path ../shared shared
           flutter pub add --dev flutter_launcher_icons flutter_native_splash
 
-          # 8. WRITE ICON & SPLASH CONFIG
+          # 9. WRITE ICON & SPLASH CONFIG
           cat >> pubspec.yaml << 'ADMINPUB'
 
           flutter_launcher_icons:
@@ -139,7 +138,7 @@ jobs:
               color: "#0A3D91"
           ADMINPUB
 
-          # 9. WRITE DART CODE
+          # 10. WRITE DART CODE
           mkdir -p lib/screens
           cat > lib/main.dart << 'ADMINMAIN'
           import 'package:flutter/material.dart';
@@ -683,18 +682,21 @@ jobs:
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>' student_app/android/app/src/main/AndroidManifest.xml
 
-          # 5. UPDATE GRADLE TO 9.3.1 (REQUIRED FOR AGP 9.x)
+          # 5. UPDATE GRADLE TO 9.3.1
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-9.3.1-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
 
-          # 6. OVERWRITE BUILD.GRADLE.KTS TO FORCE NDK & SDK
+          # 🔴 6. SET GRADLE PROPERTIES FOR AGP 9.0 COMPATIBILITY 🔴
+          echo "android.newDsl=false" >> student_app/android/gradle.properties
+          echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
+
+          # 🔴 7. OVERWRITE BUILD.GRADLE.KTS WITH NEW DSL 🔴
           cat > student_app/android/app/build.gradle.kts << 'GRADLEKTS'
           plugins {
               id("com.android.application")
-              id("kotlin-android")
               id("dev.flutter.flutter-gradle-plugin")
           }
 
-          android {
+          configure<com.android.build.api.dsl.ApplicationExtension> {
               namespace = "com.platinum.student_app"
               compileSdk = 34
               ndkVersion = "27.0.12077973"
@@ -707,10 +709,6 @@ jobs:
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
-              }
-
-              kotlinOptions {
-                  jvmTarget = "17"
               }
 
               defaultConfig {
@@ -733,12 +731,12 @@ jobs:
           }
           GRADLEKTS
 
-          # 7. ADD DEPENDENCIES
+          # 8. ADD DEPENDENCIES
           cd student_app
           flutter pub add sqflite path package_info_plus http url_launcher
           flutter pub add --dev flutter_launcher_icons flutter_native_splash
 
-          # 8. WRITE ICON & SPLASH CONFIG
+          # 9. WRITE ICON & SPLASH CONFIG
           cat >> pubspec.yaml << 'STUPUB'
 
           flutter_launcher_icons:
@@ -756,7 +754,7 @@ jobs:
               color: "#0A3D91"
           STUPUB
 
-          # 9. WRITE DART CODE
+          # 10. WRITE DART CODE
           mkdir -p lib/screens
           cat > lib/services/database_helper.dart << 'DBHELP'
           import 'package:sqflite/sqflite.dart';
