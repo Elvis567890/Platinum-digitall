@@ -26,14 +26,11 @@ jobs:
         run: |
           # 1. SMART LOGO FINDER AND CONVERTER
           mkdir -p admin_app/assets
-          # Find any file with "inshot" in the name (case-insensitive, any extension)
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
           
           if [ -n "$LOGO_SOURCE" ] && [ -f "$LOGO_SOURCE" ]; then
             echo "✅ Found school badge: $LOGO_SOURCE"
-            # Use ImageMagick to convert the image to a 1024x1024 PNG. This guarantees it's valid.
             if command -v convert &> /dev/null; then
-              echo "Converting image to valid PNG..."
               convert "$LOGO_SOURCE" -resize 1024x1024 admin_app/assets/logo.png
             else
               cp "$LOGO_SOURCE" admin_app/assets/logo.png
@@ -43,16 +40,9 @@ jobs:
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png; 
           fi
 
-          # Verify image is not empty (0 bytes)
-          if [ ! -s admin_app/assets/logo.png ]; then
-            echo "❌ ERROR: The logo.png is empty. Creating placeholder."
-            printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
-          fi
-
           # 2. SHARED MODELS
           mkdir -p shared/lib/models
-          if [ ! -f "shared/pubspec.yaml" ]; then
-            cat > shared/pubspec.yaml << 'SHAREDPUB'
+          cat > shared/pubspec.yaml << 'SHAREDPUB'
           name: shared
           description: Shared
           version: 1.0.0
@@ -61,10 +51,8 @@ jobs:
           dependencies:
             crypto: ^3.0.3
           SHAREDPUB
-          fi
 
-          if [ ! -f "shared/lib/club.dart" ]; then
-            cat > shared/lib/club.dart << 'CLUB'
+          cat > shared/lib/club.dart << 'CLUB'
           class Club {
             final String id;
             final String name;
@@ -72,7 +60,6 @@ jobs:
             Club({required this.id, required this.name, this.headStudentName});
           }
           CLUB
-          fi
 
           # 3. ADMIN APP WIRING
           flutter create --org com.platinum --project-name admin_app admin_app
@@ -81,8 +68,8 @@ jobs:
           # CHANGE THE APP NAME ON THE PHONE SCREEN
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
 
-          if [ ! -f "admin_app/pubspec.yaml" ]; then
-            cat > admin_app/pubspec.yaml << 'ADMINPUB'
+          # ALWAYS OVERWRITE PUBSPEC AND MAIN
+          cat > admin_app/pubspec.yaml << 'ADMINPUB'
           name: admin_app
           description: Platinum Staff Hub
           version: 1.0.3+4
@@ -103,11 +90,8 @@ jobs:
             assets:
               - assets/
           ADMINPUB
-          fi
 
-          # 4. ADMIN APP SOURCE CODE
-          if [ ! -f "admin_app/lib/main.dart" ]; then
-            cat > admin_app/lib/main.dart << 'ADMINMAIN'
+          cat > admin_app/lib/main.dart << 'ADMINMAIN'
           import 'package:flutter/material.dart';
           import 'screens/login.dart';
 
@@ -132,10 +116,9 @@ jobs:
             }
           }
           ADMINMAIN
-          fi
 
-          if [ ! -f "admin_app/lib/screens/login.dart" ]; then
-            cat > admin_app/lib/screens/login.dart << 'LOGIN'
+          # 4. ADMIN APP SCREENS
+          cat > admin_app/lib/screens/login.dart << 'LOGIN'
           import 'package:flutter/material.dart';
           import 'dashboard.dart';
 
@@ -195,10 +178,8 @@ jobs:
             }
           }
           LOGIN
-          fi
 
-          if [ ! -f "admin_app/lib/screens/dashboard.dart" ]; then
-            cat > admin_app/lib/screens/dashboard.dart << 'DASH'
+          cat > admin_app/lib/screens/dashboard.dart << 'DASH'
           import 'package:flutter/material.dart';
           import 'announcements.dart';
           import 'marks_submission.dart';
@@ -258,10 +239,8 @@ jobs:
             }
           }
           DASH
-          fi
 
-          if [ ! -f "admin_app/lib/screens/manage_admins.dart" ]; then
-            cat > admin_app/lib/screens/manage_admins.dart << 'MNGADMIN'
+          cat > admin_app/lib/screens/manage_admins.dart << 'MNGADMIN'
           import 'package:flutter/material.dart';
 
           class ManageAdminsScreen extends StatefulWidget {
@@ -383,10 +362,8 @@ jobs:
             }
           }
           MNGADMIN
-          fi
 
-          if [ ! -f "admin_app/lib/screens/manage_clubs.dart" ]; then
-            cat > admin_app/lib/screens/manage_clubs.dart << 'MNGCLUB'
+          cat > admin_app/lib/screens/manage_clubs.dart << 'MNGCLUB'
           import 'package:flutter/material.dart';
           import 'package:shared/club.dart';
 
@@ -478,10 +455,8 @@ jobs:
             }
           }
           MNGCLUB
-          fi
 
-          if [ ! -f "admin_app/lib/screens/marks_submission.dart" ]; then
-            cat > admin_app/lib/screens/marks_submission.dart << 'MARKSUB'
+          cat > admin_app/lib/screens/marks_submission.dart << 'MARKSUB'
           import 'package:flutter/material.dart';
           import 'package:image_picker/image_picker.dart';
           import 'dart:io';
@@ -553,10 +528,8 @@ jobs:
             }
           }
           MARKSUB
-          fi
 
-          if [ ! -f "admin_app/lib/screens/announcements.dart" ]; then
-            cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
+          cat > admin_app/lib/screens/announcements.dart << 'ANNSCR'
           import 'package:flutter/material.dart';
           class AnnouncementsScreen extends StatefulWidget {
             const AnnouncementsScreen({super.key});
@@ -568,10 +541,8 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Broadcast')), body: const Center(child: Text('Broadcast Form Here')));
           }
           ANNSCR
-          fi
 
-          if [ ! -f "admin_app/lib/screens/validation_engine.dart" ]; then
-            cat > admin_app/lib/screens/validation_engine.dart << 'VALENG'
+          cat > admin_app/lib/screens/validation_engine.dart << 'VALENG'
           import 'package:flutter/material.dart';
           class ValidationEngineScreen extends StatelessWidget {
             const ValidationEngineScreen({super.key});
@@ -579,10 +550,8 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Validation')), body: const Center(child: Text('Validation Engine')));
           }
           VALENG
-          fi
 
-          if [ ! -f "admin_app/lib/screens/coming_soon.dart" ]; then
-            cat > admin_app/lib/screens/coming_soon.dart << 'CS'
+          cat > admin_app/lib/screens/coming_soon.dart << 'CS'
           import 'package:flutter/material.dart';
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -591,12 +560,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(featureName)), body: Center(child: Text('$featureName coming soon.')));
           }
           CS
-          fi
 
       - name: Generate Icons and Splash
         run: |
           cd admin_app
-          # Create dedicated config files
           cat > flutter_launcher_icons.yaml << 'ICONS'
           flutter_launcher_icons:
             android: "launcher_icon"
@@ -645,29 +612,17 @@ jobs:
 
       - name: Generate Shared and Student Code
         run: |
-          # 1. SMART LOGO FINDER AND CONVERTER
           mkdir -p student_app/assets
-          # Find any file with "inshot" in the name (case-insensitive, any extension)
           LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
           
           if [ -n "$LOGO_SOURCE" ] && [ -f "$LOGO_SOURCE" ]; then
-            echo "✅ Found school badge: $LOGO_SOURCE"
-            # Use ImageMagick to convert the image to a 1024x1024 PNG. This guarantees it's valid.
             if command -v convert &> /dev/null; then
-              echo "Converting image to valid PNG..."
               convert "$LOGO_SOURCE" -resize 1024x1024 student_app/assets/logo.png
             else
               cp "$LOGO_SOURCE" student_app/assets/logo.png
             fi
           else 
-            echo "⚠️ No badge found. Creating placeholder."
             printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; 
-          fi
-
-          # Verify image is not empty (0 bytes)
-          if [ ! -s student_app/assets/logo.png ]; then
-            echo "❌ ERROR: The logo.png is empty. Creating placeholder."
-            printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           fi
 
           flutter create --org com.platinum --project-name student_app student_app
@@ -676,8 +631,7 @@ jobs:
 
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
 
-          if [ ! -f "student_app/pubspec.yaml" ]; then
-            cat > student_app/pubspec.yaml << 'STUPUB'
+          cat > student_app/pubspec.yaml << 'STUPUB'
           name: student_app
           description: Platinum Digital App
           version: 1.0.3+4
@@ -701,10 +655,8 @@ jobs:
             assets:
               - assets/
           STUPUB
-          fi
 
-          if [ ! -f "student_app/lib/services/database_helper.dart" ]; then
-            cat > student_app/lib/services/database_helper.dart << 'DBHELP'
+          cat > student_app/lib/services/database_helper.dart << 'DBHELP'
           import 'package:sqflite/sqflite.dart';
           import 'package:path/path.dart';
 
@@ -737,10 +689,8 @@ jobs:
             }
           }
           DBHELP
-          fi
 
-          if [ ! -f "student_app/lib/main.dart" ]; then
-            cat > student_app/lib/main.dart << 'STUMAIN'
+          cat > student_app/lib/main.dart << 'STUMAIN'
           import 'package:flutter/material.dart';
           import 'screens/registration.dart';
           import 'screens/home.dart';
@@ -814,10 +764,8 @@ jobs:
             Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
           STUMAIN
-          fi
 
-          if [ ! -f "student_app/lib/screens/registration.dart" ]; then
-            cat > student_app/lib/screens/registration.dart << 'REG'
+          cat > student_app/lib/screens/registration.dart << 'REG'
           import 'package:flutter/material.dart';
           import '../services/database_helper.dart';
           import 'home.dart';
@@ -895,10 +843,8 @@ jobs:
             }
           }
           REG
-          fi
 
-          if [ ! -f "student_app/lib/screens/home.dart" ]; then
-            cat > student_app/lib/screens/home.dart << 'HOME'
+          cat > student_app/lib/screens/home.dart << 'HOME'
           import 'package:flutter/material.dart';
           import 'reports.dart';
           import 'chat.dart';
@@ -946,10 +892,8 @@ jobs:
             }
           }
           HOME
-          fi
 
-          if [ ! -f "student_app/lib/screens/platinum_pulse.dart" ]; then
-            cat > student_app/lib/screens/platinum_pulse.dart << 'PULSE'
+          cat > student_app/lib/screens/platinum_pulse.dart << 'PULSE'
           import 'package:flutter/material.dart';
           class PlatinumPulseScreen extends StatelessWidget {
             const PlatinumPulseScreen({super.key});
@@ -959,10 +903,8 @@ jobs:
             }
           }
           PULSE
-          fi
 
-          if [ ! -f "student_app/lib/screens/suggestion_box.dart" ]; then
-            cat > student_app/lib/screens/suggestion_box.dart << 'SUGG'
+          cat > student_app/lib/screens/suggestion_box.dart << 'SUGG'
           import 'package:flutter/material.dart';
           class SuggestionBoxScreen extends StatelessWidget {
             const SuggestionBoxScreen({super.key});
@@ -970,10 +912,8 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Suggestion Box')), body: Padding(padding: const EdgeInsets.all(16), child: Column(children: [const TextField(maxLines: 6, decoration: InputDecoration(hintText: 'Type your suggestion here...', border: OutlineInputBorder())), const SizedBox(height: 16), SwitchListTile(title: const Text('Submit Anonymously'), value: true, onChanged: (v) {}), const Spacer(), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Submit')))])));
           }
           SUGG
-          fi
 
-          if [ ! -f "student_app/lib/screens/clubs.dart" ]; then
-            cat > student_app/lib/screens/clubs.dart << 'CLUBS'
+          cat > student_app/lib/screens/clubs.dart << 'CLUBS'
           import 'package:flutter/material.dart';
           class ClubsScreen extends StatelessWidget {
             const ClubsScreen({super.key});
@@ -981,10 +921,8 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Clubs')), body: ListView(padding: const EdgeInsets.all(12), children: [const Card(child: ListTile(leading: CircleAvatar(backgroundColor: Color(0xFF0A3D91), child: Icon(Icons.edit, color: Colors.white)), title: Text('Writers Club'), subtitle: Text('Head: Nambi Aisha')))]));
           }
           CLUBS
-          fi
 
-          if [ ! -f "student_app/lib/screens/reports.dart" ]; then
-            cat > student_app/lib/screens/reports.dart << 'REP'
+          cat > student_app/lib/screens/reports.dart << 'REP'
           import 'package:flutter/material.dart';
           class ReportsScreen extends StatefulWidget {
             const ReportsScreen({super.key});
@@ -1017,10 +955,8 @@ jobs:
             }
           }
           REP
-          fi
 
-          if [ ! -f "student_app/lib/screens/chat.dart" ]; then
-            cat > student_app/lib/screens/chat.dart << 'CHAT'
+          cat > student_app/lib/screens/chat.dart << 'CHAT'
           import 'package:flutter/material.dart';
           class ChatScreen extends StatelessWidget {
             const ChatScreen({super.key});
@@ -1028,10 +964,8 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('S4 Group')), body: const Center(child: Text('Class Group Chat')));
           }
           CHAT
-          fi
 
-          if [ ! -f "student_app/lib/screens/coming_soon.dart" ]; then
-            cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
+          cat > student_app/lib/screens/coming_soon.dart << 'CSSTU'
           import 'package:flutter/material.dart';
           class ComingSoonScreen extends StatelessWidget {
             final String featureName;
@@ -1040,12 +974,10 @@ jobs:
             Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(featureName)), body: Center(child: Text('$featureName coming soon.')));
           }
           CSSTU
-          fi
 
       - name: Generate Icons and Splash
         run: |
           cd student_app
-          # Create dedicated config files
           cat > flutter_launcher_icons.yaml << 'ICONS'
           flutter_launcher_icons:
             android: "launcher_icon"
