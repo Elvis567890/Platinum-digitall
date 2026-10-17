@@ -68,21 +68,21 @@ jobs:
           # CHANGE THE APP NAME ON THE PHONE SCREEN
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FIX: SET SDK VERSIONS AND NDK FOR ADMIN APP
+          # 🔴 FIX: LOCK SDK VERSIONS AND NDK FOR ADMIN APP
           GRADLE_FILE="admin_app/android/app/build.gradle"
           if [ -f "admin_app/android/app/build.gradle.kts" ]; then
             GRADLE_FILE="admin_app/android/app/build.gradle.kts"
           fi
           
           if [[ "$GRADLE_FILE" == *.kts ]]; then
-            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/' "$GRADLE_FILE"
-            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/' "$GRADLE_FILE"
-            sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 34/' "$GRADLE_FILE"
+            sed -i 's/flutter.compileSdkVersion/34/g' "$GRADLE_FILE"
+            sed -i 's/flutter.minSdkVersion/21/g' "$GRADLE_FILE"
+            sed -i 's/flutter.targetSdkVersion/34/g' "$GRADLE_FILE"
             sed -i 's/android {/android {\n    ndkVersion = "27.0.12077973"\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }/' "$GRADLE_FILE"
           else
-            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' "$GRADLE_FILE"
-            sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/' "$GRADLE_FILE"
-            sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/' "$GRADLE_FILE"
+            sed -i 's/flutter.compileSdkVersion/34/g' "$GRADLE_FILE"
+            sed -i 's/flutter.minSdkVersion/21/g' "$GRADLE_FILE"
+            sed -i 's/flutter.targetSdkVersion/34/g' "$GRADLE_FILE"
             sed -i 's/android {/android {\n    ndkVersion "27.0.12077973"\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }/' "$GRADLE_FILE"
           fi
 
@@ -662,21 +662,21 @@ jobs:
 
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
 
-          # 🔴 FIX: SET SDK VERSIONS AND NDK FOR STUDENT APP
+          # 🔴 FIX: LOCK SDK VERSIONS AND NDK FOR STUDENT APP
           GRADLE_FILE="student_app/android/app/build.gradle"
           if [ -f "student_app/android/app/build.gradle.kts" ]; then
             GRADLE_FILE="student_app/android/app/build.gradle.kts"
           fi
           
           if [[ "$GRADLE_FILE" == *.kts ]]; then
-            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/' "$GRADLE_FILE"
-            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/' "$GRADLE_FILE"
-            sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 34/' "$GRADLE_FILE"
+            sed -i 's/flutter.compileSdkVersion/34/g' "$GRADLE_FILE"
+            sed -i 's/flutter.minSdkVersion/21/g' "$GRADLE_FILE"
+            sed -i 's/flutter.targetSdkVersion/34/g' "$GRADLE_FILE"
             sed -i 's/android {/android {\n    ndkVersion = "27.0.12077973"\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }/' "$GRADLE_FILE"
           else
-            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' "$GRADLE_FILE"
-            sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/' "$GRADLE_FILE"
-            sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/' "$GRADLE_FILE"
+            sed -i 's/flutter.compileSdkVersion/34/g' "$GRADLE_FILE"
+            sed -i 's/flutter.minSdkVersion/21/g' "$GRADLE_FILE"
+            sed -i 's/flutter.targetSdkVersion/34/g' "$GRADLE_FILE"
             sed -i 's/android {/android {\n    ndkVersion "27.0.12077973"\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }/' "$GRADLE_FILE"
           fi
 
