@@ -40,7 +40,7 @@ jobs:
 
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           
-          # 🔴 GRADLE FIX: Force compileSdk for all subprojects (fixes file_picker)
+          # 🔴 GRADLE FIX: Force compileSdk and Kotlin plugin for all subprojects
           cat > student_app/android/build.gradle << 'EOF'
           allprojects {
               repositories {
@@ -52,6 +52,14 @@ jobs:
           rootProject.buildDir = '../build'
           subprojects {
               project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          // Force the Kotlin plugin for file_picker to resolve the 'flutter' property error
+          gradle.beforeProject { sub ->
+              if (sub.name == 'file_picker') {
+                  sub.plugins.withId('com.android.library') {
+                      sub.pluginManager.apply('org.jetbrains.kotlin.android')
+                  }
+              }
           }
           subprojects {
               afterEvaluate { project ->
@@ -142,6 +150,12 @@ jobs:
           grep -q "flutter_launcher_icons:" pubspec.yaml || flutter pub add --dev flutter_launcher_icons
           grep -q "flutter_native_splash:" pubspec.yaml || flutter pub add --dev flutter_native_splash
           
+          # 🔴 FORCE COMPATIBLE FILE_PICKER VERSION
+          cat >> pubspec.yaml << 'EOF'
+          dependency_overrides:
+            file_picker: 8.1.6
+          EOF
+
           cat >> pubspec.yaml << 'EOF'
           flutter_launcher_icons:
             android: "launcher_icon"
@@ -953,6 +967,12 @@ jobs:
           
           grep -q "flutter_launcher_icons:" pubspec.yaml || flutter pub add --dev flutter_launcher_icons
           
+          # 🔴 FORCE COMPATIBLE FILE_PICKER VERSION
+          cat >> pubspec.yaml << 'EOF'
+          dependency_overrides:
+            file_picker: 8.1.6
+          EOF
+
           cat >> pubspec.yaml << 'EOF'
           flutter_launcher_icons:
             android: "launcher_icon"
