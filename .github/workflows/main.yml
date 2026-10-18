@@ -1,4 +1,4 @@
-name: Build Platinum Ecosystem (Final Complete Fix)
+name: Build Platinum Ecosystem (Permanent Fix)
 
 on:
   push:
@@ -38,10 +38,12 @@ jobs:
           mkdir -p student_app/lib/models
           mkdir -p student_app/lib/services
 
-          # 🔴 THE DEFINITIVE AGP/GRADLE FIX 🔴
+          # 🔴 THE DEFINITIVE GRADLE SETTINGS FIX 🔴
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           
           if [ -f student_app/android/settings.gradle ]; then
+            # Inject the google-services plugin version into settings.gradle
+            sed -i 's/plugins {/plugins {\n    id "com.google.gms.google-services" version "4.4.1" apply false/' student_app/android/settings.gradle
             sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' student_app/android/settings.gradle
             sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' student_app/android/settings.gradle
           fi
@@ -696,10 +698,12 @@ jobs:
           mkdir -p admin_app/lib/screens
           mkdir -p admin_app/lib/services
 
-          # 🔴 THE DEFINITIVE AGP/GRADLE FIX 🔴
+          # 🔴 THE DEFINITIVE GRADLE SETTINGS FIX 🔴
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
           
           if [ -f admin_app/android/settings.gradle ]; then
+            # Inject the google-services plugin version into settings.gradle
+            sed -i 's/plugins {/plugins {\n    id "com.google.gms.google-services" version "4.4.1" apply false/' admin_app/android/settings.gradle
             sed -i 's/id "com.android.application" version ".*"/id "com.android.application" version "8.3.0"/g' admin_app/android/settings.gradle
             sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.22"/g' admin_app/android/settings.gradle
           fi
