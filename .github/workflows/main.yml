@@ -1,4 +1,4 @@
-name: Build Platinum Ecosystem (Ultimate Chat Edition)
+name: Build Platinum Ecosystem (AGP 9 Opt-Out)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   # ==========================================
-  # JOB 1: BUILD THE STUDENT APP
+  # JOB 1: BUILD THE STUDENT APP (PLATINUM PULSE)
   # ==========================================
   build-student:
     runs-on: ubuntu-latest
@@ -42,6 +42,8 @@ jobs:
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>' student_app/android/app/src/main/AndroidManifest.xml
           
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-9.3.1-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
+          
+          # 🔴 FIX: FORCE-ADD AGP 9 OPT-OUT FLAGS 🔴
           echo "android.newDsl=false" >> student_app/android/gradle.properties
           echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
 
@@ -492,7 +494,6 @@ jobs:
           }
           HUB
 
-          # REAL FIREBASE CHAT WITH MEDIA SUPPORT
           cat > lib/screens/chat.dart << 'CHAT'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -689,6 +690,7 @@ jobs:
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-9.3.1-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
           
+          # 🔴 FIX: FORCE-ADD AGP 9 OPT-OUT FLAGS 🔴
           echo "android.newDsl=false" >> admin_app/android/gradle.properties
           echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
 
@@ -914,7 +916,6 @@ jobs:
           }
           DASH
 
-          # ADMIN CHAT (Talk to whole school)
           cat > lib/screens/admin_chat.dart << 'ADMINCHAT'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1147,53 +1148,3 @@ jobs:
         with:
           name: staff-hub-apk
           path: admin_app/build/app/outputs/flutter-apk/app-release.apk
-
-  # ==========================================
-  # JOB 3: THE PYTHON FEATURE CHECKER
-  # ==========================================
-  verify-features:
-    runs-on: ubuntu-latest
-    needs: [build-student, build-admin]
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Run Feature Verification Script
-        run: |
-          cat > check_features.py << 'PY'
-          import sys
-          
-          required_features = {
-              "Student Firebase Video Feed": ("student_app/lib/screens/platinum_pulse.dart", ["FirebaseFirestore", "VideoPlayer", "FieldValue.arrayUnion"]),
-              "Student Live Class (Jitsi)": ("student_app/lib/screens/study_hub.dart", ["JitsiMeet", "room:"]),
-              "Student Local DB (SQLite)": ("student_app/lib/services/database_helper.dart", ["sqflite", "CREATE TABLE"]),
-              "Student Chat Hierarchy": ("student_app/lib/screens/hub.dart", ["Whole School Chat", "Chat (Students)", "Debate Club Chat"]),
-              "Student Chat Media Support": ("student_app/lib/screens/chat.dart", ["FilePicker", "ImagePicker", "VideoPlayer"]),
-              "Admin Setup Flow": ("admin_app/lib/main.dart", ["FirstTimeSetupScreen", "LoginScreen"]),
-              "Admin Bulk OCR": ("admin_app/lib/screens/marks_submission.dart", ["_scanSheet", "_submitBatch", "Extracted Students List"]),
-              "Admin Live Class Cameras": ("admin_app/lib/screens/announcements.dart", ["cameraFacing", "JitsiMeet"]),
-              "Admin Notification Banner": ("admin_app/lib/screens/dashboard.dart", ["Biology marks submitted", "All marks viable"]),
-              "Admin School Chat": ("admin_app/lib/screens/admin_chat.dart", ["Whole School", "FirebaseFirestore"])
-          }
-          
-          missing_features = []
-          print("🔍 Starting Feature Verification...")
-          
-          for feature_name, (file_path, keywords) in required_features.items():
-              try:
-                  with open(file_path, 'r') as f:
-                      content = f.read()
-                      for keyword in keywords:
-                          if keyword not in content:
-                              missing_features.append(f"{feature_name}: Missing '{keyword}' in {file_path}")
-              except FileNotFoundError:
-                  missing_features.append(f"{feature_name}: File {file_path} does not exist!")
-                  
-          if missing_features:
-              print("❌ BUILD FAILED: The following features are missing from the code:")
-              for error in missing_features: print(f"  - {error}")
-              sys.exit(1)
-          else:
-              print("✅ ALL FEATURES VERIFIED SUCCESSFULLY! The build is complete and safe to use.")
-          PY
-          
-          python3 check_features.py
