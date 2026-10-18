@@ -1,688 +1,202 @@
-name: Build Platinum Ecosystem (Permanent Fix)
+name: Build Platinum Ecosystem (Complete Unified)
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  # ==========================================
-  # JOB 1: BUILD THE STUDENT APP
-  # ==========================================
   build-student:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - name: Install ImageMagick
         run: sudo apt-get update && sudo apt-get install -y imagemagick
-
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-          
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5' # 🔴 PINNED VERSION
+          flutter-version: '3.24.5'
           channel: stable
           cache: true
 
       - name: Generate Student App Code
         run: |
-          mkdir -p student_app/assets
-          LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
-          if [ -n "$LOGO_SOURCE" ] && [ -f "$LOGO_SOURCE" ]; then convert "$LOGO_SOURCE" -resize 1024x1024 student_app/assets/logo.png; else printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; fi
-
-          flutter create --org com.platinum --project-name student_app student_app
-          mkdir -p student_app/lib/screens
-          mkdir -p student_app/lib/models
-          mkdir -p student_app/lib/services
-
-          # 🔴 THE DEFINITIVE GRADLE SETTINGS FIX 🔴
-          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
-          
-          # Overwrite settings.gradle to guarantee correct plugin versions
-          cat > student_app/android/settings.gradle << 'EOF'
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
-              }()
-
-              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
-
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.3.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.22" apply false
-              id "com.google.gms.google-services" version "4.4.1" apply false
-          }
-
-          include ":app"
-          EOF
-
-          # 🔴 FORCE LEGACY GRADLE BEHAVIOR (Fixes AGP 9+ error)
-          echo "android.newDsl=false" >> student_app/android/gradle.properties
-          echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
-
-          if [ -f student_app/android/build.gradle ]; then
-            sed -i 's/classpath .com.android.tools.build:gradle:.*/classpath "com.android.tools.build:gradle:8.3.0"/g' student_app/android/build.gradle
+          if [ ! -d "student_app" ]; then
+            mkdir -p student_app/assets
+            LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
+            if [ -n "$LOGO_SOURCE" ] && [ -f "$LOGO_SOURCE" ]; then convert "$LOGO_SOURCE" -resize 1024x1024 student_app/assets/logo.png; else printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png; fi
+            flutter create --org com.platinum --project-name student_app student_app
+            mkdir -p student_app/lib/screens student_app/lib/services
           fi
 
-          sed -i 's/android:label="student_app"/android:label="Platinum Pulse"/g' student_app/android/app/src/main/AndroidManifest.xml
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>' student_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
+          cat > student_app/android/build.gradle << 'EOF'
+          allprojects { repositories { google(); mavenCentral(); maven { url "https://github.com/jitsi/jitsi-maven-repository/raw/master/releases" } } }
+          rootProject.buildDir = '../build'
+          subprojects { project.buildDir = "${rootProject.buildDir}/${project.name}" }
+          subprojects { project.evaluationDependsOn(':app') }
+          tasks.register("clean", Delete) { delete rootProject.buildDir }
+          EOF
+          cat > student_app/android/settings.gradle << 'EOF'
+          pluginManagement { def flutterSdkPath = { def properties = new Properties(); file("local.properties").withInputStream { properties.load(it) }; return properties.getProperty("flutter.sdk") }(); includeBuild("$flutterSdkPath/packages/flutter_tools/gradle"); repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          plugins { id "dev.flutter.flutter-plugin-loader" version "1.0.0"; id "com.android.application" version "8.3.0" apply false; id "org.jetbrains.kotlin.android" version "1.9.22" apply false; id "com.google.gms.google-services" version "4.4.1" apply false }
+          include ":app"
+          EOF
+          grep -q "android.newDsl=false" student_app/android/gradle.properties || echo "android.newDsl=false" >> student_app/android/gradle.properties
+          grep -q "android.builtInKotlin=false" student_app/android/gradle.properties || echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
+          grep -q "android.useAndroidX=true" student_app/android/gradle.properties || echo "android.useAndroidX=true" >> student_app/android/gradle.properties
           
-          cat > student_app/android/app/build.gradle << 'APPGRADLE'
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-              id "com.google.gms.google-services"
-          }
+          sed -i 's/android:label="student_app"/android:label="Platinum Pulse"/g' student_app/android/app/src/main/AndroidManifest.xml
+          grep -q "REQUEST_INSTALL_PACKAGES" student_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' student_app/android/app/src/main/AndroidManifest.xml
+          
+          cat > student_app/android/app/build.gradle << 'EOF'
+          plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin"; id "com.google.gms.google-services" }
           android {
-              namespace = "com.platinum.student_app"
-              compileSdk = 36
-              ndkVersion = "27.0.12077973"
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
-              }
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
-              defaultConfig {
-                  applicationId = "com.platinum.student_app"
-                  minSdk = 23
-                  targetSdk = 36
-                  versionCode = flutter.versionCode
-                  versionName = flutter.versionName
-                  multiDexEnabled = true
-              }
-              buildTypes {
-                  release {
-                      signingConfig = signingConfigs.debug
-                  }
-              }
-              lint {
-                  checkReleaseBuilds = false
-                  abortOnError = false
-              }
+              namespace = "com.platinum.student_app"; compileSdk = 34; ndkVersion = "26.1.10909125"
+              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+              kotlinOptions { jvmTarget = "17" }
+              defaultConfig { applicationId = "com.platinum.student_app"; minSdk = 23; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }
+              buildTypes { release { signingConfig = signingConfigs.debug } }
+              lint { checkReleaseBuilds = false; abortOnError = false }
           }
-          flutter {
-              source = "../.."
-          }
-          dependencies {
-              implementation platform("com.google.firebase:firebase-bom:35.0.2")
-              implementation "com.google.firebase:firebase-analytics"
-          }
-          APPGRADLE
+          flutter { source = "../.." }
+          dependencies { implementation platform("com.google.firebase:firebase-bom:35.0.2"); implementation "com.google.firebase:firebase-analytics" }
+          EOF
 
           cd student_app
-          flutter pub add firebase_core cloud_firestore firebase_storage image_picker video_player cached_network_image path_provider dio google_fonts sqflite path jitsi_meet_flutter_sdk url_launcher file_picker
-          flutter pub add --dev flutter_launcher_icons flutter_native_splash
+          add_pkg() { grep -q "$1:" pubspec.yaml || flutter pub add "$1"; }
+          add_pkg firebase_core; add_pkg cloud_firestore; add_pkg firebase_storage; add_pkg image_picker; add_pkg video_player; add_pkg cached_network_image; add_pkg path_provider; add_pkg dio; add_pkg google_fonts; add_pkg sqflite; add_pkg path; add_pkg jitsi_meet_flutter_sdk; add_pkg url_launcher; add_pkg file_picker; add_pkg shared_preferences; add_pkg package_info_plus; add_pkg http; add_pkg open_filex; add_pkg permission_handler
+          grep -q "flutter_launcher_icons:" pubspec.yaml || flutter pub add --dev flutter_launcher_icons
+          grep -q "flutter_native_splash:" pubspec.yaml || flutter pub add --dev flutter_native_splash
+          cat >> pubspec.yaml << 'EOF'
+          flutter_launcher_icons: { android: "launcher_icon", image_path: "assets/logo.png" }
+          flutter_native_splash: { color: "#0A3D91", image: assets/logo.png, web: false }
+          EOF
 
-          cat >> pubspec.yaml << 'STUPUB'
-          flutter_launcher_icons:
-            android: "launcher_icon"
-            image_path: "assets/logo.png"
-          flutter_native_splash:
-            color: "#0A3D91"
-            image: assets/logo.png
-            web: false
-            android_12:
-              image: assets/logo.png
-              icon_background_color: "#0A3D91"
-          STUPUB
-
-          # ==========================================
-          # STUDENT DART CODE
-          # ==========================================
-          cat > lib/models/post_model.dart << 'MODEL'
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          class Post {
-            final String id; final String author; final String content; final String type; final String? mediaUrl; final DateTime timestamp; final List<String> likes; final int commentCount;
-            Post({required this.id, required this.author, required this.content, required this.type, this.mediaUrl, required this.timestamp, required this.likes, required this.commentCount});
-            factory Post.fromFirestore(DocumentSnapshot doc) {
-              Map data = doc.data() as Map<String, dynamic>;
-              return Post(id: doc.id, author: data['author'] ?? 'Unknown', content: data['content'] ?? '', type: data['type'] ?? 'text', mediaUrl: data['mediaUrl'], timestamp: (data['timestamp'] as Timestamp).toDate(), likes: List<String>.from(data['likes'] ?? []), commentCount: data['commentCount'] ?? 0);
+          cat > lib/main.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:firebase_core/firebase_core.dart'; import 'package:google_fonts/google_fonts.dart'; import 'package:shared_preferences/shared_preferences.dart'; import 'package:http/http.dart' as http; import 'dart:convert'; import 'package:package_info_plus/package_info_plus.dart'; import 'package:dio/dio.dart'; import 'package:path_provider/path_provider.dart'; import 'package:open_filex/open_filex.dart'; import 'package:permission_handler/permission_handler.dart'; import 'screens/registration.dart'; import 'screens/home.dart'; import 'services/db.dart';
+          void main() async { WidgetsFlutterBinding.ensureInitialized(); await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDNQ2VcWL2_Q6rkbu5TGBGqOATBxP8B5DY", authDomain: "platinum-pulse.firebaseapp.com", projectId: "platinum-pulse", storageBucket: "platinum-pulse.firebasestorage.app", messagingSenderId: "221762575431", appId: "1:221762575431:web:95054f123b6a98647f6562")); runApp(const App()); }
+          class App extends StatelessWidget { const App({super.key}); @override Widget build(BuildContext context) { return MaterialApp(title: 'Pulse', debugShowCheckedModeBanner: false, theme: ThemeData(primaryColor: const Color(0xFF0A3D91), scaffoldBackgroundColor: const Color(0xFFF4F7FC), useMaterial3: true, textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme)), home: const Start()); } }
+          class Start extends StatefulWidget { const Start({super.key}); @override State<Start> createState() => _StartState(); }
+          class _StartState extends State<Start> {
+            @override void initState() { super.initState(); _init(); }
+            Future<void> _init() async {
+              final prefs = await SharedPreferences.getInstance(); final last = prefs.getString('last') ?? ''; final today = DateTime.now().toIso8601String().substring(0,10); int streak = prefs.getInt('streak') ?? 0;
+              if (last != today) { if (last == DateTime.now().subtract(const Duration(days: 1)).toIso8601String().substring(0,10)) streak++; else streak = 1; await prefs.setString('last', today); await prefs.setInt('streak', streak); }
+              _checkForUpdates();
+              final db = await DB.instance.db; final res = await db.query('students', limit: 1);
+              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => res.isEmpty ? const RegScreen() : const HomeScreen()));
             }
-          }
-          MODEL
-
-          cat > lib/services/database_helper.dart << 'DBHELP'
-          import 'package:sqflite/sqflite.dart';
-          import 'package:path/path.dart';
-          class DatabaseHelper {
-            static final DatabaseHelper instance = DatabaseHelper._init();
-            static Database? _database;
-            DatabaseHelper._init();
-            Future<Database> get database async { if (_database != null) return _database!; _database = await _initDB('platinum_student.db'); return _database!; }
-            Future<Database> _initDB(String filePath) async { final dbPath = await getDatabasesPath(); return await openDatabase(join(dbPath, filePath), version: 1, onCreate: _createDB); }
-            Future _createDB(Database db, int version) async { await db.execute('CREATE TABLE students (id INTEGER PRIMARY KEY AUTOINCREMENT, fullName TEXT, classLevel TEXT)'); }
-            Future<Map<String, dynamic>> getStudent() async { final db = await database; final res = await db.query('students', limit: 1); return res.isNotEmpty ? res.first : {}; }
-          }
-          DBHELP
-
-          cat > lib/main.dart << 'STUMAIN'
-          import 'package:flutter/material.dart';
-          import 'package:firebase_core/firebase_core.dart';
-          import 'package:google_fonts/google_fonts.dart';
-          import 'screens/registration.dart';
-          import 'screens/home.dart';
-          import 'services/database_helper.dart';
-
-          void main() async {
-            WidgetsFlutterBinding.ensureInitialized();
-            await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDNQ2VcWL2_Q6rkbu5TGBGqOATBxP8B5DY", authDomain: "platinum-pulse.firebaseapp.com", projectId: "platinum-pulse", storageBucket: "platinum-pulse.firebasestorage.app", messagingSenderId: "221762575431", appId: "1:221762575431:web:95054f123b6a98647f6562"));
-            runApp(const PlatinumStudentApp());
-          }
-
-          class PlatinumStudentApp extends StatelessWidget {
-            const PlatinumStudentApp({super.key});
-            @override
-            Widget build(BuildContext context) {
-              return MaterialApp(title: 'Platinum Pulse', debugShowCheckedModeBanner: false, theme: ThemeData(primaryColor: const Color(0xFF0A3D91), scaffoldBackgroundColor: const Color(0xFFF4F7FC), useMaterial3: true, textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme)), home: const StartupScreen());
-            }
-          }
-
-          class StartupScreen extends StatefulWidget {
-            const StartupScreen({super.key});
-            @override State<StartupScreen> createState() => _StartupScreenState();
-          }
-          class _StartupScreenState extends State<StartupScreen> {
-            @override void initState() { super.initState(); _check(); }
-            Future<void> _check() async {
-              final db = await DatabaseHelper.instance.database;
-              final result = await db.query('students', limit: 1);
-              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => result.isEmpty ? const RegistrationScreen() : const HomeScreen()));
-            }
-            @override Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF0A3D91))));
-          }
-          STUMAIN
-
-          cat > lib/screens/registration.dart << 'REG'
-          import 'package:flutter/material.dart';
-          import '../services/database_helper.dart';
-          import 'home.dart';
-          class RegistrationScreen extends StatefulWidget {
-            const RegistrationScreen({super.key});
-            @override State<RegistrationScreen> createState() => _RegistrationScreenState();
-          }
-          class _RegistrationScreenState extends State<RegistrationScreen> {
-            final _name = TextEditingController(); String _class = 'S1';
-            void _register() async {
-              if (_name.text.isEmpty) return;
-              await (await DatabaseHelper.instance.database).insert('students', {'fullName': _name.text, 'classLevel': _class});
-              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-            }
-            @override Widget build(BuildContext context) {
-              return Scaffold(body: Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF0A3D91), Color(0xFF051C45)])), child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Card(elevation: 10, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Image.asset('assets/logo.png', height: 100), const SizedBox(height: 16), const Text('Student Registration', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))), const SizedBox(height: 32),
-                TextField(controller: _name, decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person))), const SizedBox(height: 16),
-                DropdownButtonFormField<String>(value: _class, decoration: const InputDecoration(labelText: 'Class', prefixIcon: Icon(Icons.school)), items: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _class = v!)), const SizedBox(height: 32),
-                SizedBox(width: double.infinity, height: 50, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: _register, child: const Text('Register', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)))),
-              ])))))));
-            }
-          }
-          REG
-
-          cat > lib/screens/home.dart << 'HOME'
-          import 'package:flutter/material.dart';
-          import 'announcements.dart';
-          import 'platinum_pulse.dart';
-          import 'study_hub.dart';
-          import 'reports.dart';
-          import 'hub.dart';
-          import '../services/database_helper.dart';
-
-          class HomeScreen extends StatefulWidget {
-            const HomeScreen({super.key});
-            @override State<HomeScreen> createState() => _HomeScreenState();
-          }
-          class _HomeScreenState extends State<HomeScreen> {
-            int _index = 0; String _name = 'Loading...'; String _class = '';
-            
-            @override void initState() { super.initState(); _loadUser(); }
-            void _loadUser() async { 
-              final data = await DatabaseHelper.instance.getStudent(); 
-              if (mounted && data.isNotEmpty) setState(() { _name = data['fullName']; _class = data['classLevel']; }); 
-            }
-
-            @override Widget build(BuildContext context) {
-              final pages = [
-                AnnouncementsScreen(studentName: _name, studentClass: _class), 
-                PlatinumPulseScreen(studentName: _name), 
-                StudyHubScreen(), 
-                ReportsScreen(), 
-                HubScreen(studentClass: _class, studentName: _name)
-              ];
-              
-              return Scaffold(
-                body: _index == 0 ? pages[0] : pages[_index], 
-                bottomNavigationBar: Container(
-                  decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))]), 
-                  child: BottomNavigationBar(
-                    currentIndex: _index, 
-                    onTap: (i) => setState(() => _index = i), 
-                    selectedItemColor: const Color(0xFF0A3D91), 
-                    unselectedItemColor: Colors.grey, 
-                    type: BottomNavigationBarType.fixed, 
-                    backgroundColor: Colors.white, 
-                    elevation: 0, 
-                    items: const [
-                      BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Updates'),
-                      BottomNavigationBarItem(icon: Icon(Icons.dynamic_feed), label: 'Pulse'), 
-                      BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Study'), 
-                      BottomNavigationBarItem(icon: Icon(Icons.description), label: 'Reports'), 
-                      BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Hub'),
-                    ]
-                  ),
-                ),
-              );
-            }
-          }
-          HOME
-
-          cat > lib/screens/announcements.dart << 'ANN'
-          import 'package:flutter/material.dart';
-
-          class AnnouncementsScreen extends StatelessWidget {
-            final String studentName; final String studentClass;
-            const AnnouncementsScreen({super.key, required this.studentName, required this.studentClass});
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                backgroundColor: const Color(0xFFF4F7FC),
-                body: CustomScrollView(
-                  slivers: [
-                    SliverAppBar(
-                      expandedHeight: 160.0, floating: false, pinned: true, backgroundColor: const Color(0xFF0A3D91),
-                      flexibleSpace: FlexibleSpaceBar(
-                        title: Text('Welcome, $studentName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-                        background: Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF0A3D91), Color(0xFF051C45)])), child: Padding(padding: const EdgeInsets.only(left: 16, bottom: 50), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.end, children: [
-                          Text('Class: $studentClass', style: const TextStyle(color: Colors.white70, fontSize: 14)), const SizedBox(height: 8),
-                          const Row(children: [Icon(Icons.verified, color: Color(0xFFF4B41A), size: 16), SizedBox(width: 4), Text('Official School Feed', style: TextStyle(color: Color(0xFFF4B41A), fontSize: 12))])
-                        ]))),
-                      ),
-                    ),
-                    SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(16.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('School Announcements', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))), const SizedBox(height: 12),
-                      _buildUrgentAlert(), const SizedBox(height: 12), _buildNormalAlert(),
-                      const SizedBox(height: 24), const Text('Club Updates', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))), const SizedBox(height: 12),
-                      _buildClubAlert(),
-                    ]))),
-                  ],
-                ),
-              );
-            }
-
-            Widget _buildUrgentAlert() => Card(color: Colors.red[50], elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.red.shade200)), child: Padding(padding: const EdgeInsets.all(16), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), shape: BoxShape.circle), child: const Icon(Icons.warning, color: Colors.red, size: 24)), const SizedBox(width: 16),
-              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Urgent: Assembly at 8:30am', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red)), SizedBox(height: 4), Text('Bring your sports kit for the inter-house competition tomorrow.', style: TextStyle(color: Colors.black87))])),
-            ])));
-
-            Widget _buildNormalAlert() => Card(color: Colors.white, elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), child: Padding(padding: const EdgeInsets.all(16), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0A3D91).withOpacity(0.1), shape: BoxShape.circle), child: const Icon(Icons.campaign, color: Color(0xFF0A3D91), size: 24)), const SizedBox(width: 16),
-              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Term 2 Reports Released', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0A3D91))), SizedBox(height: 4), Text('Tap the Reports tab at the bottom to unlock your report card with your secret code.', style: TextStyle(color: Colors.black87))])),
-            ])));
-
-            Widget _buildClubAlert() => Card(color: Colors.white, elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), child: Padding(padding: const EdgeInsets.all(16), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const CircleAvatar(backgroundColor: Color(0xFFF4B41A), child: Icon(Icons.edit, color: Colors.white)), const SizedBox(width: 16),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: const [Text('Writers Club', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), SizedBox(width: 4), Icon(Icons.verified, color: Color(0xFF0A3D91), size: 16)]), const SizedBox(height: 4),
-                const Text('The new poetry corner is finally ready! Come check it out in the library.', style: TextStyle(color: Colors.black87)), const SizedBox(height: 8),
-                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF0A3D91).withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: const Text('Tap to view on Platinum Pulse', style: TextStyle(color: Color(0xFF0A3D91), fontSize: 12, fontWeight: FontWeight.bold))),
-              ])),
-            ])));
-          }
-          ANN
-
-          cat > lib/screens/platinum_pulse.dart << 'PULSE'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'package:firebase_storage/firebase_storage.dart';
-          import 'package:image_picker/image_picker.dart';
-          import 'package:video_player/video_player.dart';
-          import 'package:cached_network_image/cached_network_image.dart';
-          import 'package:path_provider/path_provider.dart';
-          import 'package:dio/dio.dart';
-          import 'dart:io';
-          import '../models/post_model.dart';
-
-          class PlatinumPulseScreen extends StatefulWidget {
-            final String studentName;
-            const PlatinumPulseScreen({super.key, required this.studentName});
-            @override State<PlatinumPulseScreen> createState() => _PlatinumPulseScreenState();
-          }
-          class _PlatinumPulseScreenState extends State<PlatinumPulseScreen> {
-            final TextEditingController _postController = TextEditingController();
-            bool _isUploading = false;
-
-            Future<void> _createPost(String type) async {
-              String? mediaUrl;
-              if (type != 'text') {
-                final picker = ImagePicker();
-                XFile? file = type == 'image' ? await picker.pickImage(source: ImageSource.gallery) : await picker.pickVideo(source: ImageSource.gallery);
-                if (file == null) return;
-                setState(() => _isUploading = true);
-                try {
-                  String fileName = DateTime.now().millisecondsSinceEpoch.toString();
-                  Reference ref = FirebaseStorage.instance.ref().child('posts/$fileName');
-                  await ref.putFile(File(file.path));
-                  mediaUrl = await ref.getDownloadURL();
-                } catch (e) { setState(() => _isUploading = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'))); return; }
-              }
-              await FirebaseFirestore.instance.collection('posts').add({'author': widget.studentName, 'content': _postController.text.trim(), 'type': type, 'mediaUrl': mediaUrl, 'timestamp': FieldValue.serverTimestamp(), 'likes': [], 'commentCount': 0});
-              _postController.clear(); setState(() => _isUploading = false);
-            }
-
-            Future<void> _toggleLike(Post post) async {
-              final docRef = FirebaseFirestore.instance.collection('posts').doc(post.id);
-              if (post.likes.contains(widget.studentName)) { await docRef.update({'likes': FieldValue.arrayRemove([widget.studentName])}); } else { await docRef.update({'likes': FieldValue.arrayUnion([widget.studentName])}); }
-            }
-
-            Future<void> _downloadMedia(String url) async {
+            void _checkForUpdates() async {
               try {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Downloading...')));
-                final dir = await getApplicationDocumentsDirectory();
-                final filePath = '${dir.path}/platinum_${DateTime.now().millisecondsSinceEpoch}.mp4';
-                await Dio().download(url, filePath);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved to phone storage!')));
-              } catch (e) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e'))); }
+                PackageInfo pInfo = await PackageInfo.fromPlatform();
+                final res = await http.get(Uri.parse('https://api.github.com/repos/Elvis5/Platinum-digital/releases/latest'));
+                if (res.statusCode == 200) {
+                  final data = jsonDecode(res.body); String latest = data['tag_name'].toString().replaceAll('v', ''); String apkUrl = data['assets'][0]['browser_download_url'];
+                  if (latest != pInfo.version && mounted) {
+                    showDialog(context: context, barrierDismissible: false, builder: (ctx) => AlertDialog(title: const Text('Update Available 🚀'), content: Text('Version $latest is available. Update now!'), actions: [ TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Later')), ElevatedButton(onPressed: () async { Navigator.pop(ctx); await _download(apkUrl); }, child: const Text('Update Now')) ]));
+                  }
+                }
+              } catch (e) { debugPrint("OTA Failed"); }
             }
-
-            @override Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white, title: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.orange.withOpacity(0.2), borderRadius: BorderRadius.circular(20)), child: const Row(children: [Text('🔥', style: TextStyle(fontSize: 16)), SizedBox(width: 4), Text('7 DAYS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 12))])),
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: const Color(0xFFF4B41A).withOpacity(0.2), borderRadius: BorderRadius.circular(20)), child: const Row(children: [Text('💎', style: TextStyle(fontSize: 16)), SizedBox(width: 4), Text('1,240', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF4B41A), fontSize: 12))]))
-                ])),
-                body: Column(children: [
-                  Padding(padding: const EdgeInsets.all(12), child: Row(children: [
-                    Expanded(child: TextField(controller: _postController, decoration: InputDecoration(hintText: 'What\'s on your mind?', filled: true, fillColor: Colors.grey[200], border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none)))),
-                    IconButton(icon: const Icon(Icons.image, color: Color(0xFF0A3D91)), onPressed: () => _createPost('image')),
-                    IconButton(icon: const Icon(Icons.videocam, color: Color(0xFF0A3D91)), onPressed: () => _createPost('video')),
-                    if (_postController.text.isNotEmpty) IconButton(icon: const Icon(Icons.send, color: Color(0xFFF4B41A)), onPressed: () => _createPost('text')),
-                  ])),
-                  if (_isUploading) const LinearProgressIndicator(),
-                  Expanded(child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('posts').orderBy('timestamp', descending: true).snapshots(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                      final posts = snapshot.data!.docs.map((doc) => Post.fromFirestore(doc)).toList();
-                      return ListView.builder(padding: const EdgeInsets.all(12), itemCount: posts.length, itemBuilder: (context, index) {
-                        final post = posts[index];
-                        final isLiked = post.likes.contains(widget.studentName);
-                        return Card(margin: const EdgeInsets.only(bottom: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Row(children: [CircleAvatar(backgroundColor: const Color(0xFF0A3D91), child: Text(post.author[0], style: const TextStyle(color: Colors.white))), const SizedBox(width: 12), Text(post.author, style: const TextStyle(fontWeight: FontWeight.bold))]),
-                          const SizedBox(height: 12), Text(post.content),
-                          if (post.type == 'image' && post.mediaUrl != null) Padding(padding: const EdgeInsets.only(top: 12), child: ClipRRect(borderRadius: BorderRadius.circular(12), child: CachedNetworkImage(imageUrl: post.mediaUrl!, height: 200, width: double.infinity, fit: BoxFit.cover))),
-                          if (post.type == 'video' && post.mediaUrl != null) Padding(padding: const EdgeInsets.only(top: 12), child: _VideoPlayerWidget(url: post.mediaUrl!)),
-                          const Divider(height: 30),
-                          Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                            GestureDetector(onTap: () => _toggleLike(post), child: Row(children: [Icon(isLiked ? Icons.favorite : Icons.favorite_border, color: isLiked ? Colors.red : Colors.grey), const SizedBox(width: 4), Text('${post.likes.length}', style: TextStyle(color: isLiked ? Colors.red : Colors.grey))])),
-                            GestureDetector(onTap: () => _showComments(context, post.id), child: Row(children: [const Icon(Icons.comment, color: Colors.grey), const SizedBox(width: 4), Text('${post.commentCount}', style: const TextStyle(color: Colors.grey))])),
-                            if (post.mediaUrl != null) IconButton(icon: const Icon(Icons.download, color: Colors.grey), onPressed: () => _downloadMedia(post.mediaUrl!)),
-                          ])
-                        ]))); 
-                      });
-                    }
-                  )),
-                ]),
-              );
+            Future<void> _download(String url) async {
+              if (await Permission.requestInstallPackages.status != PermissionStatus.granted) await Permission.requestInstallPackages.request();
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Downloading...')));
+              try { final dir = await getExternalStorageDirectory(); final path = '${dir!.path}/up.apk'; await Dio().download(url, path); OpenFilex.open(path); } catch (e) { debugPrint("Err: $e"); }
             }
-            void _showComments(BuildContext context, String postId) {
-              showModalBottomSheet(context: context, isScrollControlled: true, builder: (context) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, top: 20, left: 20, right: 20), child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Text('Comments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)), const SizedBox(height: 16),
-                TextField(decoration: const InputDecoration(hintText: 'Write a comment...', border: OutlineInputBorder()), onSubmitted: (val) async {
-                  if (val.isNotEmpty) { await FirebaseFirestore.instance.collection('posts').doc(postId).update({'commentCount': FieldValue.increment(1)}); Navigator.pop(context); }
-                }), const SizedBox(height: 20),
-              ])));
-            }
+            @override Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
+          EOF
 
-          class _VideoPlayerWidget extends StatefulWidget {
-            final String url; const _VideoPlayerWidget({required this.url}); @override State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
-          }
-          class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
-            late VideoPlayerController _controller; bool _isInitialized = false;
-            @override void initState() { super.initState(); _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { if (mounted) setState(() => _isInitialized = true); }); }
-            @override void dispose() { _controller.dispose(); super.dispose(); }
-            @override Widget build(BuildContext context) {
-              if (!_isInitialized) return const Center(child: CircularProgressIndicator());
-              return ClipRRect(borderRadius: BorderRadius.circular(12), child: AspectRatio(aspectRatio: _controller.value.aspectRatio, child: Stack(alignment: Alignment.bottomCenter, children: [
-                VideoPlayer(_controller), VideoProgressIndicator(_controller, allowScrubbing: true, colors: const VideoProgressColors(playedColor: Color(0xFFF4B41A))),
-                Positioned(bottom: 10, right: 10, child: FloatingActionButton.small(backgroundColor: Colors.black54, onPressed: () { setState(() { _controller.value.isPlaying ? _controller.pause() : _controller.play(); }); }, child: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white)))
-              ])));
-            }
-          }
-          PULSE
+          cat > lib/services/db.dart << 'EOF'
+          import 'package:sqflite/sqflite.dart'; import 'package:path/path.dart';
+          class DB { static final DB instance = DB._(); static Database? _db; DB._(); Future<Database> get db async { if (_db != null) return _db!; _db = await openDatabase(join(await getDatabasesPath(), 'p.db'), version: 1, onCreate: (d,v) async => await d.execute('CREATE TABLE students (id INTEGER PRIMARY KEY, fullName TEXT, classLevel TEXT)')); return _db!; } }
+          EOF
 
-          cat > lib/screens/study_hub.dart << 'STUDY'
-          import 'package:flutter/material.dart';
-          import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
-          class StudyHubScreen extends StatelessWidget {
-            const StudyHubScreen({super.key});
-            Future<void> _joinLiveClass(BuildContext context) async {
-              var options = JitsiMeetConferenceOptions(room: "PlatinumS4Chemistry", configOverrides: {"startWithAudioMuted": false, "startWithVideoMuted": false}, featureFlags: {FeatureFlags.welcomePageEnabled: false, FeatureFlags.preJoinPageEnabled: false});
-              try { await JitsiMeet().join(options); } catch (e) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); }
-            }
-            @override Widget build(BuildContext context) {
-              return Scaffold(appBar: AppBar(title: const Text('Study Hub'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white), body: ListView(padding: const EdgeInsets.all(16), children: [
-                const Text('Today\'s Live Classes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 12),
-                Card(color: const Color(0xFF0A3D91), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Row(children: [CircleAvatar(backgroundColor: Colors.red, radius: 8), SizedBox(width: 8), Text('LIVE NOW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]), const SizedBox(height: 12),
-                  const Text('S4 Chemistry - Mole Concept', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), const Text('Mr. Okello (Verified Teacher)', style: TextStyle(color: Colors.white70)), const SizedBox(height: 16),
-                  SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: () => _joinLiveClass(context), child: const Text('Join Class', style: TextStyle(color: Colors.white)))),
-                ]))),
-                const SizedBox(height: 24), const Text('Recorded Library', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 12),
-                ListTile(leading: const CircleAvatar(backgroundColor: Color(0xFF0A3D91), child: Icon(Icons.play_arrow, color: Colors.white)), title: const Text('Biology - Cell Structure'), subtitle: const Text('Ms. Nambi • 45 mins • 120MB'), trailing: const Icon(Icons.download)),
-              ]));
-            }
+          cat > lib/screens/registration.dart << 'EOF'
+          import 'package:flutter/material.dart'; import '../services/db.dart'; import 'home.dart';
+          class RegScreen extends StatefulWidget { const RegScreen({super.key}); @override State<RegScreen> createState() => _RegScreenState(); }
+          class _RegScreenState extends State<RegScreen> { final _n = TextEditingController(); String _c = 'S1';
+            @override Widget build(BuildContext context) { return Scaffold(body: Container(decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF0A3D91), Color(0xFF051C45)])), child: Center(child: Card(margin: const EdgeInsets.all(24), child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [ Image.asset('assets/logo.png', height: 80), const SizedBox(height: 20), TextField(controller: _n, decoration: const InputDecoration(labelText: 'Full Name')), const SizedBox(height: 16), DropdownButtonFormField<String>(value: _c, items: ['S1','S2','S3','S4','S5','S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _c = v!)), const SizedBox(height: 24), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: () async { if (_n.text.isNotEmpty) { await (await DB.instance.db).insert('students', {'fullName': _n.text, 'classLevel': _c}); if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())); } }, child: const Text('Enter', style: TextStyle(color: Colors.white))) ])))))); }
           }
-          STUDY
+          EOF
 
-          cat > lib/screens/reports.dart << 'REP'
+          cat > lib/screens/home.dart << 'EOF'
+          import 'package:flutter/material.dart'; import '../services/db.dart'; import 'announcements.dart'; import 'pulse.dart'; import 'study.dart'; import 'reports.dart'; import 'hub.dart';
+          class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _HomeScreenState(); }
+          class _HomeScreenState extends State<HomeScreen> { int _i = 0; String _n = ''; String _c = '';
+            @override void initState() { super.initState(); _load(); }
+            void _load() async { final d = await (await DB.instance.db).query('students', limit: 1); if (d.isNotEmpty && mounted) setState(() { _n = d.first['fullName'] as String; _c = d.first['classLevel'] as String; }); }
+            @override Widget build(BuildContext context) { if (_n.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator())); final p = [AnnouncementsScreen(name: _n, cls: _c), const PulseScreen(), const StudyScreen(), const ReportsScreen(), HubScreen(name: _n, cls: _c)]; return Scaffold(body: p[_i], bottomNavigationBar: BottomNavigationBar(currentIndex: _i, onTap: (v) => setState(() => _i = v), selectedItemColor: const Color(0xFF0A3D91), type: BottomNavigationBarType.fixed, items: const [BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Feed'), BottomNavigationBarItem(icon: Icon(Icons.dynamic_feed), label: 'Pulse'), BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Study'), BottomNavigationBarItem(icon: Icon(Icons.description), label: 'Reports'), BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Hub')])); }
+          }
+          EOF
+
+          cat > lib/screens/announcements.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class AnnouncementsScreen extends StatelessWidget { final String name; final String cls; const AnnouncementsScreen({super.key, required this.name, required this.cls});
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: Text('Hi, $name ($cls)'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white), body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('announcements').orderBy('time', descending: true).snapshots(), builder: (context, snap) { if (!snap.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(padding: const EdgeInsets.all(16), itemCount: snap.data!.docs.length, itemBuilder: (c, i) { final d = snap.data!.docs[i].data() as Map<String, dynamic>; return Card(child: ListTile(leading: Icon(Icons.campaign, color: d['urgent'] == true ? Colors.red : Colors.blue), title: Text(d['title'] ?? ''), subtitle: Text(d['body'] ?? ''))); }); })); }
+          }
+          EOF
+
+          cat > lib/screens/pulse.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart'; import 'package:firebase_storage/firebase_storage.dart'; import 'package:image_picker/image_picker.dart'; import 'dart:io'; import 'package:cached_network_image/cached_network_image.dart';
+          class PulseScreen extends StatefulWidget { const PulseScreen({super.key}); @override State<PulseScreen> createState() => _PulseScreenState(); }
+          class _PulseScreenState extends State<PulseScreen> { final _c = TextEditingController();
+            void _post({String? img}) async { String? url; if (img != null) { final ref = FirebaseStorage.instance.ref().child('p/${DateTime.now().millisecondsSinceEpoch}.jpg'); await ref.putFile(File(img)); url = await ref.getDownloadURL(); } await FirebaseFirestore.instance.collection('posts').add({'text': _c.text, 'img': url, 'time': FieldValue.serverTimestamp(), 'likes': 0}); _c.clear(); }
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('Pulse 🔥 7 DAYS'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white), body: Column(children: [ Padding(padding: const EdgeInsets.all(8), child: Row(children: [ Expanded(child: TextField(controller: _c, decoration: const InputDecoration(hintText: 'What\'s on your mind?', border: OutlineInputBorder())),), IconButton(icon: const Icon(Icons.image, color: Color(0xFFF4B41A)), onPressed: () async { final x = await ImagePicker().pickImage(source: ImageSource.gallery); if (x != null) _post(img: x.path); }), IconButton(icon: const Icon(Icons.send, color: Colors.blue), onPressed: () => _post()) ])), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('posts').orderBy('time', descending: true).snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final d = s.data!.docs[i].data() as Map<String, dynamic>; return Card(margin: const EdgeInsets.all(8), child: Column(children: [ ListTile(title: Text(d['text'] ?? ''), trailing: Text('${d['likes'] ?? 0} ❤️')), if (d['img'] != null) CachedNetworkImage(imageUrl: d['img'], height: 200, width: double.infinity, fit: BoxFit.cover) ])); }); })) ])); }
+          }
+          EOF
+
+          cat > lib/screens/study.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:video_player/video_player.dart'; import 'dart:async';
+          class StudyScreen extends StatefulWidget { const StudyScreen({super.key}); @override State<StudyScreen> createState() => _StudyScreenState(); }
+          class _StudyScreenState extends State<StudyScreen> { late VideoPlayerController _v; Timer? _t; String _time = 'Calculating...';
+            @override void initState() { super.initState(); _v = VideoPlayerController.networkUrl(Uri.parse('https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'))..initialize().then((_) => setState(() {})); _t = Timer.periodic(const Duration(seconds: 1), (timer) { final diff = DateTime.now().add(const Duration(hours: 2)).difference(DateTime.now()); setState(() => _time = '${diff.inHours}h ${diff.inMinutes % 60}m ${diff.inSeconds % 60}s'); }); }
+            @override void dispose() { _v.dispose(); _t?.cancel(); super.dispose(); }
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('Study Hub'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white), body: ListView(padding: const EdgeInsets.all(16), children: [ Card(color: const Color(0xFF0A3D91), child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [ const Text('Next Class Starts In:', style: TextStyle(color: Colors.white70)), Text(_time, style: const TextStyle(color: Color(0xFFF4B41A), fontSize: 24, fontWeight: FontWeight.bold)), const SizedBox(height: 10), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: () {}, child: const Text('Join Live')) ]))), const SizedBox(height: 20), const Text('Recorded Library', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 10), if (_v.value.isInitialized) AspectRatio(aspectRatio: _v.value.aspectRatio, child: Stack(alignment: Alignment.center, children: [ VideoPlayer(_v), IconButton(icon: Icon(_v.value.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 50), onPressed: () => setState(() => _v.value.isPlaying ? _v.pause() : _v.play())) ])) else const Center(child: CircularProgressIndicator()) ]); }
+          }
+          EOF
+
+          cat > lib/screens/reports.dart << 'EOF'
           import 'package:flutter/material.dart';
           class ReportsScreen extends StatefulWidget { const ReportsScreen({super.key}); @override State<ReportsScreen> createState() => _ReportsScreenState(); }
-          class _ReportsScreenState extends State<ReportsScreen> { final _code = TextEditingController(); bool _unlocked = false;
-            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('My Reports'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white), body: Center(child: Padding(padding: const EdgeInsets.all(32), child: _unlocked ? const Text('Report Card PDF Loaded!') : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(Icons.lock, size: 80, color: Color(0xFF0A3D91)), const SizedBox(height: 24), const Text('Enter Secret Code', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 16),
-              TextField(controller: _code, decoration: const InputDecoration(border: OutlineInputBorder()), textAlign: TextAlign.center), const SizedBox(height: 24),
-              ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: () { if (_code.text.length >= 4) setState(() => _unlocked = true); }, child: const Text('Unlock', style: TextStyle(color: Colors.white))),
-            ]))));
+          class _ReportsScreenState extends State<ReportsScreen> { final _c = TextEditingController(); bool _u = false;
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('My Reports'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white), body: Center(child: Padding(padding: const EdgeInsets.all(20), child: _u ? const Text('Report Card Unlocked!') : Column(mainAxisSize: MainAxisSize.min, children: [ const Icon(Icons.lock, size: 80, color: Color(0xFF0A3D91)), const SizedBox(height: 20), TextField(controller: _c, decoration: const InputDecoration(hintText: 'Enter Secret Code', border: OutlineInputBorder()), textAlign: TextAlign.center), const SizedBox(height: 20), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: () { if (_c.text == '1234') setState(() => _u = true); }, child: const Text('Unlock', style: TextStyle(color: Colors.white))) ])))); }
           }
-          REP
+          EOF
 
-          cat > lib/screens/hub.dart << 'HUB'
-          import 'package:flutter/material.dart';
-          import 'chat.dart';
-          import 'rewards.dart';
-          import 'coming_soon.dart';
-          
-          class HubScreen extends StatelessWidget {
-            final String studentClass;
-            final String studentName;
-            const HubScreen({super.key, required this.studentClass, required this.studentName});
-            
-            @override Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Platinum Hub'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white), 
-                body: GridView.count(crossAxisCount: 2, padding: const EdgeInsets.all(16), mainAxisSpacing: 16, crossAxisSpacing: 16, children: [
-                  _tile(context, 'Whole School Chat', Icons.public, ChatScreen(chatName: 'Whole School', isStudentOnly: false, currentUser: studentName), Colors.teal),
-                  _tile(context, '$studentClass Chat (All)', Icons.chat, ChatScreen(chatName: '$studentClass (Teachers & Students)', isStudentOnly: false, currentUser: studentName), Colors.blue),
-                  _tile(context, '$studentClass Chat (Students)', Icons.people, ChatScreen(chatName: '$studentClass (Students Only)', isStudentOnly: true, currentUser: studentName), Colors.indigo),
-                  _tile(context, 'Debate Club Chat', Icons.gavel, ChatScreen(chatName: 'Debate Club', isStudentOnly: false, currentUser: studentName), Colors.deepOrange),
-                  _tile(context, 'Writers Club Chat', Icons.edit, ChatScreen(chatName: 'Writers Club', isStudentOnly: false, currentUser: studentName), Colors.purple),
-                  _tile(context, 'Suggestions', Icons.lightbulb, const ComingSoonScreen(featureName: 'Suggestions'), Colors.orange),
-                  _tile(context, 'Rewards', Icons.emoji_events, const RewardsScreen(), Colors.amber),
-                ]),
-              );
-            }
-            Widget _tile(BuildContext context, String title, IconData icon, Widget screen, Color color) => InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => screen)), child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircleAvatar(radius: 30, backgroundColor: color.withOpacity(0.1), child: Icon(icon, size: 30, color: color)), const SizedBox(height: 12), Padding(padding: const EdgeInsets.symmetric(horizontal: 8.0), child: Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)))])));
+          cat > lib/screens/hub.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'chat.dart'; import 'confessions.dart';
+          class HubScreen extends StatelessWidget { final String name; final String cls; const HubScreen({super.key, required this.name, required this.cls});
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('Hub'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white), body: GridView.count(crossAxisCount: 2, padding: const EdgeInsets.all(16), crossAxisSpacing: 10, mainAxisSpacing: 10, children: [ _t(context, 'Whole School', Icons.public, ChatScreen(room: 'All', user: name)), _t(context, '$cls Chat', Icons.class_, ChatScreen(room: cls, user: name)), _t(context, 'Confessions', Icons.security, const ConfessionsScreen()), _t(context, 'Rewards', Icons.emoji_events, const Scaffold(body: Center(child: Text('Coming Soon')))) ])); }
+            Widget _t(BuildContext c, String t, IconData i, Widget s) => InkWell(onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => s)), child: Card(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [ Icon(i, size: 40, color: const Color(0xFF0A3D91)), const SizedBox(height: 10), Text(t, style: const TextStyle(fontWeight: FontWeight.bold)) ])));
           }
-          HUB
+          EOF
 
-          cat > lib/screens/chat.dart << 'CHAT'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'package:firebase_storage/firebase_storage.dart';
-          import 'package:image_picker/image_picker.dart';
-          import 'package:file_picker/file_picker.dart';
-          import 'package:cached_network_image/cached_network_image.dart';
-          import 'package:video_player/video_player.dart';
-          import 'dart:io';
-
-          class ChatScreen extends StatefulWidget {
-            final String chatName;
-            final bool isStudentOnly;
-            final String currentUser;
-            const ChatScreen({super.key, required this.chatName, required this.isStudentOnly, required this.currentUser});
-            @override State<ChatScreen> createState() => _ChatScreenState();
+          cat > lib/screens/confessions.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class ConfessionsScreen extends StatefulWidget { const ConfessionsScreen({super.key}); @override State<ConfessionsScreen> createState() => _ConfessionsScreenState(); }
+          class _ConfessionsScreenState extends State<ConfessionsScreen> { final _c = TextEditingController();
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('Anonymous Confessions'), backgroundColor: Colors.black), backgroundColor: Colors.grey[900], body: Column(children: [ Padding(padding: const EdgeInsets.all(10), child: Row(children: [ Expanded(child: TextField(controller: _c, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Type anonymously...', filled: true, fillColor: Color(0xFF1E1E1E), border: OutlineInputBorder())),), IconButton(icon: const Icon(Icons.send, color: Colors.greenAccent), onPressed: () async { if (_c.text.isNotEmpty) { await FirebaseFirestore.instance.collection('confessions').add({'text': _c.text, 'time': FieldValue.serverTimestamp()}); _c.clear(); } }) ])), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('confessions').orderBy('time', descending: true).snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { return Card(color: const Color(0xFF1E1E1E), child: Padding(padding: const EdgeInsets.all(16), child: Text(s.data!.docs[i]['text'], style: const TextStyle(color: Colors.white)))); }); })) ])); }
           }
-          class _ChatScreenState extends State<ChatScreen> {
-            final TextEditingController _msgController = TextEditingController();
-            bool _isUploading = false;
+          EOF
 
-            Future<void> _sendMessage(String type, {String? filePath, String? text}) async {
-              String? mediaUrl;
-              if (filePath != null) {
-                setState(() => _isUploading = true);
-                try {
-                  String fileName = DateTime.now().millisecondsSinceEpoch.toString();
-                  Reference ref = FirebaseStorage.instance.ref().child('chats/${widget.chatName}/$fileName');
-                  await ref.putFile(File(filePath));
-                  mediaUrl = await ref.getDownloadURL();
-                } catch (e) {
-                  setState(() => _isUploading = false);
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
-                  return;
-                }
-              }
-
-              await FirebaseFirestore.instance.collection('chats').doc(widget.chatName).collection('messages').add({
-                'sender': widget.currentUser,
-                'text': text ?? '',
-                'mediaUrl': mediaUrl,
-                'type': type,
-                'timestamp': FieldValue.serverTimestamp(),
-              });
-
-              _msgController.clear();
-              setState(() => _isUploading = false);
-            }
-
-            Future<void> _pickMedia(String type) async {
-              if (type == 'image' || type == 'video') {
-                final picker = ImagePicker();
-                XFile? file = type == 'image' ? await picker.pickImage(source: ImageSource.gallery) : await picker.pickVideo(source: ImageSource.gallery);
-                if (file != null) _sendMessage(type, filePath: file.path);
-              } else {
-                FilePickerResult? result = await FilePicker.platform.pickFiles();
-                if (result != null) _sendMessage('document', filePath: result.files.single.path);
-              }
-            }
-
-            @override Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: Text(widget.chatName), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white, actions: [
-                  if (!widget.isStudentOnly) const Padding(padding: EdgeInsets.all(16.0), child: Icon(Icons.verified_user, color: Color(0xFFF4B41A)))
-                ]),
-                body: Column(
-                  children: [
-                    if (_isUploading) const LinearProgressIndicator(color: Color(0xFFF4B41A)),
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance.collection('chats').doc(widget.chatName).collection('messages').orderBy('timestamp', descending: false).snapshots(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                          final messages = snapshot.data!.docs;
-                          return ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: messages.length,
-                            itemBuilder: (context, index) {
-                              final msg = messages[index].data() as Map<String, dynamic>;
-                              final isMe = msg['sender'] == widget.currentUser;
-                              final time = (msg['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
-                              final timeStr = "${time.hour}:${time.minute.toString().padLeft(2, '0')}";
-
-                              return Align(
-                                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isMe ? const Color(0xFF0A3D91) : Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(16).copyWith(bottomRight: isMe ? Radius.zero : const Radius.circular(16), bottomLeft: isMe ? const Radius.circular(16) : Radius.zero),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                    children: [
-                                      if (!isMe) Text(msg['sender'], style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A3D91), fontSize: 12)),
-                                      const SizedBox(height: 4),
-                                      if (msg['text'] != null && msg['text'].isNotEmpty) Text(msg['text'], style: TextStyle(color: isMe ? Colors.white : Colors.black87)),
-                                      
-                                      if (msg['type'] == 'image' && msg['mediaUrl'] != null)
-                                        Padding(padding: const EdgeInsets.only(top: 8), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: msg['mediaUrl'], width: 200, fit: BoxFit.cover))),
-                                      if (msg['type'] == 'video' && msg['mediaUrl'] != null)
-                                        Padding(padding: const EdgeInsets.only(top: 8), child: const Icon(Icons.play_circle_fill, size: 50, color: Colors.white)),
-                                      if (msg['type'] == 'document' && msg['mediaUrl'] != null)
-                                        Padding(padding: const EdgeInsets.only(top: 8), child: Row(children: [Icon(Icons.insert_drive_file, color: isMe ? Colors.white : Colors.black), const SizedBox(width: 8), const Text('Document', style: TextStyle(fontWeight: FontWeight.bold))])),
-
-                                      const SizedBox(height: 4),
-                                      Text(timeStr, style: TextStyle(color: isMe ? Colors.white70 : Colors.grey, fontSize: 10)),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          IconButton(icon: const Icon(Icons.add_circle, color: Color(0xFFF4B41A)), onPressed: () {
-                            showModalBottomSheet(context: context, builder: (context) => Wrap(children: [
-                              ListTile(leading: const Icon(Icons.image), title: const Text('Send Image'), onTap: () { Navigator.pop(context); _pickMedia('image'); }),
-                              ListTile(leading: const Icon(Icons.videocam), title: const Text('Send Video'), onTap: () { Navigator.pop(context); _pickMedia('video'); }),
-                              ListTile(leading: const Icon(Icons.audiotrack), title: const Text('Send Audio/Doc'), onTap: () { Navigator.pop(context); _pickMedia('document'); }),
-                            ]));
-                          }),
-                          Expanded(child: TextField(controller: _msgController, decoration: InputDecoration(hintText: 'Type a message...', filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none)), onSubmitted: (val) => _sendMessage('text', text: val))),
-                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF0A3D91)), onPressed: () => _sendMessage('text', text: _msgController.text)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
+          cat > lib/screens/chat.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart'; import 'package:shared_preferences/shared_preferences.dart';
+          class ChatScreen extends StatefulWidget { final String room; final String user; const ChatScreen({super.key, required this.room, required this.user}); @override State<ChatScreen> createState() => _ChatScreenState(); }
+          class _ChatScreenState extends State<ChatScreen> { final _c = TextEditingController(); List<String> _blocked = [];
+            @override void initState() { super.initState(); _load(); }
+            void _load() async { final p = await SharedPreferences.getInstance(); setState(() => _blocked = p.getStringList('blocks') ?? []); }
+            void _block(String u) async { final p = await SharedPreferences.getInstance(); _blocked.add(u); await p.setStringList('blocks', _blocked); setState(() {}); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Blocked $u'))); }
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: Text(widget.room), backgroundColor: const Color(0xFF0A3D91)), body: Column(children: [ Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').orderBy('time', descending: false).snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); final docs = s.data!.docs.where((d) => !_blocked.contains((d.data() as Map)['sender'])).toList(); return ListView.builder(padding: const EdgeInsets.all(10), itemCount: docs.length, itemBuilder: (c, i) { final d = docs[i].data() as Map<String, dynamic>; final isMe = d['sender'] == widget.user; return Align(alignment: isMe ? Alignment.centerRight : Alignment.centerLeft, child: GestureDetector(onLongPress: () => _block(d['sender']), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isMe ? const Color(0xFF0A3D91) : Colors.grey[300], borderRadius: BorderRadius.circular(16)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ if (!isMe) Text(d['sender'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)), Text(d['text'], style: TextStyle(color: isMe ? Colors.white : Colors.black)), ])))); }); })), Padding(padding: const EdgeInsets.all(8), child: Row(children: [ Expanded(child: TextField(controller: _c, decoration: const InputDecoration(hintText: 'Message...', border: OutlineInputBorder())),), IconButton(icon: const Icon(Icons.send, color: Color(0xFF0A3D91)), onPressed: () async { if (_c.text.isNotEmpty) { await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'sender': widget.user, 'text': _c.text, 'time': FieldValue.serverTimestamp()}); _c.clear(); } }) ])) ])); }
           }
-          CHAT
-
-          cat > lib/screens/rewards.dart << 'REWARDS'
-          import 'package:flutter/material.dart';
-          class RewardsScreen extends StatelessWidget { const RewardsScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Rewards'), backgroundColor: Color(0xFF0A3D91)), body: const Center(child: Text('Leaderboard & Spin Wheel'))); }
-          REWARDS
-          cat > lib/screens/coming_soon.dart << 'CS'
-          import 'package:flutter/material.dart';
-          class ComingSoonScreen extends StatelessWidget { final String featureName; const ComingSoonScreen({super.key, required this.featureName}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(featureName), backgroundColor: Color(0xFF0A3D91)), body: Center(child: Text('$featureName coming soon.'))); }
-          CS
+          EOF
 
       - name: Build Student APK
         run: |
@@ -690,13 +204,14 @@ jobs:
           flutter pub get
           dart run flutter_launcher_icons
           dart run flutter_native_splash:create
-          flutter build apk --release
+          flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
 
-      - name: Upload Student APK
-        uses: actions/upload-artifact@v4
+      - name: Create Release for OTA (Student)
+        uses: softprops/action-gh-release@v1
         with:
-          name: platinum-pulse-apk
-          path: student_app/build/app/outputs/flutter-apk/app-release.apk
+          tag_name: v1.0.${{ github.run_number }}
+          name: Release v1.0.${{ github.run_number }}
+          files: student_app/build/app/outputs/flutter-apk/app-release.apk
 
   # ==========================================
   # JOB 2: BUILD THE STAFF HUB (ADMIN APP)
@@ -705,513 +220,115 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install ImageMagick
-        run: sudo apt-get update && sudo apt-get install -y imagemagick
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5' # 🔴 PINNED VERSION
+          flutter-version: '3.24.5'
           channel: stable
           cache: true
 
       - name: Generate Admin App Code
         run: |
-          mkdir -p admin_app/assets
-          LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
-          if [ -n "$LOGO_SOURCE" ] && [ -f "$LOGO_SOURCE" ]; then convert "$LOGO_SOURCE" -resize 1024x1024 admin_app/assets/logo.png; else printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png; fi
-
-          flutter create --org com.platinum --project-name admin_app admin_app
-          mkdir -p admin_app/lib/screens
-          mkdir -p admin_app/lib/services
-
-          # 🔴 THE DEFINITIVE GRADLE SETTINGS FIX 🔴
+          if [ ! -d "admin_app" ]; then
+            mkdir -p admin_app/assets
+            LOGO_SOURCE=$(find . -maxdepth 1 -iname "*inshot*" | head -n 1)
+            if [ -n "$LOGO_SOURCE" ] && [ -f "$LOGO_SOURCE" ]; then convert "$LOGO_SOURCE" -resize 1024x1024 admin_app/assets/logo.png; else printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png; fi
+            flutter create --org com.platinum --project-name admin_app admin_app
+            mkdir -p admin_app/lib/screens admin_app/lib/services
+          fi
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
-          
-          # Overwrite settings.gradle to guarantee correct plugin versions
-          cat > admin_app/android/settings.gradle << 'EOF'
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
-              }()
-
-              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
-
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
+          cp student_app/android/build.gradle admin_app/android/build.gradle
+          cp student_app/android/settings.gradle admin_app/android/settings.gradle
+          grep -q "android.newDsl=false" admin_app/android/gradle.properties || echo "android.newDsl=false" >> admin_app/android/gradle.properties
+          grep -q "android.builtInKotlin=false" admin_app/android/gradle.properties || echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
+          sed -i 's/android:label="admin_app"/android:label="Platinum Staff"/g' admin_app/android/app/src/main/AndroidManifest.xml
+          grep -q "android.permission.CAMERA" admin_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>' admin_app/android/app/src/main/AndroidManifest.xml
+          cat > admin_app/android/app/build.gradle << 'EOF'
+          plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin"; id "com.google.gms.google-services" }
+          android {
+              namespace = "com.platinum.admin_app"; compileSdk = 34; ndkVersion = "26.1.10909125"
+              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+              kotlinOptions { jvmTarget = "17" }
+              defaultConfig { applicationId = "com.platinum.admin_app"; minSdk = 21; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName }
+              buildTypes { release { signingConfig = signingConfigs.debug } }
+              lint { checkReleaseBuilds = false; abortOnError = false }
           }
-
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.3.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.22" apply false
-              id "com.google.gms.google-services" version "4.4.1" apply false
-          }
-
-          include ":app"
+          flutter { source = "../.." }
+          dependencies { implementation platform("com.google.firebase:firebase-bom:35.0.2"); implementation "com.google.firebase:firebase-analytics" }
           EOF
 
-          # 🔴 FORCE LEGACY GRADLE BEHAVIOR (Fixes AGP 9+ error)
-          echo "android.newDsl=false" >> admin_app/android/gradle.properties
-          echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
-
-          if [ -f admin_app/android/build.gradle ]; then
-            sed -i 's/classpath .com.android.tools.build:gradle:.*/classpath "com.android.tools.build:gradle:8.3.0"/g' admin_app/android/build.gradle
-          fi
-
-          sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>' admin_app/android/app/src/main/AndroidManifest.xml
-          
-          cat > admin_app/android/app/build.gradle << 'APPGRADLE'
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-              id "com.google.gms.google-services"
-          }
-          android {
-              namespace = "com.platinum.admin_app"
-              compileSdk = 36
-              ndkVersion = "27.0.12077973"
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
-              }
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
-              defaultConfig {
-                  applicationId = "com.platinum.admin_app"
-                  minSdk = 21
-                  targetSdk = 36
-                  versionCode = flutter.versionCode
-                  versionName = flutter.versionName
-              }
-              buildTypes {
-                  release {
-                      signingConfig = signingConfigs.debug
-                  }
-              }
-              lint {
-                  checkReleaseBuilds = false
-                  abortOnError = false
-              }
-          }
-          flutter {
-              source = "../.."
-          }
-          dependencies {
-              implementation platform("com.google.firebase:firebase-bom:35.0.2")
-              implementation "com.google.firebase:firebase-analytics"
-          }
-          APPGRADLE
-
           cd admin_app
-          flutter pub add sqflite path image_picker intl google_fonts jitsi_meet_flutter_sdk firebase_core cloud_firestore firebase_storage file_picker cached_network_image video_player
-          flutter pub add --dev flutter_launcher_icons flutter_native_splash
+          add_pkg() { grep -q "$1:" pubspec.yaml || flutter pub add "$1"; }
+          add_pkg sqflite; add_pkg path; add_pkg image_picker; add_pkg google_fonts; add_pkg firebase_core; add_pkg cloud_firestore; add_pkg google_mlkit_text_recognition
+          grep -q "flutter_launcher_icons:" pubspec.yaml || flutter pub add --dev flutter_launcher_icons
+          cat >> pubspec.yaml << 'EOF'
+          flutter_launcher_icons: { android: "launcher_icon", image_path: "assets/logo.png" }
+          flutter_native_splash: { color: "#121212", image: assets/logo.png, web: false }
+          EOF
 
-          cat >> pubspec.yaml << 'ADMINPUB'
-          flutter_launcher_icons:
-            android: "launcher_icon"
-            image_path: "assets/logo.png"
-          flutter_native_splash:
-            color: "#121212"
-            image: assets/logo.png
-            web: false
-            android_12:
-              image: assets/logo.png
-              icon_background_color: "#121212"
-          ADMINPUB
+          cat > lib/main.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:firebase_core/firebase_core.dart'; import 'package:google_fonts/google_fonts.dart'; import 'services/db.dart'; import 'screens/login.dart'; import 'screens/setup.dart';
+          void main() async { WidgetsFlutterBinding.ensureInitialized(); await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDNQ2VcWL2_Q6rkbu5TGBGqOATBxP8B5DY", authDomain: "platinum-pulse.firebaseapp.com", projectId: "platinum-pulse", storageBucket: "platinum-pulse.firebasestorage.app", messagingSenderId: "221762575431", appId: "1:221762575431:web:95054f123b6a98647f6562")); runApp(const AdminApp()); }
+          class AdminApp extends StatelessWidget { const AdminApp({super.key}); @override Widget build(BuildContext context) { return MaterialApp(title: 'Staff', debugShowCheckedModeBanner: false, theme: ThemeData.dark().copyWith(primaryColor: const Color(0xFF0A3D91), scaffoldBackgroundColor: const Color(0xFF121212), textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white))), home: const Start()); } }
+          class Start extends StatefulWidget { const Start({super.key}); @override State<Start> createState() => _StartState(); }
+          class _StartState extends State<Start> { @override void initState() { super.initState(); _go(); } void _go() async { final db = await DB.instance.db; final r = await db.query('staff', limit: 1); if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => r.isEmpty ? const SetupScreen() : const LoginScreen())); } @override Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator())); }
+          EOF
 
-          cat > lib/services/database_helper.dart << 'DBHELP'
-          import 'package:sqflite/sqflite.dart';
-          import 'package:path/path.dart';
-          class DatabaseHelper {
-            static final DatabaseHelper instance = DatabaseHelper._init();
-            static Database? _database;
-            DatabaseHelper._init();
-            Future<Database> get database async { if (_database != null) return _database!; _database = await _initDB('platinum_staff.db'); return _database!; }
-            Future<Database> _initDB(String filePath) async { final dbPath = await getDatabasesPath(); return await openDatabase(join(dbPath, filePath), version: 1, onCreate: _createDB); }
-            Future _createDB(Database db, int version) async { await db.execute('CREATE TABLE staff (id INTEGER PRIMARY KEY AUTOINCREMENT, staffId TEXT, name TEXT, pin TEXT, role TEXT)'); }
+          cat > lib/services/db.dart << 'EOF'
+          import 'package:sqflite/sqflite.dart'; import 'package:path/path.dart';
+          class DB { static final DB instance = DB._(); static Database? _db; DB._(); Future<Database> get db async { if (_db != null) return _db!; _db = await openDatabase(join(await getDatabasesPath(), 'a.db'), version: 1, onCreate: (d,v) async => await d.execute('CREATE TABLE staff (id INTEGER PRIMARY KEY, pin TEXT)')); return _db!; } }
+          EOF
+
+          cat > lib/screens/setup.dart << 'EOF'
+          import 'package:flutter/material.dart'; import '../services/db.dart'; import 'login.dart';
+          class SetupScreen extends StatefulWidget { const SetupScreen({super.key}); @override State<SetupScreen> createState() => _SetupScreenState(); }
+          class _SetupScreenState extends State<SetupScreen> { final _p = TextEditingController();
+            @override Widget build(BuildContext context) { return Scaffold(body: Center(child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [ const Text('Super Admin Setup', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), const SizedBox(height: 20), TextField(controller: _p, obscureText: true, decoration: const InputDecoration(labelText: 'Create PIN', border: OutlineInputBorder())), const SizedBox(height: 20), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: () async { if (_p.text.length >= 4) { await (await DB.instance.db).insert('staff', {'pin': _p.text}); if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen())); } }, child: const Text('Create', style: TextStyle(color: Colors.black))) ])))); }
           }
-          DBHELP
+          EOF
 
-          cat > lib/main.dart << 'ADMINMAIN'
-          import 'package:flutter/material.dart';
-          import 'package:google_fonts/google_fonts.dart';
-          import 'package:firebase_core/firebase_core.dart';
-          import 'screens/first_time_setup.dart';
-          import 'screens/login.dart';
-          import 'services/database_helper.dart';
-
-          void main() async {
-            WidgetsFlutterBinding.ensureInitialized();
-            await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDNQ2VcWL2_Q6rkbu5TGBGqOATBxP8B5DY", authDomain: "platinum-pulse.firebaseapp.com", projectId: "platinum-pulse", storageBucket: "platinum-pulse.firebasestorage.app", messagingSenderId: "221762575431", appId: "1:221762575431:web:95054f123b6a98647f6562"));
-            runApp(const PlatinumAdminApp());
+          cat > lib/screens/login.dart << 'EOF'
+          import 'package:flutter/material.dart'; import '../services/db.dart'; import 'dashboard.dart';
+          class LoginScreen extends StatefulWidget { const LoginScreen({super.key}); @override State<LoginScreen> createState() => _LoginScreenState(); }
+          class _LoginScreenState extends State<LoginScreen> { final _p = TextEditingController();
+            @override Widget build(BuildContext context) { return Scaffold(body: Center(child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [ const Icon(Icons.security, size: 60, color: Color(0xFFF4B41A)), const SizedBox(height: 20), TextField(controller: _p, obscureText: true, decoration: const InputDecoration(labelText: 'Staff PIN', border: OutlineInputBorder()), textAlign: TextAlign.center), const SizedBox(height: 20), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91)), onPressed: () async { final r = await (await DB.instance.db).query('staff', where: 'pin = ?', whereArgs: [_p.text]); if (r.isNotEmpty && mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Dashboard())); else ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid PIN'))); }, child: const Text('Login')) ])))); }
           }
+          EOF
 
-          class PlatinumAdminApp extends StatelessWidget {
-            const PlatinumAdminApp({super.key});
-            @override
-            Widget build(BuildContext context) {
-              return MaterialApp(title: 'Platinum Staff Hub', debugShowCheckedModeBanner: false, theme: ThemeData.dark().copyWith(primaryColor: const Color(0xFF0A3D91), scaffoldBackgroundColor: const Color(0xFF121212), textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white, displayColor: Colors.white))), home: const StartupScreen());
-            }
+          cat > lib/screens/dashboard.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'broadcast.dart'; import 'ocr_marks.dart'; import 'validation.dart';
+          class Dashboard extends StatelessWidget { const Dashboard({super.key});
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('Staff Dashboard'), backgroundColor: const Color(0xFF0A3D91)), body: GridView.count(crossAxisCount: 2, padding: const EdgeInsets.all(16), mainAxisSpacing: 16, crossAxisSpacing: 16, children: [ _t(context, 'Broadcast', Icons.campaign, const BroadcastScreen()), _t(context, 'Scan Marks', Icons.document_scanner, const OcrMarksScreen()), _t(context, 'Validation', Icons.warning, const ValidationScreen()), _t(context, 'Chat', Icons.chat, const Scaffold(body: Center(child: Text('Chat Feature')))) ])); }
+            Widget _t(BuildContext c, String t, IconData i, Widget s) => InkWell(onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => s)), child: Card(color: const Color(0xFF1E1E1E), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [ Icon(i, size: 40, color: const Color(0xFFF4B41A)), const SizedBox(height: 10), Text(t, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)) ])));
           }
+          EOF
 
-          class StartupScreen extends StatefulWidget {
-            const StartupScreen({super.key});
-            @override State<StartupScreen> createState() => _StartupScreenState();
+          cat > lib/screens/broadcast.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class BroadcastScreen extends StatefulWidget { const BroadcastScreen({super.key}); @override State<BroadcastScreen> createState() => _BroadcastScreenState(); }
+          class _BroadcastScreenState extends State<BroadcastScreen> { final _t = TextEditingController(); final _b = TextEditingController(); bool _u = false;
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('New Announcement')), body: Padding(padding: const EdgeInsets.all(16), child: Column(children: [ TextField(controller: _t, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())), const SizedBox(height: 16), TextField(controller: _b, maxLines: 4, decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())), const SizedBox(height: 16), SwitchListTile(title: const Text('Urgent'), value: _u, onChanged: (v) => setState(() => _u = v)), const SizedBox(height: 20), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), minimumSize: const Size(double.infinity, 50)), onPressed: () async { if (_t.text.isNotEmpty) { await FirebaseFirestore.instance.collection('announcements').add({'title': _t.text, 'body': _b.text, 'urgent': _u, 'time': FieldValue.serverTimestamp()}); if (mounted) Navigator.pop(context); } }, child: const Text('Broadcast', style: TextStyle(color: Colors.black))) ]))); }
           }
-          class _StartupScreenState extends State<StartupScreen> {
-            @override void initState() { super.initState(); _checkSetup(); }
-            Future<void> _checkSetup() async {
-              final db = await DatabaseHelper.instance.database;
-              final result = await db.query('staff', limit: 1);
-              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => result.isEmpty ? const FirstTimeSetupScreen() : const LoginScreen()));
-            }
-            @override Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFF4B41A))));
+          EOF
+
+          cat > lib/screens/ocr_marks.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:image_picker/image_picker.dart'; import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'; import 'dart:io'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class OcrMarksScreen extends StatefulWidget { const OcrMarksScreen({super.key}); @override State<OcrMarksScreen> createState() => _OcrMarksScreenState(); }
+          class _OcrMarksScreenState extends State<OcrMarksScreen> { String _text = 'No image scanned.'; bool _loading = false;
+            void _scan() async { final img = await ImagePicker().pickImage(source: ImageSource.camera); if (img == null) return; setState(() => _loading = true); final rec = TextRecognizer(); final res = await rec.processImage(InputImage.fromFile(File(img.path))); setState(() { _text = res.text; _loading = false; }); await FirebaseFirestore.instance.collection('marks').add({'raw': res.text, 'time': FieldValue.serverTimestamp()}); }
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('ML Kit OCR Scanner')), body: Padding(padding: const EdgeInsets.all(16), child: Column(children: [ Expanded(child: Container(width: double.infinity, padding: const EdgeInsets.all(10), color: Colors.black, child: SingleChildScrollView(child: Text(_text, style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace'))))), const SizedBox(height: 20), if (_loading) const CircularProgressIndicator(), ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), minimumSize: const Size(double.infinity, 50)), onPressed: _scan, icon: const Icon(Icons.camera_alt, color: Colors.black), label: const Text('Scan Physical Marksheet', style: TextStyle(color: Colors.black))) ]))); }
           }
-          ADMINMAIN
+          EOF
 
-          cat > lib/screens/first_time_setup.dart << 'SETUP'
-          import 'package:flutter/material.dart';
-          import '../services/database_helper.dart';
-          import 'login.dart';
-          class FirstTimeSetupScreen extends StatefulWidget {
-            const FirstTimeSetupScreen({super.key});
-            @override State<FirstTimeSetupScreen> createState() => _FirstTimeSetupScreenState();
+          cat > lib/screens/validation.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class ValidationScreen extends StatelessWidget { const ValidationScreen({super.key});
+            @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('Real-time Validation')), body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('marks').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final d = s.data!.docs[i].data() as Map<String, dynamic>; return Card(color: const Color(0xFF1E1E1E), child: ListTile(leading: const Icon(Icons.check_circle, color: Colors.green), title: Text('Scanned Record ${i+1}', style: const TextStyle(color: Colors.white)), subtitle: Text(d['raw'].toString().substring(0, 20) + '...', style: const TextStyle(color: Colors.grey)))); }); })); }
           }
-          class _FirstTimeSetupScreenState extends State<FirstTimeSetupScreen> {
-            final _name = TextEditingController(); final _pin = TextEditingController();
-            void _create() async {
-              if (_name.text.isEmpty || _pin.text.isEmpty) return;
-              final db = await DatabaseHelper.instance.database;
-              await db.insert('staff', {'staffId': 'SUPER', 'name': _name.text, 'pin': _pin.text, 'role': 'super_admin'});
-              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-            }
-            @override Widget build(BuildContext context) {
-              return Scaffold(backgroundColor: const Color(0xFF121212), body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Card(color: const Color(0xFF1E1E1E), elevation: 8, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Image.asset('assets/logo.png', height: 80), const SizedBox(height: 16),
-                const Text('System Setup', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 8),
-                const Text('Create the main Super Admin account.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)), const SizedBox(height: 32),
-                TextField(controller: _name, decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person), border: OutlineInputBorder())), const SizedBox(height: 16),
-                TextField(controller: _pin, obscureText: true, decoration: const InputDecoration(labelText: 'Secret PIN', prefixIcon: Icon(Icons.lock), border: OutlineInputBorder())), const SizedBox(height: 32),
-                SizedBox(width: double.infinity, height: 50, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), foregroundColor: Colors.black), onPressed: _create, child: const Text('Initialize System', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
-              ]))))));
-            }
-          }
-          SETUP
-
-          cat > lib/screens/login.dart << 'LOGIN'
-          import 'package:flutter/material.dart';
-          import 'dashboard.dart';
-          import '../services/database_helper.dart';
-          class LoginScreen extends StatefulWidget {
-            const LoginScreen({super.key});
-            @override State<LoginScreen> createState() => _LoginScreenState();
-          }
-          class _LoginScreenState extends State<LoginScreen> {
-            final _id = TextEditingController(); final _pin = TextEditingController();
-            void _login() async {
-              if (_id.text.isEmpty || _pin.text.isEmpty) return;
-              final db = await DatabaseHelper.instance.database;
-              final res = await db.query('staff', where: 'staffId = ? AND pin = ?', whereArgs: [_id.text.toUpperCase(), _pin.text]);
-              if (res.isNotEmpty) {
-                if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(role: res.first['role'] as String, name: res.first['name'] as String)));
-              } else {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid Credentials')));
-              }
-            }
-            @override Widget build(BuildContext context) {
-              return Scaffold(backgroundColor: const Color(0xFF121212), body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Card(color: const Color(0xFF1E1E1E), elevation: 8, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Image.asset('assets/logo.png', height: 80), const SizedBox(height: 16),
-                const Text('Staff Hub Login', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 32),
-                TextField(controller: _id, decoration: const InputDecoration(labelText: 'Staff ID', prefixIcon: Icon(Icons.badge), border: OutlineInputBorder())), const SizedBox(height: 16),
-                TextField(controller: _pin, obscureText: true, decoration: const InputDecoration(labelText: 'PIN', prefixIcon: Icon(Icons.lock), border: OutlineInputBorder())), const SizedBox(height: 32),
-                SizedBox(width: double.infinity, height: 50, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91)), onPressed: _login, child: const Text('Login', style: TextStyle(fontSize: 18, color: Colors.white)))),
-              ]))))));
-            }
-          }
-          LOGIN
-
-          cat > lib/screens/dashboard.dart << 'DASH'
-          import 'package:flutter/material.dart';
-          import 'announcements.dart';
-          import 'marks_submission.dart';
-          import 'validation_engine.dart';
-          import 'manage_clubs.dart';
-          import 'manage_admins.dart';
-          import 'release_reports.dart';
-          import 'admin_chat.dart';
-
-          class DashboardScreen extends StatelessWidget {
-            final String role; final String name;
-            const DashboardScreen({super.key, required this.role, required this.name});
-            @override Widget build(BuildContext context) {
-              final isSuper = role == 'super_admin';
-              final isTeacher = role == 'teacher';
-              return Scaffold(
-                appBar: AppBar(title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Welcome, $name', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text(role.toString().toUpperCase(), style: const TextStyle(fontSize: 12, color: Color(0xFFF4B41A))),
-                ]), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
-                body: Container(
-                  decoration: const BoxDecoration(color: Color(0xFF121212)),
-                  child: Column(
-                    children: [
-                      if (isTeacher || isSuper)
-                        Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green)), child: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 12), Expanded(child: Text('Biology marks submitted. All marks viable.', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)))])),
-                      Expanded(
-                        child: GridView.count(crossAxisCount: 2, padding: const EdgeInsets.all(16), mainAxisSpacing: 16, crossAxisSpacing: 16, children: [
-                          _tile(context, 'Broadcast & Live', Icons.campaign, AnnouncementsScreen(teacherName: name), Colors.blue),
-                          _tile(context, 'Marks Entry', Icons.edit_note, const MarksSubmissionScreen(), Colors.green),
-                          _tile(context, 'School Chat', Icons.chat, AdminChatScreen(teacherName: name), Colors.teal),
-                          if (!isTeacher) _tile(context, 'Validation', Icons.checklist, const ValidationEngineScreen(), Colors.orange),
-                          if (role == 'release_admin' || isSuper) _tile(context, 'Release Reports', Icons.lock_open, const ReleaseReportsScreen(), Colors.red),
-                          if (isSuper) _tile(context, 'Manage Clubs', Icons.groups, const ManageClubsScreen(), Colors.purple),
-                          if (isSuper) _tile(context, 'Manage Staff', Icons.admin_panel_settings, const ManageAdminsScreen(), Colors.amber),
-                        ]),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-            Widget _tile(BuildContext context, String title, IconData icon, Widget screen, Color color) {
-              return InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => screen)), borderRadius: BorderRadius.circular(16), child: Container(decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                CircleAvatar(radius: 25, backgroundColor: color.withOpacity(0.2), child: Icon(icon, size: 28, color: color)), const SizedBox(height: 12), Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-              ])));
-            }
-          }
-          DASH
-
-          cat > lib/screens/admin_chat.dart << 'ADMINCHAT'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'package:firebase_storage/firebase_storage.dart';
-          import 'package:image_picker/image_picker.dart';
-          import 'package:file_picker/file_picker.dart';
-          import 'package:cached_network_image/cached_network_image.dart';
-          import 'dart:io';
-
-          class AdminChatScreen extends StatefulWidget {
-            final String teacherName;
-            const AdminChatScreen({super.key, required this.teacherName});
-            @override State<AdminChatScreen> createState() => _AdminChatScreenState();
-          }
-          class _AdminChatScreenState extends State<AdminChatScreen> {
-            final TextEditingController _msgController = TextEditingController();
-            bool _isUploading = false;
-            final String chatName = 'Whole School';
-
-            Future<void> _sendMessage(String type, {String? filePath, String? text}) async {
-              String? mediaUrl;
-              if (filePath != null) {
-                setState(() => _isUploading = true);
-                try {
-                  String fileName = DateTime.now().millisecondsSinceEpoch.toString();
-                  Reference ref = FirebaseStorage.instance.ref().child('chats/$chatName/$fileName');
-                  await ref.putFile(File(filePath));
-                  mediaUrl = await ref.getDownloadURL();
-                } catch (e) { setState(() => _isUploading = false); return; }
-              }
-
-              await FirebaseFirestore.instance.collection('chats').doc(chatName).collection('messages').add({
-                'sender': '${widget.teacherName} (Teacher)',
-                'text': text ?? '',
-                'mediaUrl': mediaUrl,
-                'type': type,
-                'timestamp': FieldValue.serverTimestamp(),
-              });
-
-              _msgController.clear();
-              setState(() => _isUploading = false);
-            }
-
-            Future<void> _pickMedia(String type) async {
-              if (type == 'image') {
-                final picker = ImagePicker();
-                XFile? file = await picker.pickImage(source: ImageSource.gallery);
-                if (file != null) _sendMessage('image', filePath: file.path);
-              } else {
-                FilePickerResult? result = await FilePicker.platform.pickFiles();
-                if (result != null) _sendMessage('document', filePath: result.files.single.path);
-              }
-            }
-
-            @override Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: Text('School Chat (Whole School)'), backgroundColor: const Color(0xFF0A3D91)),
-                body: Column(
-                  children: [
-                    if (_isUploading) const LinearProgressIndicator(color: Color(0xFFF4B41A)),
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance.collection('chats').doc(chatName).collection('messages').orderBy('timestamp', descending: false).snapshots(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                          final messages = snapshot.data!.docs;
-                          return ListView.builder(
-                            padding: const EdgeInsets.all(16), itemCount: messages.length,
-                            itemBuilder: (context, index) {
-                              final msg = messages[index].data() as Map<String, dynamic>;
-                              final isMe = msg['sender'].contains(widget.teacherName);
-                              return Align(
-                                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(color: isMe ? const Color(0xFF0A3D91) : const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(16)),
-                                  child: Column(
-                                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                    children: [
-                                      if (!isMe) Text(msg['sender'], style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF4B41A), fontSize: 12)),
-                                      if (msg['text'].isNotEmpty) Text(msg['text'], style: const TextStyle(color: Colors.white)),
-                                      if (msg['type'] == 'image') Padding(padding: const EdgeInsets.only(top: 8), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: msg['mediaUrl'], width: 200))),
-                                      if (msg['type'] == 'document') Padding(padding: const EdgeInsets.only(top: 8), child: const Row(children: [Icon(Icons.file_present, color: Colors.white), SizedBox(width: 8), Text('Attachment', style: TextStyle(color: Colors.white))])),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          IconButton(icon: const Icon(Icons.add_circle, color: Color(0xFFF4B41A)), onPressed: () {
-                            showModalBottomSheet(context: context, builder: (context) => Wrap(children: [
-                              ListTile(leading: const Icon(Icons.image), title: const Text('Send Image'), onTap: () { Navigator.pop(context); _pickMedia('image'); }),
-                              ListTile(leading: const Icon(Icons.audiotrack), title: const Text('Send Audio/Doc'), onTap: () { Navigator.pop(context); _pickMedia('document'); }),
-                            ]));
-                          }),
-                          Expanded(child: TextField(controller: _msgController, decoration: InputDecoration(hintText: 'Broadcast to school...', filled: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30))), onSubmitted: (val) => _sendMessage('text', text: val))),
-                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF0A3D91)), onPressed: () => _sendMessage('text', text: _msgController.text)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-          }
-          ADMINCHAT
-
-          cat > lib/screens/marks_submission.dart << 'MARKSUB'
-          import 'package:flutter/material.dart';
-          class MarksSubmissionScreen extends StatefulWidget {
-            const MarksSubmissionScreen({super.key});
-            @override State<MarksSubmissionScreen> createState() => _MarksSubmissionScreenState();
-          }
-          class _MarksSubmissionScreenState extends State<MarksSubmissionScreen> {
-            bool _isScanning = false; bool _hasScanned = false;
-            final _subjectController = TextEditingController(text: 'Biology');
-            List<Map<String, dynamic>> _students = [];
-
-            void _scanSheet() async {
-              setState(() => _isScanning = true);
-              await Future.delayed(const Duration(seconds: 2)); 
-              setState(() {
-                _isScanning = false; _hasScanned = true;
-                _students = [{'name': 'Kato Joseph', 'score': '85'}, {'name': 'Nambi Aisha', 'score': '92'}, {'name': 'Trevor Okello', 'score': '78'}];
-              });
-            }
-            void _submitBatch() { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ 3 Students\' marks submitted.'), backgroundColor: Colors.green)); Navigator.pop(context); }
-
-            @override Widget build(BuildContext context) {
-              return Scaffold(appBar: AppBar(title: const Text('Bulk Marks Entry'), backgroundColor: const Color(0xFF0A3D91)), body: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
-                GestureDetector(onTap: _scanSheet, child: Container(height: 150, width: double.infinity, decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF0A3D91), width: 2)), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.document_scanner, size: 50, color: Color(0xFFF4B41A)), const SizedBox(height: 8), Text(_isScanning ? 'Extracting...' : 'Scan List', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]))),
-                const SizedBox(height: 16),
-                if (_isScanning) const LinearProgressIndicator(color: Color(0xFFF4B41A)),
-                if (_hasScanned) ...[
-                  TextField(controller: _subjectController, decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder())),
-                  const SizedBox(height: 16),
-                  Expanded(child: ListView.builder(itemCount: _students.length, itemBuilder: (context, index) { final s = _students[index]; return Card(color: const Color(0xFF1E1E1E), child: ListTile(title: Text(s['name'], style: const TextStyle(color: Colors.white)), trailing: SizedBox(width: 60, child: TextFormField(initialValue: s['score'], style: const TextStyle(color: Color(0xFFF4B41A)))))); })),
-                  SizedBox(width: double.infinity, height: 50, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91)), onPressed: _submitBatch, child: const Text('Submit Batch', style: TextStyle(color: Colors.white)))),
-                ]
-              ])));
-            }
-          }
-          MARKSUB
-
-          cat > lib/screens/announcements.dart << 'ANNSCR'
-          import 'package:flutter/material.dart';
-          import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
-          class AnnouncementsScreen extends StatefulWidget { final String teacherName; const AnnouncementsScreen({super.key, required this.teacherName}); @override State<AnnouncementsScreen> createState() => _AnnouncementsScreenState(); }
-          class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
-            final _title = TextEditingController(); final _body = TextEditingController(); String _audience = 'Whole School'; String _cameraFacing = 'Front';
-            void _post() { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Broadcast Sent!'))); _title.clear(); _body.clear(); }
-            Future<void> _goLive() async {
-              var options = JitsiMeetConferenceOptions(room: "PlatinumS4Chemistry", configOverrides: {"startWithAudioMuted": false, "startWithVideoMuted": false, "cameraFacing": _cameraFacing == 'Front' ? "user" : "environment"}, featureFlags: {FeatureFlags.welcomePageEnabled: false, FeatureFlags.preJoinPageEnabled: false});
-              try { await JitsiMeet().join(options); } catch (e) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); }
-            }
-            @override Widget build(BuildContext context) {
-              return Scaffold(appBar: AppBar(title: const Text('Broadcast & Live'), backgroundColor: const Color(0xFF0A3D91)), body: Padding(padding: const EdgeInsets.all(16), child: ListView(children: [
-                const Text('Start a Live Class', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFFF4B41A))), const SizedBox(height: 12),
-                Card(color: const Color(0xFF1E1E1E), child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
-                  DropdownButtonFormField<String>(value: _cameraFacing, decoration: const InputDecoration(labelText: 'Camera', border: OutlineInputBorder()), items: const [DropdownMenuItem(value: 'Front', child: Text('Front')), DropdownMenuItem(value: 'Back', child: Text('Back'))], onChanged: (v) => setState(() => _cameraFacing = v!)),
-                  const SizedBox(height: 16), SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: _goLive, icon: const Icon(Icons.videocam, color: Colors.white), label: const Text('GO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
-                ]))),
-                const SizedBox(height: 24),
-                const Text('Post Text Announcement', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFFF4B41A))), const SizedBox(height: 12),
-                DropdownButtonFormField<String>(value: _audience, decoration: const InputDecoration(labelText: 'Audience', border: OutlineInputBorder()), items: const [DropdownMenuItem(value: 'Whole School', child: Text('Whole School')), DropdownMenuItem(value: 'Senior Four', child: Text('Senior Four'))], onChanged: (v) => setState(() => _audience = v!)),
-                const SizedBox(height: 16), TextField(controller: _title, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
-                const SizedBox(height: 16), TextField(controller: _body, maxLines: 4, decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
-                const SizedBox(height: 24), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), foregroundColor: Colors.black), onPressed: _post, child: const Text('Broadcast Now')),
-              ])));
-            }
-          }
-          ANNSCR
-
-          cat > lib/screens/validation_engine.dart << 'VALENG'
-          import 'package:flutter/material.dart';
-          class ValidationEngineScreen extends StatelessWidget { const ValidationEngineScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Validation'), backgroundColor: Color(0xFF0A3D91)), body: ListView(padding: const EdgeInsets.all(16), children: [Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red)), child: const Row(children: [Icon(Icons.error, color: Colors.red), SizedBox(width: 12), Text('1 Error Detected', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))])), const SizedBox(height: 16), Card(color: const Color(0xFF1E1E1E), child: ListTile(leading: const Icon(Icons.warning, color: Colors.orange), title: const Text('Student: Kato J.', style: TextStyle(color: Colors.white)), subtitle: const Text('Mark 150 exceeds 100 limit', style: TextStyle(color: Colors.grey)), trailing: const Icon(Icons.chevron_right, color: Colors.white)))])); }
-          VALENG
-
-          cat > lib/screens/release_reports.dart << 'RELEASE'
-          import 'package:flutter/material.dart';
-          class ReleaseReportsScreen extends StatelessWidget { const ReleaseReportsScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Release Reports'), backgroundColor: Color(0xFF0A3D91)), body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.lock_open, size: 80, color: Color(0xFFF4B41A)), const SizedBox(height: 24), const Text('Ready to Publish', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 32), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), foregroundColor: Colors.black), onPressed: () { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All Reports Released!'), backgroundColor: Colors.green)); }, child: const Text('Release All Reports Now'))]))); }
-          RELEASE
-
-          cat > lib/screens/manage_admins.dart << 'MNGADMIN'
-          import 'package:flutter/material.dart';
-          import '../services/database_helper.dart';
-          class ManageAdminsScreen extends StatefulWidget {
-            const ManageAdminsScreen({super.key});
-            @override State<ManageAdminsScreen> createState() => _ManageAdminsScreenState();
-          }
-          class _ManageAdminsScreenState extends State<ManageAdminsScreen> {
-            List<Map<String, dynamic>> _staff = [];
-            @override void initState() { super.initState(); _load(); }
-            void _load() async { final data = await (await DatabaseHelper.instance.database).query('staff'); if (mounted) setState(() => _staff = data); }
-            void _add() {
-              final id = TextEditingController(); final name = TextEditingController(); final pin = TextEditingController(); String role = 'Teacher';
-              showDialog(context: context, builder: (ctx) => AlertDialog(backgroundColor: const Color(0xFF1E1E1E), title: const Text('Register Staff', style: TextStyle(color: Colors.white)), content: Column(mainAxisSize: MainAxisSize.min, children: [
-                TextField(controller: id, decoration: const InputDecoration(labelText: 'Staff ID')), TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')), TextField(controller: pin, decoration: const InputDecoration(labelText: 'PIN')),
-                DropdownButtonFormField<String>(value: role, items: const [DropdownMenuItem(value: 'Admin', child: Text('Admin')), DropdownMenuItem(value: 'Teacher', child: Text('Teacher')), DropdownMenuItem(value: 'Release Admin', child: Text('Release Admin'))], onChanged: (v) => role = v!),
-              ]), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), foregroundColor: Colors.black), onPressed: () async { if (id.text.isNotEmpty) { await (await DatabaseHelper.instance.database).insert('staff', {'staffId': id.text.toUpperCase(), 'name': name.text, 'pin': pin.text, 'role': role == 'Admin' ? 'admin' : (role == 'Teacher' ? 'teacher' : 'release_admin')}); _load(); if (mounted) Navigator.pop(ctx); } }, child: const Text('Create'))]));
-            }
-            @override Widget build(BuildContext context) {
-              return Scaffold(appBar: AppBar(title: const Text('Manage Staff'), backgroundColor: const Color(0xFF0A3D91)), body: ListView.builder(padding: const EdgeInsets.all(16), itemCount: _staff.length, itemBuilder: (context, i) { final s = _staff[i]; return Card(color: const Color(0xFF1E1E1E), child: ListTile(leading: const CircleAvatar(backgroundColor: Color(0xFF0A3D91), child: Icon(Icons.person, color: Colors.white)), title: Text(s['staffId'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), subtitle: Text('${s['name']} • ${s['role'].toString().toUpperCase()}', style: const TextStyle(color: Colors.grey)))); }), floatingActionButton: FloatingActionButton.extended(backgroundColor: const Color(0xFFF4B41A), onPressed: _add, icon: const Icon(Icons.add, color: Colors.black), label: const Text('Add Staff', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))));
-            }
-          }
-          MNGADMIN
-
-          cat > lib/screens/manage_clubs.dart << 'MNGCLUB'
-          import 'package:flutter/material.dart';
-          class ManageClubsScreen extends StatelessWidget { const ManageClubsScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Manage Clubs'), backgroundColor: Color(0xFF0A3D91)), body: const Center(child: Text('Club Management'))); }
-          MNGCLUB
+          EOF
 
       - name: Build Admin APK
         run: |
