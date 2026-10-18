@@ -24,6 +24,7 @@ jobs:
           
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.5' # 🔴 PINNED VERSION
           channel: stable
           cache: true
 
@@ -41,7 +42,7 @@ jobs:
           # 🔴 THE DEFINITIVE GRADLE SETTINGS FIX 🔴
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           
-          # 重写 settings.gradle，锁定 AGP 版本为 8.3.0
+          # Overwrite settings.gradle to guarantee correct plugin versions
           cat > student_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -71,7 +72,9 @@ jobs:
           include ":app"
           EOF
 
-          # ❌ 删除了无效的 android.newDsl 标志
+          # 🔴 FORCE LEGACY GRADLE BEHAVIOR (Fixes AGP 9+ error)
+          echo "android.newDsl=false" >> student_app/android/gradle.properties
+          echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
 
           if [ -f student_app/android/build.gradle ]; then
             sed -i 's/classpath .com.android.tools.build:gradle:.*/classpath "com.android.tools.build:gradle:8.3.0"/g' student_app/android/build.gradle
@@ -143,7 +146,7 @@ jobs:
           STUPUB
 
           # ==========================================
-          # STUDENT DART CODE (保持不变)
+          # STUDENT DART CODE
           # ==========================================
           cat > lib/models/post_model.dart << 'MODEL'
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -710,6 +713,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.5' # 🔴 PINNED VERSION
           channel: stable
           cache: true
 
@@ -726,7 +730,7 @@ jobs:
           # 🔴 THE DEFINITIVE GRADLE SETTINGS FIX 🔴
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
           
-          # 重写 settings.gradle，锁定 AGP 版本为 8.3.0
+          # Overwrite settings.gradle to guarantee correct plugin versions
           cat > admin_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -756,7 +760,9 @@ jobs:
           include ":app"
           EOF
 
-          # ❌ 删除了无效的 android.newDsl 标志
+          # 🔴 FORCE LEGACY GRADLE BEHAVIOR (Fixes AGP 9+ error)
+          echo "android.newDsl=false" >> admin_app/android/gradle.properties
+          echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
 
           if [ -f admin_app/android/build.gradle ]; then
             sed -i 's/classpath .com.android.tools.build:gradle:.*/classpath "com.android.tools.build:gradle:8.3.0"/g' admin_app/android/build.gradle
