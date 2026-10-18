@@ -9,9 +9,6 @@ permissions:
   contents: write
 
 jobs:
-  # ==========================================
-  # JOB 1: BUILD THE STUDENT APP
-  # ==========================================
   build-student:
     runs-on: ubuntu-latest
     steps:
@@ -32,7 +29,6 @@ jobs:
         run: |
           if [ ! -d "student_app" ]; then
             mkdir -p student_app/assets
-            # Create a blue student badge icon
             convert -size 1024x1024 xc:"#0A3D91" -fill white -gravity center -pointsize 400 -annotate 0 "S" student_app/assets/logo.png 2>/dev/null || printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
             flutter create --org com.platinum --project-name student_app student_app
             mkdir -p student_app/lib/screens student_app/lib/services
@@ -40,7 +36,6 @@ jobs:
 
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           
-          # 🔴 GRADLE FIX: Force compileSdk and Kotlin plugin for all subprojects
           cat > student_app/android/build.gradle << 'EOF'
           allprojects {
               repositories {
@@ -53,7 +48,6 @@ jobs:
           subprojects {
               project.buildDir = "${rootProject.buildDir}/${project.name}"
           }
-          // Force the Kotlin plugin for file_picker to resolve the 'flutter' property error
           gradle.beforeProject { sub ->
               if (sub.name == 'file_picker') {
                   sub.plugins.withId('com.android.library') {
@@ -150,28 +144,28 @@ jobs:
           grep -q "flutter_launcher_icons:" pubspec.yaml || flutter pub add --dev flutter_launcher_icons
           grep -q "flutter_native_splash:" pubspec.yaml || flutter pub add --dev flutter_native_splash
           
-          # 🔴 FORCE COMPATIBLE FILE_PICKER VERSION
+          # 🔴 SINGLE BLOCK FOR OVERRIDES AND ICONS/SPLASH
           cat >> pubspec.yaml << 'EOF'
-          dependency_overrides:
-            file_picker: 8.1.6
-          EOF
+dependency_overrides:
+  file_picker: 8.1.6
+  package_info_plus: 8.0.2
 
-          cat >> pubspec.yaml << 'EOF'
-          flutter_launcher_icons:
-            android: "launcher_icon"
-            image_path: "assets/logo.png"
-            adaptive_icon_background: "#0A3D91"
-            adaptive_icon_foreground: "assets/logo.png"
-          flutter_native_splash:
-            color: "#0A3D91"
-            image: assets/logo.png
-            web: false
-            fullscreen: true
-            android_gravity: fill
-            android_12:
-              image: assets/logo.png
-              icon_background_color: "#0A3D91"
-          EOF
+flutter_launcher_icons:
+  android: "launcher_icon"
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#0A3D91"
+  adaptive_icon_foreground: "assets/logo.png"
+
+flutter_native_splash:
+  color: "#0A3D91"
+  image: assets/logo.png
+  web: false
+  fullscreen: true
+  android_gravity: fill
+  android_12:
+    image: assets/logo.png
+    icon_background_color: "#0A3D91"
+EOF
 
           # --- STUDENT DART CODE ---
           cat > lib/main.dart << 'EOF'
@@ -911,7 +905,6 @@ jobs:
         run: |
           if [ ! -d "admin_app" ]; then
             mkdir -p admin_app/assets
-            # Create a distinct dark staff badge icon
             convert -size 1024x1024 xc:"#121212" -fill "#F4B41A" -gravity center -pointsize 400 -annotate 0 "A" admin_app/assets/logo.png 2>/dev/null || printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
             flutter create --org com.platinum --project-name admin_app admin_app
             mkdir -p admin_app/lib/screens admin_app/lib/services
@@ -967,28 +960,26 @@ jobs:
           
           grep -q "flutter_launcher_icons:" pubspec.yaml || flutter pub add --dev flutter_launcher_icons
           
-          # 🔴 FORCE COMPATIBLE FILE_PICKER VERSION
           cat >> pubspec.yaml << 'EOF'
-          dependency_overrides:
-            file_picker: 8.1.6
-          EOF
+dependency_overrides:
+  file_picker: 8.1.6
 
-          cat >> pubspec.yaml << 'EOF'
-          flutter_launcher_icons:
-            android: "launcher_icon"
-            image_path: "assets/logo.png"
-            adaptive_icon_background: "#121212"
-            adaptive_icon_foreground: "assets/logo.png"
-          flutter_native_splash:
-            color: "#121212"
-            image: assets/logo.png
-            web: false
-            fullscreen: true
-            android_gravity: fill
-            android_12:
-              image: assets/logo.png
-              icon_background_color: "#121212"
-          EOF
+flutter_launcher_icons:
+  android: "launcher_icon"
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#121212"
+  adaptive_icon_foreground: "assets/logo.png"
+
+flutter_native_splash:
+  color: "#121212"
+  image: assets/logo.png
+  web: false
+  fullscreen: true
+  android_gravity: fill
+  android_12:
+    image: assets/logo.png
+    icon_background_color: "#121212"
+EOF
 
           # --- ADMIN DART CODE ---
           cat > lib/main.dart << 'EOF'
