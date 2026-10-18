@@ -117,7 +117,7 @@ jobs:
               kotlinOptions { jvmTarget = "17" }
               defaultConfig {
                   applicationId = "com.afrinode.platinum"
-                  minSdk = 23
+                  minSdk = 24
                   targetSdk = 34
                   versionCode = flutter.versionCode
                   versionName = flutter.versionName
@@ -963,7 +963,7 @@ jobs:
               kotlinOptions { jvmTarget = "17" }
               defaultConfig {
                   applicationId = "com.afrinode.platinumadmin"
-                  minSdk = 21
+                  minSdk = 24
                   targetSdk = 34
                   versionCode = flutter.versionCode
                   versionName = flutter.versionName
