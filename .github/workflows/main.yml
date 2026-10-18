@@ -208,7 +208,7 @@ jobs:
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
-            await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDNQ2VcWL2_Q6rkbu5TGBGqOATBxP8B5DY", authDomain: "platinum-pulse.firebaseapp.com", projectId: "platinum-pulse", storageBucket: "platinum-pulse.firebasestorage.app", messagingSenderId: "221762575431", appId: "1:221762575431:web:95054f123b6a98647f6562"));
+            await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDl-dfyyRT9kdxJOCm4ZM6QYmnY1cgXI0M", appId: "1:374715668746:android:b985232e1b3a6d0d4342f3", messagingSenderId: "374715668746", projectId: "payment-sas", storageBucket: "payment-sas.firebasestorage.app"));
             runApp(const App());
           }
 
@@ -892,7 +892,7 @@ jobs:
           EOF
 
       - name: Decode Google Services JSON (Student)
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > student_app/android/app/google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | tr -d '[:space:]' | base64 -d > student_app/android/app/google-services.json
 
       - name: Build Student APK
         run: |
@@ -1036,7 +1036,7 @@ jobs:
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
-            await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDNQ2VcWL2_Q6rkbu5TGBGqOATBxP8B5DY", authDomain: "platinum-pulse.firebaseapp.com", projectId: "platinum-pulse", storageBucket: "platinum-pulse.firebasestorage.app", messagingSenderId: "221762575431", appId: "1:221762575431:web:95054f123b6a98647f6562"));
+            await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDl-dfyyRT9kdxJOCm4ZM6QYmnY1cgXI0M", appId: "1:374715668746:android:234cb73082daea324342f3", messagingSenderId: "374715668746", projectId: "payment-sas", storageBucket: "payment-sas.firebasestorage.app"));
             runApp(const AdminApp());
           }
 
@@ -1494,7 +1494,7 @@ jobs:
           EOF
 
       - name: Decode Google Services JSON (Admin)
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > admin_app/android/app/google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | tr -d '[:space:]' | base64 -d > admin_app/android/app/google-services.json
 
       - name: Build Admin APK
         run: |
