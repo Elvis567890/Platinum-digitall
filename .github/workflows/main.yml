@@ -1,4 +1,4 @@
-name: Build Platinum Ecosystem (Guaranteed Success)
+name: Build Platinum Ecosystem (Final Fixed)
 
 on:
   push:
@@ -88,7 +88,7 @@ jobs:
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
               id "com.android.application" version "8.3.0" apply false
               id "org.jetbrains.kotlin.android" version "1.9.22" apply false
-              id "com.google.gms.google-services" version "4.4.1" apply false
+              id "com.google.gms.google-services" version "4.5.0" apply false
           }
           include ":app"
           EOF
@@ -116,7 +116,7 @@ jobs:
               }
               kotlinOptions { jvmTarget = "17" }
               defaultConfig {
-                  applicationId = "com.platinum.student_app"
+                  applicationId = "com.afrinode.platinum"
                   minSdk = 23
                   targetSdk = 34
                   versionCode = flutter.versionCode
@@ -135,7 +135,6 @@ jobs:
 
           cd student_app
           
-          # 🔴 COMPLETELY OVERWRITE PUBSPEC.YAML TO LOCK VERSIONS
           cat > pubspec.yaml << 'EOF'
           name: student_app
           description: "A new Flutter project."
@@ -892,6 +891,9 @@ jobs:
           }
           EOF
 
+      - name: Decode Google Services JSON (Student)
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > student_app/android/app/google-services.json
+
       - name: Build Student APK
         run: |
           cd student_app
@@ -960,7 +962,7 @@ jobs:
               }
               kotlinOptions { jvmTarget = "17" }
               defaultConfig {
-                  applicationId = "com.platinum.admin_app"
+                  applicationId = "com.afrinode.platinumadmin"
                   minSdk = 21
                   targetSdk = 34
                   versionCode = flutter.versionCode
@@ -1490,6 +1492,9 @@ jobs:
             }
           }
           EOF
+
+      - name: Decode Google Services JSON (Admin)
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > admin_app/android/app/google-services.json
 
       - name: Build Admin APK
         run: |
