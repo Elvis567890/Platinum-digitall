@@ -135,6 +135,7 @@ jobs:
 
           cd student_app
           
+          # 🔴 COMPLETELY OVERWRITE PUBSPEC.YAML TO LOCK VERSIONS
           cat > pubspec.yaml << 'EOF'
           name: student_app
           description: "A new Flutter project."
