@@ -96,6 +96,8 @@ jobs:
           grep -q "android.newDsl=false" student_app/android/gradle.properties || echo "android.newDsl=false" >> student_app/android/gradle.properties
           grep -q "android.builtInKotlin=false" student_app/android/gradle.properties || echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
           
+          # 🔴 FIX MANIFEST MERGER CONFLICT
+          sed -i 's/<application/<application tools:replace="android:label"/' student_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="student_app"/android:label="Platinum Pulse"/g' student_app/android/app/src/main/AndroidManifest.xml
           grep -q "REQUEST_INSTALL_PACKAGES" student_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' student_app/android/app/src/main/AndroidManifest.xml
           
@@ -994,6 +996,8 @@ jobs:
           grep -q "android.newDsl=false" admin_app/android/gradle.properties || echo "android.newDsl=false" >> admin_app/android/gradle.properties
           grep -q "android.builtInKotlin=false" admin_app/android/gradle.properties || echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
           
+          # 🔴 FIX MANIFEST MERGER CONFLICT FOR ADMIN
+          sed -i 's/<application/<application tools:replace="android:label"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff"/g' admin_app/android/app/src/main/AndroidManifest.xml
           grep -q "android.permission.CAMERA" admin_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>' admin_app/android/app/src/main/AndroidManifest.xml
           
