@@ -71,6 +71,10 @@ jobs:
           include ":app"
           EOF
 
+          # 🔴 关键修复：强制禁用新 DSL，兼容当前 Flutter Gradle 插件
+          echo "android.newDsl=false" >> student_app/android/gradle.properties
+          echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
+
           if [ -f student_app/android/build.gradle ]; then
             sed -i 's/classpath .com.android.tools.build:gradle:.*/classpath "com.android.tools.build:gradle:8.3.0"/g' student_app/android/build.gradle
           fi
@@ -753,6 +757,10 @@ jobs:
 
           include ":app"
           EOF
+
+          # 🔴 关键修复：强制禁用新 DSL，兼容当前 Flutter Gradle 插件
+          echo "android.newDsl=false" >> admin_app/android/gradle.properties
+          echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
 
           if [ -f admin_app/android/build.gradle ]; then
             sed -i 's/classpath .com.android.tools.build:gradle:.*/classpath "com.android.tools.build:gradle:8.3.0"/g' admin_app/android/build.gradle
