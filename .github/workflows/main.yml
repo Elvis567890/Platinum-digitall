@@ -39,7 +39,6 @@ jobs:
 
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           
-          # Root build.gradle - REMOVED kotlinOptions
           cat > student_app/android/build.gradle << 'EOF'
           allprojects {
               repositories {
@@ -113,7 +112,6 @@ jobs:
           sed -i 's/android:label="student_app"/android:label="Platinum Pulse"/g' student_app/android/app/src/main/AndroidManifest.xml
           grep -q "REQUEST_INSTALL_PACKAGES" student_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' student_app/android/app/src/main/AndroidManifest.xml
           
-          # App build.gradle - REMOVED kotlinOptions
           cat > student_app/android/app/build.gradle << 'EOF'
           plugins {
               id "com.android.application"
@@ -127,6 +125,10 @@ jobs:
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { 
+                  jvmTarget = "17"
+                  freeCompilerArgs += ["-Xskip-metadata-version-check"]
               }
               defaultConfig {
                   applicationId = "com.afrinode.platinum"
@@ -959,7 +961,6 @@ jobs:
           
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
           
-          # Root build.gradle - REMOVED kotlinOptions
           cat > admin_app/android/build.gradle << 'EOF'
           allprojects {
               repositories {
@@ -1033,7 +1034,6 @@ jobs:
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff"/g' admin_app/android/app/src/main/AndroidManifest.xml
           grep -q "android.permission.CAMERA" admin_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>' admin_app/android/app/src/main/AndroidManifest.xml
           
-          # App build.gradle - REMOVED kotlinOptions
           cat > admin_app/android/app/build.gradle << 'EOF'
           plugins {
               id "com.android.application"
@@ -1047,6 +1047,10 @@ jobs:
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { 
+                  jvmTarget = "17"
+                  freeCompilerArgs += ["-Xskip-metadata-version-check"]
               }
               defaultConfig {
                   applicationId = "com.afrinode.platinumadmin"
