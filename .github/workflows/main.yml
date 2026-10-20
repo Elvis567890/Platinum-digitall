@@ -37,7 +37,7 @@ jobs:
             mkdir -p student_app/lib/screens student_app/lib/services
           fi
 
-          # 🔴 UPGRADED GRADLE
+          # 🔴 UPGRADED GRADLE 8.7
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           
           cat > student_app/android/build.gradle << 'EOF'
@@ -69,7 +69,7 @@ jobs:
           }
           EOF
 
-          # 🔴 UPGRADED AGP & KOTLIN
+          # 🔴 UPGRADED AGP 8.5.0 & KOTLIN 2.0.10
           cat > student_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -98,6 +98,7 @@ jobs:
           grep -q "android.newDsl=false" student_app/android/gradle.properties || echo "android.newDsl=false" >> student_app/android/gradle.properties
           grep -q "android.builtInKotlin=false" student_app/android/gradle.properties || echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
           
+          # Fix Manifest XML
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' student_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application tools:replace="android:label"/' student_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="student_app"/android:label="Platinum Pulse"/g' student_app/android/app/src/main/AndroidManifest.xml
@@ -906,6 +907,7 @@ jobs:
       - name: Build Student APK
         run: |
           cd student_app
+          flutter clean
           flutter pub get
           dart run flutter_launcher_icons
           dart run flutter_native_splash:create
@@ -946,7 +948,7 @@ jobs:
             mkdir -p admin_app/lib/screens admin_app/lib/services
           fi
           
-          # 🔴 UPGRADED GRADLE
+          # 🔴 UPGRADED GRADLE 8.7
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
           
           cat > admin_app/android/build.gradle << 'EOF'
@@ -965,7 +967,7 @@ jobs:
               afterEvaluate { project ->
                   if (project.extensions.findByName("android") != null) {
                       project.android {
-                          compileSdk 34
+                          compileSdk 35
                       }
                   }
               }
@@ -978,7 +980,7 @@ jobs:
           }
           EOF
 
-          # 🔴 UPGRADED AGP & KOTLIN
+          # 🔴 UPGRADED AGP 8.5.0 & KOTLIN 2.0.10
           cat > admin_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -1007,6 +1009,7 @@ jobs:
           grep -q "android.newDsl=false" admin_app/android/gradle.properties || echo "android.newDsl=false" >> admin_app/android/gradle.properties
           grep -q "android.builtInKotlin=false" admin_app/android/gradle.properties || echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
           
+          # Fix Manifest XML
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application tools:replace="android:label"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff"/g' admin_app/android/app/src/main/AndroidManifest.xml
@@ -1021,7 +1024,7 @@ jobs:
           }
           android {
               namespace = "com.platinum.admin_app"
-              compileSdk = 34
+              compileSdk = 35
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
@@ -1030,7 +1033,7 @@ jobs:
               defaultConfig {
                   applicationId = "com.afrinode.platinumadmin"
                   minSdk = 24
-                  targetSdk = 34
+                  targetSdk = 35
                   versionCode = flutter.versionCode
                   versionName = flutter.versionName
                   multiDexEnabled = true
@@ -1572,6 +1575,7 @@ jobs:
       - name: Build Admin APK
         run: |
           cd admin_app
+          flutter clean
           flutter pub get
           dart run flutter_launcher_icons
           dart run flutter_native_splash:create
