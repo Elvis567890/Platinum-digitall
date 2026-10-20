@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   # ==========================================
-  # JOB 1: BUILD PLATINUM DIGITAL TOOL (STUDENT APP)
+  # JOB 1: BUILD PLATINUM DIGITAL APP (STUDENT)
   # ==========================================
   build-student:
     runs-on: ubuntu-latest
@@ -37,7 +37,6 @@ jobs:
           fi
 
           # --- REAL LOGO PROCESSING (Student) ---
-          # Takes your JPG from the root, removes the white background, and puts it on a White canvas
           if [ -f "InShot_20261017_024714317.jpg" ]; then
             convert InShot_20261017_024714317.jpg -fuzz 5% -transparent white -resize 850x850 -background "#FFFFFF" -gravity center -extent 1024x1024 student_app/assets/logo.png
           elif [ ! -f "student_app/assets/logo.png" ]; then
@@ -115,8 +114,8 @@ jobs:
           grep -q "kotlin.jvm.target.validation.mode = IGNORE" student_app/android/gradle.properties || echo "kotlin.jvm.target.validation.mode = IGNORE" >> student_app/android/gradle.properties
           
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' student_app/android/app/src/main/AndroidManifest.xml
-          sed -i 's/<application/<application tools:replace="android:label"/' student_app/android/app/src/main/AndroidManifest.xml
-          sed -i 's/android:label="student_app"/android:label="Platinum Digital Tool"/g' student_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:requestLegacyExternalStorage="true" tools:replace="android:label"/' student_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
           grep -q "REQUEST_INSTALL_PACKAGES" student_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' student_app/android/app/src/main/AndroidManifest.xml
           
           cat > student_app/android/app/build.gradle << 'EOF'
@@ -165,7 +164,7 @@ jobs:
           
           cat > pubspec.yaml << 'EOF'
           name: student_app
-          description: "Platinum Digital Tool"
+          description: "Platinum Digital App"
           publish_to: 'none'
           version: 1.0.0+1
           environment:
@@ -230,9 +229,9 @@ jobs:
           import 'package:path_provider/path_provider.dart';
           import 'package:open_filex/open_filex.dart';
           import 'package:permission_handler/permission_handler.dart';
-          import 'screens/registration.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+          import 'screens/login.dart';
           import 'screens/home.dart';
-          import 'services/db.dart';
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
@@ -245,9 +244,21 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
-                title: 'Platinum Digital Tool',
+                title: 'Platinum Digital App',
                 debugShowCheckedModeBanner: false,
-                theme: ThemeData(primaryColor: const Color(0xFF0A3D91), scaffoldBackgroundColor: const Color(0xFFF4F7FC), useMaterial3: true, textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme)),
+                theme: ThemeData(
+                  brightness: Brightness.dark,
+                  primaryColor: const Color(0xFF0B0F19),
+                  scaffoldBackgroundColor: const Color(0xFF0B0F19),
+                  useMaterial3: true,
+                  textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
+                  appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true),
+                  bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+                    backgroundColor: Color(0xFF131A26),
+                    selectedItemColor: Color(0xFFD4AF37),
+                    unselectedItemColor: Colors.grey,
+                  ),
+                ),
                 home: const Start()
               );
             }
@@ -268,9 +279,16 @@ jobs:
 
             Future<void> _init() async {
               _checkForUpdates();
-              final db = await DB.instance.db;
-              final res = await db.query('students', limit: 1);
-              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => res.isEmpty ? const RegScreen() : const HomeScreen()));
+              final prefs = await SharedPreferences.getInstance();
+              final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+              
+              if (mounted) {
+                if (isLoggedIn) {
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+                } else {
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                }
+              }
             }
 
             void _checkForUpdates() async {
@@ -315,7 +333,7 @@ jobs:
               
               showDialog(context: context, barrierDismissible: false, builder: (ctx) => const AlertDialog(
                 content: Column(mainAxisSize: MainAxisSize.min, children: [
-                  CircularProgressIndicator(),
+                  CircularProgressIndicator(color: Color(0xFFD4AF37)),
                   SizedBox(height: 20),
                   Text("Downloading Update in Background...")
                 ])
@@ -334,72 +352,99 @@ jobs:
             }
 
             @override
-            Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
+            Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))));
           }
           EOF
 
-          cat > lib/services/db.dart << 'EOF'
-          import 'package:sqflite/sqflite.dart';
-          import 'package:path/path.dart';
-          class DB {
-            static final DB instance = DB._();
-            static Database? _db;
-            DB._();
-            Future<Database> get db async {
-              if (_db != null) return _db!;
-              _db = await openDatabase(join(await getDatabasesPath(), 'p.db'), version: 1, onCreate: (d,v) async => await d.execute('CREATE TABLE students (id INTEGER PRIMARY KEY, fullName TEXT, classLevel TEXT)'));
-              return _db!;
-            }
-          }
-          EOF
-
-          cat > lib/screens/registration.dart << 'EOF'
+          # --- LOGIN (ONLY ASKS FOR UNIT CODE) ---
+          cat > lib/screens/login.dart << 'EOF'
           import 'package:flutter/material.dart';
-          import '../services/db.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
           import 'home.dart';
-          class RegScreen extends StatefulWidget {
-            const RegScreen({super.key});
+
+          class LoginScreen extends StatefulWidget {
+            const LoginScreen({super.key});
             @override
-            State<RegScreen> createState() => _RegScreenState();
+            State<LoginScreen> createState() => _LoginScreenState();
           }
-          class _RegScreenState extends State<RegScreen> {
-            final _n = TextEditingController();
-            String _c = 'S1';
+          class _LoginScreenState extends State<LoginScreen> {
+            final _code = TextEditingController();
+            bool _loading = false;
+
+            Future<void> _login() async {
+              if (_code.text.trim().isEmpty) return;
+              setState(() => _loading = true);
+              
+              try {
+                final snap = await FirebaseFirestore.instance.collection('marks')
+                    .where('unitCode', isEqualTo: _code.text.trim().toUpperCase())
+                    .limit(1).get();
+
+                if (snap.docs.isNotEmpty) {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('isLoggedIn', true);
+                  await prefs.setString('unitCode', _code.text.trim().toUpperCase());
+                  
+                  if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+                } else {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid Unit Code. Contact your Teacher.'), backgroundColor: Colors.redAccent));
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              } finally {
+                if (mounted) setState(() => _loading = false);
+              }
+            }
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
                 body: Container(
-                  decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF0A3D91), Color(0xFF051C45)])),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: [Color(0xFF0B0F19), Color(0xFF131A26)], begin: Alignment.topCenter, end: Alignment.bottomCenter)
+                  ),
                   child: Center(
-                    child: Card(
+                    child: Container(
                       margin: const EdgeInsets.all(24),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset('assets/logo.png', height: 100),
-                            const SizedBox(height: 20),
-                            TextField(controller: _n, decoration: const InputDecoration(labelText: 'Full Name')),
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<String>(
-                              value: _c,
-                              items: ['S1','S2','S3','S4','S5','S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                              onChanged: (v) => setState(() => _c = v!)
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131A26).withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white10),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20)],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset('assets/logo.png', height: 100),
+                          const SizedBox(height: 20),
+                          const Text('Student Portal', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit')),
+                          const SizedBox(height: 8),
+                          const Text('Enter the unique Unit Code given to you by your teacher.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          const SizedBox(height: 24),
+                          TextField(
+                            controller: _code,
+                            style: const TextStyle(color: Colors.white, letterSpacing: 4, fontWeight: FontWeight.bold, fontSize: 20),
+                            textAlign: TextAlign.center,
+                            decoration: InputDecoration(
+                              labelText: 'Unit Code (e.g. A7X9P2)',
+                              labelStyle: const TextStyle(color: Colors.grey, letterSpacing: 0, fontSize: 14, fontWeight: FontWeight.normal),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white24)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
                             ),
-                            const SizedBox(height: 24),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)),
-                              onPressed: () async {
-                                if (_n.text.isNotEmpty) {
-                                  await (await DB.instance.db).insert('students', {'fullName': _n.text, 'classLevel': _c});
-                                  if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-                                }
-                              },
-                              child: const Text('Enter', style: TextStyle(color: Colors.white))
-                            )
-                          ]
-                        )
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                              onPressed: _loading ? null : _login,
+                              child: _loading ? const CircularProgressIndicator(color: Colors.black) : const Text('Access App', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                            ),
+                          )
+                        ]
                       )
                     )
                   )
@@ -411,12 +456,11 @@ jobs:
 
           cat > lib/screens/home.dart << 'EOF'
           import 'package:flutter/material.dart';
-          import '../services/db.dart';
-          import 'announcements.dart';
-          import 'pulse.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+          import 'feed.dart';
           import 'study.dart';
-          import 'reports.dart';
           import 'hub.dart';
+          import 'profile.dart';
 
           class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
@@ -425,85 +469,54 @@ jobs:
           }
           class _HomeScreenState extends State<HomeScreen> {
             int _i = 0;
-            String _n = '';
-            String _c = '';
+            String _code = '';
             @override
             void initState() {
               super.initState();
               _load();
             }
             void _load() async {
-              final d = await (await DB.instance.db).query('students', limit: 1);
-              if (d.isNotEmpty && mounted) setState(() { _n = d.first['fullName'] as String; _c = d.first['classLevel'] as String; });
+              final prefs = await SharedPreferences.getInstance();
+              if (mounted) {
+                setState(() {
+                  _code = prefs.getString('unitCode') ?? '';
+                });
+              }
             }
             @override
             Widget build(BuildContext context) {
-              if (_n.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              if (_code.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))));
               final p = [
-                AnnouncementsScreen(name: _n, cls: _c),
-                PulseScreen(authorName: _n),
+                FeedScreen(name: _code),
                 const StudyScreen(),
-                ReportsScreen(studentName: _n),
-                HubScreen(name: _n, cls: _c)
+                HubScreen(name: _code),
+                ProfileScreen(code: _code),
               ];
               return Scaffold(
                 body: p[_i],
-                bottomNavigationBar: BottomNavigationBar(
-                  currentIndex: _i,
-                  onTap: (v) => setState(() => _i = v),
-                  selectedItemColor: const Color(0xFF0A3D91),
-                  type: BottomNavigationBarType.fixed,
-                  items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Feed'),
-                    BottomNavigationBarItem(icon: Icon(Icons.dynamic_feed), label: 'Pulse'),
-                    BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Study'),
-                    BottomNavigationBarItem(icon: Icon(Icons.description), label: 'Reports'),
-                    BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Hub')
-                  ]
+                bottomNavigationBar: Container(
+                  decoration: BoxDecoration(
+                    border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1))
+                  ),
+                  child: BottomNavigationBar(
+                    currentIndex: _i,
+                    onTap: (v) => setState(() => _i = v),
+                    type: BottomNavigationBarType.fixed,
+                    items: const [
+                      BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: 'Feed'),
+                      BottomNavigationBarItem(icon: Icon(Icons.school_rounded), label: 'Study'),
+                      BottomNavigationBarItem(icon: Icon(Icons.groups_rounded), label: 'Hub'),
+                      BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile')
+                    ]
+                  )
                 )
               );
             }
           }
           EOF
 
-          cat > lib/screens/announcements.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          class AnnouncementsScreen extends StatelessWidget {
-            final String name;
-            final String cls;
-            const AnnouncementsScreen({super.key, required this.name, required this.cls});
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: Text('Hi, $name ($cls)'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
-                body: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance.collection('announcements').orderBy('time', descending: true).snapshots(),
-                  builder: (context, snap) {
-                    if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                    if (snap.data!.docs.isEmpty) return const Center(child: Text('No announcements yet.'));
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: snap.data!.docs.length,
-                      itemBuilder: (c, i) {
-                        final d = snap.data!.docs[i].data() as Map<String, dynamic>;
-                        return Card(
-                          child: ListTile(
-                            leading: Icon(Icons.campaign, color: d['urgent'] == true ? Colors.red : Colors.blue),
-                            title: Text(d['title'] ?? ''),
-                            subtitle: Text(d['body'] ?? '')
-                          )
-                        );
-                      }
-                    );
-                  }
-                )
-              );
-            }
-          }
-          EOF
-
-          cat > lib/screens/pulse.dart << 'EOF'
+          # --- FEED ---
+          cat > lib/screens/feed.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
           import 'package:firebase_storage/firebase_storage.dart';
@@ -512,28 +525,18 @@ jobs:
           import 'package:cached_network_image/cached_network_image.dart';
           import 'package:video_player/video_player.dart';
 
-          class PulseScreen extends StatefulWidget {
-            final String authorName;
-            const PulseScreen({super.key, required this.authorName});
+          class FeedScreen extends StatefulWidget {
+            final String name;
+            const FeedScreen({super.key, required this.name});
             @override
-            State<PulseScreen> createState() => _PulseScreenState();
+            State<FeedScreen> createState() => _FeedScreenState();
           }
 
-          class _PulseScreenState extends State<PulseScreen> {
+          class _FeedScreenState extends State<FeedScreen> {
             final _c = TextEditingController();
             XFile? _media;
             String? _mediaType;
             bool _posting = false;
-
-            Future<void> _pickImage() async {
-              final x = await ImagePicker().pickImage(source: ImageSource.gallery);
-              if (x != null) setState(() { _media = x; _mediaType = 'image'; });
-            }
-
-            Future<void> _pickVideo() async {
-              final x = await ImagePicker().pickVideo(source: ImageSource.gallery);
-              if (x != null) setState(() { _media = x; _mediaType = 'video'; });
-            }
 
             Future<void> _post() async {
               if (_c.text.trim().isEmpty && _media == null) return;
@@ -541,112 +544,167 @@ jobs:
               String? url;
               try {
                 if (_media != null) {
-                  final ref = FirebaseStorage.instance.ref().child('posts/${DateTime.now().millisecondsSinceEpoch}_${_media!.name}');
+                  final ref = FirebaseStorage.instance.ref().child('feed/${DateTime.now().millisecondsSinceEpoch}_${_media!.name}');
                   await ref.putFile(File(_media!.path));
                   url = await ref.getDownloadURL();
                 }
-                await FirebaseFirestore.instance.collection('posts').add({
-                  'author': widget.authorName,
+                await FirebaseFirestore.instance.collection('feed_posts').add({
+                  'author': widget.name,
+                  'authorType': 'student',
                   'text': _c.text.trim(),
                   'mediaUrl': url,
-                  'mediaType': _media == null ? null : _mediaType,
+                  'mediaType': _mediaType,
                   'time': FieldValue.serverTimestamp(),
                   'likes': 0,
                 });
                 _c.clear();
                 setState(() { _media = null; _mediaType = null; });
+                if (mounted) Navigator.pop(context);
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Post failed: $e')));
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
               } finally {
                 if (mounted) setState(() => _posting = false);
               }
             }
 
-            Future<void> _toggleLike(String postId) async {
-              final likeRef = FirebaseFirestore.instance.collection('posts').doc(postId).collection('likes').doc(widget.authorName);
-              final postRef = FirebaseFirestore.instance.collection('posts').doc(postId);
-              final s = await likeRef.get();
-              if (s.exists) {
-                await likeRef.delete();
-                await postRef.update({'likes': FieldValue.increment(-1)});
-              } else {
-                await likeRef.set({'time': FieldValue.serverTimestamp()});
-                await postRef.update({'likes': FieldValue.increment(1)});
-              }
+            void _showPostModal() {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: const Color(0xFF131A26),
+                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                builder: (ctx) => Padding(
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Create Post', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _c,
+                        maxLines: 3,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: 'What is happening on campus?',
+                          hintStyle: const TextStyle(color: Colors.grey),
+                          filled: true,
+                          fillColor: const Color(0xFF0B0F19),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (_media != null)
+                        Stack(
+                          children: [
+                            if (_mediaType == 'image')
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.file(File(_media!.path), height: 150, width: double.infinity, fit: BoxFit.cover),
+                              )
+                            else
+                              Container(
+                                height: 150, width: double.infinity, color: Colors.black54,
+                                child: const Center(child: Icon(Icons.videocam, color: Colors.white, size: 50)),
+                              ),
+                            Positioned(
+                              top: 8, right: 8,
+                              child: GestureDetector(
+                                onTap: () => setState(() { _media = null; _mediaType = null; }),
+                                child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: const Icon(Icons.close, color: Colors.white, size: 20)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.image, color: Color(0xFFD4AF37), size: 30),
+                            onPressed: () async {
+                              final x = await ImagePicker().pickImage(source: ImageSource.gallery);
+                              if (x != null) setState(() { _media = x; _mediaType = 'image'; });
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.videocam, color: Color(0xFFD4AF37), size: 30),
+                            onPressed: () async {
+                              final x = await ImagePicker().pickVideo(source: ImageSource.gallery);
+                              if (x != null) setState(() { _media = x; _mediaType = 'video'; });
+                            },
+                          ),
+                          _posting
+                              ? const CircularProgressIndicator(color: Color(0xFFD4AF37))
+                              : ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
+                                  onPressed: _post,
+                                  child: const Text('Post to Feed', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              );
             }
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(
-                  backgroundColor: const Color(0xFF0A3D91),
-                  foregroundColor: Colors.white,
-                  title: const Text('Pulse'),
+                  title: const Text('Platinum Feed', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
+                  actions: [
+                    IconButton(icon: const Icon(Icons.add_circle, color: Color(0xFFD4AF37), size: 30), onPressed: _showPostModal)
+                  ],
                 ),
                 body: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      color: Colors.white,
-                      child: Column(
-                        children: [
-                          TextField(controller: _c, maxLines: null, decoration: const InputDecoration(hintText: "What's on your mind?", border: OutlineInputBorder())),
-                          if (_media != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Stack(
-                                children: [
-                                  if (_mediaType == 'image')
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.file(File(_media!.path), height: 150, width: double.infinity, fit: BoxFit.cover),
-                                    )
-                                  else
-                                    Container(
-                                      height: 150,
-                                      width: double.infinity,
-                                      color: Colors.black54,
-                                      child: const Center(child: Icon(Icons.videocam, color: Colors.white, size: 50)),
-                                    ),
-                                  Positioned(
-                                    top: 4, right: 4,
-                                    child: GestureDetector(
-                                      onTap: () => setState(() { _media = null; _mediaType = null; }),
-                                      child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: const Icon(Icons.close, color: Colors.white, size: 16)),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('announcements').where('urgent', isEqualTo: true).orderBy('time', descending: true).limit(1).snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
+                        final ann = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB5952F)]),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [BoxShadow(color: const Color(0xFFD4AF37).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+                          ),
+                          child: Row(
                             children: [
-                              IconButton(icon: const Icon(Icons.image, color: Color(0xFFF4B41A)), onPressed: _pickImage, tooltip: 'Image'),
-                              IconButton(icon: const Icon(Icons.videocam, color: Color(0xFFF4B41A)), onPressed: _pickVideo, tooltip: 'Video'),
-                              _posting
-                                  ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
-                                  : IconButton(icon: const Icon(Icons.send, color: Color(0xFF0A3D91)), onPressed: _post, tooltip: 'Post'),
+                              const Icon(Icons.campaign, color: Colors.black, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  "${ann['title']}: ${ann['body']}",
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ),
                             ],
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
+                    
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance.collection('posts').orderBy('time', descending: true).snapshots(),
+                        stream: FirebaseFirestore.instance.collection('feed_posts').orderBy('time', descending: true).snapshots(),
                         builder: (c, s) {
-                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
-                          if (s.data!.docs.isEmpty) return const Center(child: Text('No posts yet. Be the first!'));
+                          if (!s.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
+                          if (s.data!.docs.isEmpty) return const Center(child: Text('No posts yet. Start the conversation!', style: TextStyle(color: Colors.grey)));
+                          
                           return ListView.builder(
+                            padding: const EdgeInsets.all(16),
                             itemCount: s.data!.docs.length,
                             itemBuilder: (c, i) {
                               final doc = s.data!.docs[i];
-                              return _PostCard(
-                                docId: doc.id,
-                                data: doc.data() as Map<String, dynamic>,
-                                authorName: widget.authorName,
-                                onLike: () => _toggleLike(doc.id),
-                              );
+                              final data = doc.data() as Map<String, dynamic>;
+                              return _FeedCard(data: data);
                             },
                           );
                         },
@@ -658,110 +716,120 @@ jobs:
             }
           }
 
-          class _PostCard extends StatelessWidget {
-            final String docId;
+          class _FeedCard extends StatefulWidget {
             final Map<String, dynamic> data;
-            final String authorName;
-            final VoidCallback onLike;
-            const _PostCard({required this.docId, required this.data, required this.authorName, required this.onLike});
+            const _FeedCard({required this.data});
+
+            @override
+            State<_FeedCard> createState() => _FeedCardState();
+          }
+
+          class _FeedCardState extends State<_FeedCard> {
+            VideoPlayerController? _videoController;
+            bool _isPlaying = false;
+
+            @override
+            void initState() {
+              super.initState();
+              if (widget.data['mediaType'] == 'video' && widget.data['mediaUrl'] != null) {
+                _videoController = VideoPlayerController.networkUrl(Uri.parse(widget.data['mediaUrl']))
+                  ..initialize().then((_) => setState(() {}));
+              }
+            }
+
+            @override
+            void dispose() {
+              _videoController?.dispose();
+              super.dispose();
+            }
 
             @override
             Widget build(BuildContext context) {
-              return Card(
-                margin: const EdgeInsets.all(8),
+              final isClub = widget.data['authorType'] == 'club';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131A26),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.05)),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ListTile(
-                      leading: CircleAvatar(backgroundColor: const Color(0xFF0A3D91), child: Text((data['author'] ?? '?').toString()[0].toUpperCase(), style: const TextStyle(color: Colors.white))),
-                      title: Text(data['author'] ?? 'Anonymous', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(_formatTime(data['time'])),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: CircleAvatar(
+                        backgroundColor: isClub ? const Color(0xFFD4AF37) : const Color(0xFF1A365D),
+                        child: Icon(isClub ? Icons.groups : Icons.person, color: isClub ? Colors.black : Colors.white),
+                      ),
+                      title: Row(
+                        children: [
+                          Text(widget.data['author'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                          if (isClub) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified, color: Color(0xFFD4AF37), size: 16),
+                          ]
+                        ],
+                      ),
+                      subtitle: Text(isClub ? 'Official Club' : 'Student Post', style: const TextStyle(color: Colors.grey, fontSize: 12)),
                     ),
-                    if (data['text'] != null && (data['text'] as String).isNotEmpty)
+                    if (widget.data['text'] != null && widget.data['text'].toString().isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(data['text']),
+                        child: Text(widget.data['text'], style: const TextStyle(fontSize: 15, height: 1.4)),
                       ),
-                    if (data['mediaType'] == 'image' && data['mediaUrl'] != null)
+                    if (widget.data['mediaType'] == 'image' && widget.data['mediaUrl'] != null)
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: CachedNetworkImage(imageUrl: data['mediaUrl'], width: double.infinity, height: 250, fit: BoxFit.cover),
+                        padding: const EdgeInsets.only(top: 12),
+                        child: CachedNetworkImage(imageUrl: widget.data['mediaUrl'], width: double.infinity, fit: BoxFit.cover),
                       ),
-                    if (data['mediaType'] == 'video' && data['mediaUrl'] != null)
+                    if (widget.data['mediaType'] == 'video' && widget.data['mediaUrl'] != null && _videoController!.value.isInitialized)
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.only(top: 12),
                         child: GestureDetector(
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _FullScreenVideo(url: data['mediaUrl']))),
-                          child: Container(
-                            height: 250,
-                            width: double.infinity,
-                            color: Colors.black87,
-                            child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 72)),
+                          onTap: () {
+                            setState(() {
+                              if (_isPlaying) { _videoController!.pause(); } else { _videoController!.play(); }
+                              _isPlaying = !_isPlaying;
+                            });
+                          },
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              AspectRatio(
+                                aspectRatio: _videoController!.value.aspectRatio,
+                                child: VideoPlayer(_videoController!),
+                              ),
+                              if (!_isPlaying)
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 40),
+                                )
+                            ],
                           ),
                         ),
                       ),
-                    StreamBuilder<DocumentSnapshot>(
-                      stream: FirebaseFirestore.instance.collection('posts').doc(docId).collection('likes').doc(authorName).snapshots(),
-                      builder: (c, likeSnap) {
-                        final liked = likeSnap.hasData && likeSnap.data!.exists;
-                        return Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : null),
-                              onPressed: onLike,
-                            ),
-                            Text('${data['likes'] ?? 0}'),
-                          ],
-                        );
-                      },
-                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.favorite_border, color: Colors.grey),
+                            onPressed: () {},
+                          ),
+                          Text('${widget.data['likes'] ?? 0}', style: const TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    )
                   ],
-                ),
-              );
-            }
-
-            String _formatTime(dynamic t) {
-              if (t is Timestamp) {
-                final diff = DateTime.now().difference(t.toDate());
-                if (diff.inSeconds < 60) return 'just now';
-                if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-                if (diff.inHours < 24) return '${diff.inHours}h ago';
-                return '${diff.inDays}d ago';
-              }
-              return '';
-            }
-          }
-
-          class _FullScreenVideo extends StatefulWidget {
-            final String url;
-            const _FullScreenVideo({required this.url});
-            @override
-            State<_FullScreenVideo> createState() => _FullScreenVideoState();
-          }
-          class _FullScreenVideoState extends State<_FullScreenVideo> {
-            late VideoPlayerController _ctrl;
-            @override
-            void initState() {
-              super.initState();
-              _ctrl = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _ctrl.play(); });
-            }
-            @override
-            void dispose() { _ctrl.dispose(); super.dispose(); }
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                backgroundColor: Colors.black,
-                appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
-                body: Center(
-                  child: _ctrl.value.isInitialized
-                      ? AspectRatio(aspectRatio: _ctrl.value.aspectRatio, child: VideoPlayer(_ctrl))
-                      : const CircularProgressIndicator(color: Colors.white),
                 ),
               );
             }
           }
           EOF
 
+          # --- STUDY HUB (SIMPLIFIED: ONLY LIVE CLASSES & LIBRARY) ---
           cat > lib/screens/study.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:video_player/video_player.dart';
@@ -792,62 +860,81 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Study Hub'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
+                appBar: AppBar(title: const Text('Study Hub', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)))),
                 body: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    const Text('Live Now', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
+                    const Text('Live Classes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 10),
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance.collection('live_classes').snapshots(),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                          return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No live classes currently active.')));
+                          return Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.05))),
+                            child: const Text('No live classes currently active.', style: TextStyle(color: Colors.grey)),
+                          );
                         }
                         return Column(
                           children: snapshot.data!.docs.map((doc) {
                             final data = doc.data() as Map<String, dynamic>;
-                            return Card(
-                              color: const Color(0xFF0A3D91),
+                            return Container(
                               margin: const EdgeInsets.only(bottom: 12),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Row(children: [CircleAvatar(backgroundColor: Colors.red, radius: 8), SizedBox(width: 8), Text('LIVE NOW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
-                                    const SizedBox(height: 12),
-                                    Text(data['title'] ?? 'Class', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                                    Text(data['teacher'] ?? 'Teacher', style: const TextStyle(color: Colors.white70)),
-                                    const SizedBox(height: 16),
-                                    SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: () => _join(context, data['room']), child: const Text('Join Class', style: TextStyle(color: Colors.white)))),
-                                  ],
-                                ),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF131A26),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(children: [
+                                    const CircleAvatar(backgroundColor: Colors.redAccent, radius: 6),
+                                    const SizedBox(width: 8),
+                                    const Text('LIVE NOW', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                                  ]),
+                                  const SizedBox(height: 12),
+                                  Text(data['title'] ?? 'Class', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                                  Text(data['teacher'] ?? 'Teacher', style: const TextStyle(color: Colors.grey)),
+                                  const SizedBox(height: 16),
+                                  SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => _join(context, data['room']), child: const Text('Join Class', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)))),
+                                ],
                               ),
                             );
                           }).toList(),
                         );
                       }
                     ),
-                    const SizedBox(height: 20),
-                    const Text('Recorded Library', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
+                    const SizedBox(height: 24),
+                    const Text('Digital Library', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 10),
-                    if (_v.value.isInitialized)
-                      AspectRatio(
-                        aspectRatio: _v.value.aspectRatio,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            VideoPlayer(_v),
-                            IconButton(
-                              icon: Icon(_v.value.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 50),
-                              onPressed: () => setState(() => _v.value.isPlaying ? _v.pause() : _v.play())
-                            )
-                          ]
-                        )
-                      )
-                    else
-                      const Center(child: CircularProgressIndicator())
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 40),
+                          const SizedBox(width: 16),
+                          const Expanded(child: Text('S4 Biology Textbook.pdf', style: TextStyle(fontWeight: FontWeight.bold))),
+                          IconButton(icon: const Icon(Icons.download, color: Color(0xFFD4AF37)), onPressed: () {}),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.image, color: Colors.blueAccent, size: 40),
+                          const SizedBox(width: 16),
+                          const Expanded(child: Text('Term 2 Timetable.png', style: TextStyle(fontWeight: FontWeight.bold))),
+                          IconButton(icon: const Icon(Icons.download, color: Color(0xFFD4AF37)), onPressed: () {}),
+                        ],
+                      ),
+                    )
                   ]
                 )
               );
@@ -855,116 +942,405 @@ jobs:
           }
           EOF
 
-          cat > lib/screens/reports.dart << 'EOF'
+          cat > lib/screens/hub.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+          import 'chat.dart';
 
-          class ReportsScreen extends StatelessWidget {
-            final String studentName;
-            const ReportsScreen({super.key, required this.studentName});
+          class HubScreen extends StatefulWidget {
+            final String name;
+            const HubScreen({super.key, required this.name});
+            @override
+            State<HubScreen> createState() => _HubScreenState();
+          }
+
+          class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMixin {
+            late TabController _tabController;
+            List<String> _subscribed = [];
+            bool _loading = true;
+
+            @override
+            void initState() {
+              super.initState();
+              _tabController = TabController(length: 2, vsync: this);
+              _loadSubscriptions();
+            }
+
+            Future<void> _loadSubscriptions() async {
+              final prefs = await SharedPreferences.getInstance();
+              setState(() {
+                _subscribed = prefs.getStringList('subscribedGroups') ?? ['All'];
+                _loading = false;
+              });
+            }
+
+            Future<void> _toggleSub(String groupName) async {
+              final prefs = await SharedPreferences.getInstance();
+              setState(() {
+                if (_subscribed.contains(groupName)) {
+                  _subscribed.remove(groupName);
+                } else {
+                  _subscribed.add(groupName);
+                }
+              });
+              await prefs.setStringList('subscribedGroups', _subscribed);
+            }
+
+            @override
+            void dispose() {
+              _tabController.dispose();
+              super.dispose();
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))));
+
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('Groups Hub', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
+                  bottom: TabBar(
+                    controller: _tabController,
+                    indicatorColor: const Color(0xFFD4AF37),
+                    labelColor: const Color(0xFFD4AF37),
+                    unselectedLabelColor: Colors.grey,
+                    tabs: const [Tab(text: 'My Groups'), Tab(text: 'Discover')],
+                  ),
+                ),
+                body: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildMyGroups(),
+                    _buildDiscover(),
+                  ],
+                ),
+              );
+            }
+
+            Widget _buildMyGroups() {
+              if (_subscribed.isEmpty) {
+                return const Center(child: Text('You haven\'t joined any groups yet.\nGo to Discover to find groups!', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)));
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _subscribed.length,
+                itemBuilder: (c, i) {
+                  final group = _subscribed[i];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131A26),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFFD4AF37).withOpacity(0.1),
+                        child: const Icon(Icons.forum, color: Color(0xFFD4AF37)),
+                      ),
+                      title: Text(group == 'All' ? 'Whole School Chat' : '$group Chat', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(group == 'All' ? 'Open Group' : 'Club Group', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      trailing: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A365D), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: group, user: widget.name))),
+                        child: const Text('Open Chat'),
+                      ),
+                    ),
+                  );
+                },
+              );
+            }
+
+            Widget _buildDiscover() {
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('clubs').snapshots(),
+                builder: (c, snapshot) {
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
+                  
+                  final clubs = snapshot.data!.docs.map((d) => d['name'] as String).toList();
+                  final allGroups = ['All', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', ...clubs];
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: allGroups.length,
+                    itemBuilder: (c, i) {
+                      final group = allGroups[i];
+                      final isSubscribed = _subscribed.contains(group);
+                      final isClass = group.startsWith('S') && group.length == 2;
+                      final isSchool = group == 'All';
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131A26),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.white.withOpacity(0.05),
+                            child: Icon(isSchool ? Icons.public : (isClass ? Icons.school : Icons.groups), color: Colors.grey),
+                          ),
+                          title: Text(isSchool ? 'Whole School' : (isClass ? '$group Class Group' : group), style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(isSchool ? 'Public • No teachers' : (isClass ? 'Private • Teacher monitored' : 'Club • Peer-to-peer'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          trailing: isSubscribed
+                              ? OutlinedButton(
+                                  style: OutlinedButton.styleFrom(foregroundColor: Colors.grey, side: const BorderSide(color: Colors.grey)),
+                                  onPressed: () => _toggleSub(group),
+                                  child: const Text('Subscribed'),
+                                )
+                              : ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
+                                  onPressed: () => _toggleSub(group),
+                                  child: const Text('Subscribe'),
+                                ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            }
+          }
+          EOF
+
+          # --- PROFILE & REPORTS (FEE RECEIPTS) ---
+          cat > lib/screens/profile.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+          import 'login.dart';
+
+          class ProfileScreen extends StatelessWidget {
+            final String code;
+            const ProfileScreen({super.key, required this.code});
+
+            Future<void> _logout(BuildContext context) async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
+              }
+            }
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('My Reports'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
+                appBar: AppBar(title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)))),
+                body: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    Center(
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundColor: const Color(0xFF1A365D),
+                            child: Text(code.isNotEmpty ? code[0] : 'S', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white)),
+                          ),
+                          const SizedBox(height: 16),
+                          Text('Student $code', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    _buildMenuTile(Icons.description, 'View Report Card', () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ReportCardScreen(unitCode: code)));
+                    }),
+                    _buildMenuTile(Icons.receipt_long, 'Fee Receipts', () {
+                      _showFeeReceipts(context);
+                    }),
+                    _buildMenuTile(Icons.lock_outline, 'Security Settings', () {}),
+                    _buildMenuTile(Icons.help_outline, 'Help & Support', () {}),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                          side: const BorderSide(color: Colors.redAccent),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => _logout(context),
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    )
+                  ],
+                ),
+              );
+            }
+
+            void _showFeeReceipts(BuildContext context) {
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: const Color(0xFF131A26),
+                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                builder: (ctx) => Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Fee Receipts', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
+                      const SizedBox(height: 16),
+                      ListTile(
+                        leading: const Icon(Icons.check_circle, color: Colors.greenAccent),
+                        title: const Text('Term 1 Fees - Paid'),
+                        subtitle: const Text('Receipt #: 84729'),
+                        trailing: const Icon(Icons.download, color: Colors.white),
+                        onTap: () {},
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.pending, color: Colors.orangeAccent),
+                        title: const Text('Term 2 Fees - Pending'),
+                        subtitle: const Text('Balance: UGX 150,000'),
+                        trailing: const Icon(Icons.payment, color: Colors.white),
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            Widget _buildMenuTile(IconData icon, String title, VoidCallback onTap) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  leading: Icon(icon, color: Colors.grey),
+                  title: Text(title),
+                  trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  onTap: onTap,
+                ),
+              );
+            }
+          }
+
+          class ReportCardScreen extends StatefulWidget {
+            final String unitCode;
+            const ReportCardScreen({super.key, required this.unitCode});
+            @override
+            State<ReportCardScreen> createState() => _ReportCardScreenState();
+          }
+          class _ReportCardScreenState extends State<ReportCardScreen> {
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('My Report Card')),
                 body: StreamBuilder<DocumentSnapshot>(
                   stream: FirebaseFirestore.instance.collection('settings').doc('reports').snapshots(),
                   builder: (c, setSnap) {
-                    if (!setSnap.hasData) return const Center(child: CircularProgressIndicator());
+                    if (!setSnap.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
                     final released = (setSnap.data!.data() as Map?)?['released'] == true;
                     if (!released) {
-                      return const Center(child: Padding(
-                        padding: EdgeInsets.all(24),
+                      return Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.lock, size: 80, color: Color(0xFF0A3D91)),
-                            SizedBox(height: 16),
-                            Text('Reports have not been released yet.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
-                            SizedBox(height: 8),
-                            Text('Please check back after the term ends.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                            Icon(Icons.lock_outline, size: 80, color: Colors.grey[700]),
+                            const SizedBox(height: 16),
+                            const Text('Reports Locked', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            const Text('Your reports will appear here\nonce released by the school.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
                           ],
                         ),
-                      ));
+                      );
                     }
                     return StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance.collection('marks').where('studentName', isEqualTo: studentName).limit(1).snapshots(),
+                      stream: FirebaseFirestore.instance.collection('marks')
+                          .where('unitCode', isEqualTo: widget.unitCode)
+                          .limit(1).snapshots(),
                       builder: (c, marksSnap) {
-                        if (!marksSnap.hasData) return const Center(child: CircularProgressIndicator());
+                        if (!marksSnap.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
                         if (marksSnap.data!.docs.isEmpty) {
-                          return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No report card found for this term.')));
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.error_outline, size: 80, color: Colors.orangeAccent),
+                                const SizedBox(height: 16),
+                                const Text('Results Not Found', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 8),
+                                const Text('Your results are not in the system.\nPlease contact the Admin.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          );
                         }
                         final m = marksSnap.data!.docs.first.data() as Map<String, dynamic>;
                         final subjects = (m['subjects'] as List?) ?? [];
                         return SingleChildScrollView(
                           padding: const EdgeInsets.all(16),
-                          child: Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          child: Container(
+                            decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(24)),
                             child: Column(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(20),
-                                  decoration: const BoxDecoration(color: Color(0xFF0A3D91), borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16))),
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: const BoxDecoration(color: Color(0xFF0A3D91), borderRadius: BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24))),
                                   child: Column(
                                     children: [
-                                      const Icon(Icons.school, color: Colors.white, size: 40),
-                                      const SizedBox(height: 8),
-                                      const Text('PLATINUM SECONDARY SCHOOL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                                      const Icon(Icons.school, color: Color(0xFFD4AF37), size: 50),
+                                      const SizedBox(height: 12),
+                                      const Text('PLATINUM SECONDARY SCHOOL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1)),
                                       Text('${m['term'] ?? 'Term'} Report Card', style: const TextStyle(color: Colors.white70)),
                                     ],
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(20),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                        const Text('Student', style: TextStyle(color: Colors.grey)),
-                                        Text(m['studentName'] ?? studentName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                        const Text('Student', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                        Text(m['studentName'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                                       ]),
                                       Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                        const Text('Class', style: TextStyle(color: Colors.grey)),
-                                        Text(m['classLevel'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                        const Text('Class', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                        Text(m['classLevel'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                                       ]),
                                     ],
                                   ),
                                 ),
-                                const Divider(),
+                                const Divider(color: Colors.grey, height: 1),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  padding: const EdgeInsets.all(16),
                                   child: Table(
-                                    border: TableBorder.all(color: Colors.grey.shade300),
+                                    border: TableBorder.all(color: Colors.grey.withOpacity(0.2)),
                                     columnWidths: const {0: FlexColumnWidth(3), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1)},
                                     children: [
-                                      const TableRow(decoration: BoxDecoration(color: Color(0xFFF4B41A)), children: [
-                                        Padding(padding: EdgeInsets.all(8), child: Text('Subject', style: TextStyle(fontWeight: FontWeight.bold))),
-                                        Padding(padding: EdgeInsets.all(8), child: Text('Score', style: TextStyle(fontWeight: FontWeight.bold))),
-                                        Padding(padding: EdgeInsets.all(8), child: Text('Grade', style: TextStyle(fontWeight: FontWeight.bold))),
+                                      const TableRow(decoration: BoxDecoration(color: Color(0xFFD4AF37)), children: [
+                                        Padding(padding: EdgeInsets.all(12), child: Text('Subject', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
+                                        Padding(padding: EdgeInsets.all(12), child: Text('Score', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                                        Padding(padding: EdgeInsets.all(12), child: Text('Grade', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                                       ]),
                                       ...subjects.map<TableRow>((s) => TableRow(children: [
-                                        Padding(padding: const EdgeInsets.all(8), child: Text('${s['name'] ?? ''}')),
-                                        Padding(padding: const EdgeInsets.all(8), child: Text('${s['score'] ?? ''}', textAlign: TextAlign.center)),
-                                        Padding(padding: const EdgeInsets.all(8), child: Text('${s['grade'] ?? ''}', textAlign: TextAlign.center)),
+                                        Padding(padding: const EdgeInsets.all(12), child: Text('${s['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w500))),
+                                        Padding(padding: const EdgeInsets.all(12), child: Text('${s['score'] ?? ''}', textAlign: TextAlign.center)),
+                                        Padding(padding: const EdgeInsets.all(12), child: Text('${s['grade'] ?? ''}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)))),
                                       ])),
                                     ],
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(20),
                                   child: Column(
                                     children: [
-                                      const Divider(),
                                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                                        Text('Total: ${m['total'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                        Text('Average: ${m['average'] ?? '-'}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        const Text('Total Score', style: TextStyle(color: Colors.grey)),
+                                        Text('${m['total'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                                       ]),
-                                      if (m['comment'] != null) ...[
-                                        const SizedBox(height: 16),
-                                        const Align(alignment: Alignment.centerLeft, child: Text("Teacher's Comment:", style: TextStyle(fontWeight: FontWeight.bold))),
-                                        Align(alignment: Alignment.centerLeft, child: Text(m['comment'], style: const TextStyle(fontStyle: FontStyle.italic))),
-                                      ],
+                                      const SizedBox(height: 8),
+                                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                                        const Text('Average', style: TextStyle(color: Colors.grey)),
+                                        Text('${m['average'] ?? '-'}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFFD4AF37))),
+                                      ]),
                                     ],
                                   ),
                                 ),
@@ -976,201 +1352,6 @@ jobs:
                     );
                   },
                 ),
-              );
-            }
-          }
-          EOF
-
-          cat > lib/screens/hub.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'chat.dart';
-          import 'confessions.dart';
-          import 'rewards.dart';
-          class HubScreen extends StatelessWidget {
-            final String name;
-            final String cls;
-            const HubScreen({super.key, required this.name, required this.cls});
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Hub'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
-                body: GridView.count(
-                  crossAxisCount: 2,
-                  padding: const EdgeInsets.all(16),
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  children: [
-                    _t(context, 'Whole School', Icons.public, ChatScreen(room: 'All', user: name)),
-                    _t(context, '$cls Chat', Icons.class_, ChatScreen(room: cls, user: name)),
-                    _t(context, 'Debate Club', Icons.gavel, ChatScreen(room: 'Debate', user: name)),
-                    _t(context, 'Writers Club', Icons.edit, ChatScreen(room: 'Writers', user: name)),
-                    _t(context, 'Confessions', Icons.security, const ConfessionsScreen()),
-                    _t(context, 'Rewards', Icons.emoji_events, RewardsScreen(studentName: name))
-                  ]
-                )
-              );
-            }
-            Widget _t(BuildContext c, String t, IconData i, Widget s) => InkWell(
-              onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => s)),
-              child: Card(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(i, size: 40, color: const Color(0xFF0A3D91)),
-                    const SizedBox(height: 10),
-                    Text(t, style: const TextStyle(fontWeight: FontWeight.bold))
-                  ]
-                )
-              )
-            );
-          }
-          EOF
-
-          cat > lib/screens/rewards.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'dart:math';
-
-          class RewardsScreen extends StatelessWidget {
-            final String studentName;
-            const RewardsScreen({super.key, required this.studentName});
-
-            Future<void> _spin(BuildContext context) async {
-              final ref = FirebaseFirestore.instance.collection('rewards').doc(studentName);
-              final snap = await ref.get();
-              if (snap.exists) {
-                final last = snap.data()?['lastSpin'];
-                if (last is Timestamp) {
-                  final diff = DateTime.now().difference(last.toDate());
-                  if (diff.inHours < 24) {
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Come back in ${24 - diff.inHours}h')));
-                    return;
-                  }
-                }
-              }
-              final pts = Random().nextInt(46) + 5;
-              await ref.set({
-                'name': studentName,
-                'points': FieldValue.increment(pts),
-                'lastSpin': FieldValue.serverTimestamp(),
-              }, SetOptions(merge: true));
-              if (context.mounted) {
-                showDialog(context: context, builder: (c) => AlertDialog(
-                  title: const Text('🎉 You won!'),
-                  content: Text('$pts P-Points added to your account.'),
-                  actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK'))],
-                ));
-              }
-            }
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Rewards'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
-                body: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    const Text('Leaderboard', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance.collection('rewards').orderBy('points', descending: true).limit(10).snapshots(),
-                      builder: (c, s) {
-                        if (!s.hasData) return const Center(child: CircularProgressIndicator());
-                        if (s.data!.docs.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No points yet. Be the first to spin!')));
-                        return Column(
-                          children: s.data!.docs.asMap().entries.map((e) {
-                            final i = e.key;
-                            final d = e.value.data() as Map<String, dynamic>;
-                            return Card(
-                              child: ListTile(
-                                leading: Text('${i + 1}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
-                                title: Text(d['name'] ?? '?', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                trailing: Text('${d['points'] ?? 0} PTS', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
-                              ),
-                            );
-                          }).toList(),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    const Text('Daily Spin', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Card(
-                      color: const Color(0xFFF4B41A).withOpacity(0.1),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.casino, size: 80, color: Color(0xFFF4B41A)),
-                            const SizedBox(height: 16),
-                            const Text('Win P-Points!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91)),
-                              onPressed: () => _spin(context),
-                              child: const Text('SPIN NOW', style: TextStyle(color: Colors.white)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-          }
-          EOF
-
-          cat > lib/screens/confessions.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          class ConfessionsScreen extends StatefulWidget {
-            const ConfessionsScreen({super.key});
-            @override
-            State<ConfessionsScreen> createState() => _ConfessionsScreenState();
-          }
-          class _ConfessionsScreenState extends State<ConfessionsScreen> {
-            final _c = TextEditingController();
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Anonymous Confessions'), backgroundColor: Colors.black),
-                backgroundColor: Colors.grey[900],
-                body: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Row(
-                        children: [
-                          Expanded(child: TextField(controller: _c, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Type anonymously...', filled: true, fillColor: Color(0xFF1E1E1E), border: OutlineInputBorder()))),
-                          IconButton(
-                            icon: const Icon(Icons.send, color: Colors.greenAccent),
-                            onPressed: () async {
-                              if (_c.text.isNotEmpty) {
-                                await FirebaseFirestore.instance.collection('confessions').add({'text': _c.text, 'time': FieldValue.serverTimestamp()});
-                                _c.clear();
-                              }
-                            }
-                          )
-                        ]
-                      )
-                    ),
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance.collection('confessions').orderBy('time', descending: true).snapshots(),
-                        builder: (c, s) {
-                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
-                          return ListView.builder(
-                            itemCount: s.data!.docs.length,
-                            itemBuilder: (c, i) {
-                              return Card(color: const Color(0xFF1E1E1E), child: Padding(padding: const EdgeInsets.all(16), child: Text(s.data!.docs[i]['text'], style: const TextStyle(color: Colors.white))));
-                            }
-                          );
-                        }
-                      )
-                    )
-                  ]
-                )
               );
             }
           }
@@ -1257,12 +1438,14 @@ jobs:
             void _showAttachMenu() {
               showModalBottomSheet(
                 context: context,
+                backgroundColor: const Color(0xFF131A26),
+                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
                 builder: (ctx) => SafeArea(
                   child: Wrap(
                     children: [
-                      ListTile(leading: const Icon(Icons.image, color: Colors.blue), title: const Text('Image'), onTap: () { Navigator.pop(ctx); _sendMedia('image'); }),
-                      ListTile(leading: const Icon(Icons.videocam, color: Colors.red), title: const Text('Video'), onTap: () { Navigator.pop(ctx); _sendMedia('video'); }),
-                      ListTile(leading: const Icon(Icons.audiotrack, color: Colors.orange), title: const Text('Audio'), onTap: () { Navigator.pop(ctx); _sendMedia('audio'); }),
+                      ListTile(leading: const Icon(Icons.image, color: Colors.blueAccent), title: const Text('Image'), onTap: () { Navigator.pop(ctx); _sendMedia('image'); }),
+                      ListTile(leading: const Icon(Icons.videocam, color: Colors.redAccent), title: const Text('Video'), onTap: () { Navigator.pop(ctx); _sendMedia('video'); }),
+                      ListTile(leading: const Icon(Icons.audiotrack, color: Colors.orangeAccent), title: const Text('Audio'), onTap: () { Navigator.pop(ctx); _sendMedia('audio'); }),
                       ListTile(leading: const Icon(Icons.insert_drive_file, color: Colors.grey), title: const Text('File'), onTap: () { Navigator.pop(ctx); _sendMedia('file'); }),
                     ],
                   ),
@@ -1285,19 +1468,19 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: Text(widget.room), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
+                appBar: AppBar(title: Text(widget.room)),
                 body: Column(
                   children: [
-                    if (_uploading) const LinearProgressIndicator(),
+                    if (_uploading) const LinearProgressIndicator(color: Color(0xFFD4AF37)),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').orderBy('time', descending: false).snapshots(),
                         builder: (c, s) {
-                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                          if (!s.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
                           final docs = s.data!.docs.where((d) => !_blocked.contains((d.data() as Map)['sender'])).toList();
-                          if (docs.isEmpty) return const Center(child: Text('No messages yet. Say hi!'));
+                          if (docs.isEmpty) return const Center(child: Text('No messages yet. Say hi!', style: TextStyle(color: Colors.grey)));
                           return ListView.builder(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(12),
                             itemCount: docs.length,
                             itemBuilder: (c, i) {
                               final d = docs[i].data() as Map<String, dynamic>;
@@ -1313,9 +1496,27 @@ jobs:
                         padding: const EdgeInsets.all(8),
                         child: Row(
                           children: [
-                            IconButton(icon: const Icon(Icons.add_circle, color: Color(0xFF0A3D91)), onPressed: _uploading ? null : _showAttachMenu),
-                            Expanded(child: TextField(controller: _c, decoration: const InputDecoration(hintText: 'Message...', border: OutlineInputBorder()), onSubmitted: (_) => _sendText())),
-                            IconButton(icon: const Icon(Icons.send, color: Color(0xFF0A3D91)), onPressed: _sendText),
+                            IconButton(icon: const Icon(Icons.add_circle, color: Color(0xFFD4AF37), size: 28), onPressed: _uploading ? null : _showAttachMenu),
+                            Expanded(
+                              child: TextField(
+                                controller: _c,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  hintText: 'Message...',
+                                  hintStyle: const TextStyle(color: Colors.grey),
+                                  filled: true,
+                                  fillColor: const Color(0xFF131A26),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                ),
+                                onSubmitted: (_) => _sendText(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            CircleAvatar(
+                              backgroundColor: const Color(0xFFD4AF37),
+                              child: IconButton(icon: const Icon(Icons.send, color: Colors.black, size: 20), onPressed: _sendText),
+                            ),
                           ],
                         ),
                       ),
@@ -1336,39 +1537,43 @@ jobs:
             Widget build(BuildContext context) {
               final type = data['type'] ?? 'text';
               final url = data['url'] as String?;
-              final textColor = isMe ? Colors.white : Colors.black;
               return Align(
                 alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                 child: GestureDetector(
                   onLongPress: isMe ? null : onBlock,
                   child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isMe ? const Color(0xFF0A3D91) : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(12),
+                      color: isMe ? const Color(0xFF1A365D) : const Color(0xFF131A26),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
+                        bottomRight: isMe ? Radius.zero : const Radius.circular(16),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (!isMe) Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text(data['sender'] ?? '?', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(data['sender'] ?? '?', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFD4AF37))),
                         ),
                         if (type == 'text')
-                          Text(data['text'] ?? '', style: TextStyle(color: textColor))
+                          Text(data['text'] ?? '', style: const TextStyle(color: Colors.white))
                         else if (type == 'image' && url != null)
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: CachedNetworkImage(imageUrl: url, width: 200, height: 200, fit: BoxFit.cover),
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(imageUrl: url, width: 220, height: 220, fit: BoxFit.cover),
                           )
                         else if (type == 'video' && url != null)
                           GestureDetector(
                             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _VideoScreen(url: url))),
                             child: Container(
-                              width: 200, height: 150,
-                              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
-                              child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 50)),
+                              width: 220, height: 160,
+                              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+                              child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 60)),
                             ),
                           )
                         else if (type == 'audio' && url != null)
@@ -1379,15 +1584,15 @@ jobs:
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.insert_drive_file, color: textColor),
-                                const SizedBox(width: 4),
-                                Flexible(child: Text(data['fileName'] ?? 'File', style: TextStyle(color: textColor, decoration: TextDecoration.underline))),
+                                const Icon(Icons.insert_drive_file, color: Colors.grey),
+                                const SizedBox(width: 8),
+                                Flexible(child: Text(data['fileName'] ?? 'File', style: const TextStyle(color: Colors.blueAccent, decoration: TextDecoration.underline))),
                               ],
                             ),
                           ),
                         Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(_formatTime(data['time']), style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.black54)),
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(_formatTime(data['time']), style: const TextStyle(fontSize: 10, color: Colors.grey)),
                         ),
                       ],
                     ),
@@ -1430,8 +1635,8 @@ jobs:
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(icon: Icon(_playing ? Icons.pause_circle : Icons.play_circle, size: 32, color: Colors.white), onPressed: _toggle),
-                  const Text('Voice note', style: TextStyle(color: Colors.white)),
+                  IconButton(icon: Icon(_playing ? Icons.pause_circle : Icons.play_circle, size: 36, color: const Color(0xFFD4AF37)), onPressed: _toggle),
+                  const Text('Voice note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ],
               );
             }
@@ -1456,11 +1661,11 @@ jobs:
             Widget build(BuildContext context) {
               return Scaffold(
                 backgroundColor: Colors.black,
-                appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+                appBar: AppBar(backgroundColor: Colors.black),
                 body: Center(
                   child: _ctrl.value.isInitialized
                       ? AspectRatio(aspectRatio: _ctrl.value.aspectRatio, child: VideoPlayer(_ctrl))
-                      : const CircularProgressIndicator(color: Colors.white),
+                      : const CircularProgressIndicator(color: Color(0xFFD4AF37)),
                 ),
               );
             }
@@ -1483,13 +1688,13 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: Platinum Digital Tool v1.0.${{ github.run_number }}
+          name: Platinum Digital App v1.0.${{ github.run_number }}
           files: student_app/build/app/outputs/flutter-apk/app-release.apk
           
       - name: Upload Student APK
         uses: actions/upload-artifact@v4
         with:
-          name: platinum-digital-tool-apk
+          name: platinum-digital-app-apk
           path: student_app/build/app/outputs/flutter-apk/app-release.apk
 
   # ==========================================
@@ -1520,11 +1725,10 @@ jobs:
           fi
           
           # --- REAL LOGO PROCESSING (Staff) ---
-          # Takes your JPG from the root, removes the white background, and puts it on a BLUE canvas
           if [ -f "InShot_20261017_024714317.jpg" ]; then
-            convert InShot_20261017_024714317.jpg -fuzz 5% -transparent white -resize 800x800 -background "#0A3D91" -gravity center -extent 1024x1024 admin_app/assets/logo.png
+            convert InShot_20261017_024714317.jpg -fuzz 5% -transparent white -resize 800x800 -background "#0B0F19" -gravity center -extent 1024x1024 admin_app/assets/logo.png
           elif [ ! -f "admin_app/assets/logo.png" ]; then
-            convert -size 1024x1024 xc:"#0A3D91" admin_app/assets/logo.png
+            convert -size 1024x1024 xc:"#0B0F19" admin_app/assets/logo.png
           fi
           
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
@@ -1598,9 +1802,9 @@ jobs:
           grep -q "kotlin.jvm.target.validation.mode = IGNORE" admin_app/android/gradle.properties || echo "kotlin.jvm.target.validation.mode = IGNORE" >> admin_app/android/gradle.properties
           
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' admin_app/android/app/src/main/AndroidManifest.xml
-          sed -i 's/<application/<application tools:replace="android:label"/' admin_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:requestLegacyExternalStorage="true" tools:replace="android:label"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
-          grep -q "android.permission.CAMERA" admin_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>' admin_app/android/app/src/main/AndroidManifest.xml
+          grep -q "android.permission.CAMERA" admin_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' admin_app/android/app/src/main/AndroidManifest.xml
           
           cat > admin_app/android/app/build.gradle << 'EOF'
           plugins {
@@ -1677,18 +1881,18 @@ jobs:
           flutter_launcher_icons:
             android: "launcher_icon"
             image_path: "assets/logo.png"
-            adaptive_icon_background: "#0A3D91"
+            adaptive_icon_background: "#0B0F19"
             adaptive_icon_foreground: "assets/logo.png"
 
           flutter_native_splash:
-            color: "#0A3D91"
+            color: "#0B0F19"
             image: assets/logo.png
             web: false
             fullscreen: true
             android_gravity: fill
             android_12:
               image: assets/logo.png
-              icon_background_color: "#0A3D91"
+              icon_background_color: "#0B0F19"
           EOF
 
           # --- ADMIN DART CODE ---
@@ -1713,7 +1917,14 @@ jobs:
               return MaterialApp(
                 title: 'Platinum Staff Hub',
                 debugShowCheckedModeBanner: false,
-                theme: ThemeData.dark().copyWith(primaryColor: const Color(0xFF0A3D91), scaffoldBackgroundColor: const Color(0xFF121212), textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white))),
+                theme: ThemeData(
+                  brightness: Brightness.dark,
+                  primaryColor: const Color(0xFF0B0F19),
+                  scaffoldBackgroundColor: const Color(0xFF0B0F19),
+                  useMaterial3: true,
+                  textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
+                  appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true),
+                ),
                 home: const Start()
               );
             }
@@ -1736,7 +1947,7 @@ jobs:
               if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => r.isEmpty ? const SetupScreen() : const LoginScreen()));
             }
             @override
-            Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
+            Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))));
           }
           EOF
 
@@ -1775,19 +1986,19 @@ jobs:
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('Super Admin Setup', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                        const Text('Super Admin Setup', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
                         const SizedBox(height: 20),
                         TextField(controller: _p, obscureText: true, decoration: const InputDecoration(labelText: 'Create PIN', border: OutlineInputBorder())),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37)),
                           onPressed: () async {
                             if (_p.text.length >= 4) {
                               await (await DB.instance.db).insert('staff', {'pin': _p.text, 'role': 'super'});
                               if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
                             }
                           },
-                          child: const Text('Create', style: TextStyle(color: Colors.black))
+                          child: const Text('Create', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
                         )
                       ]
                     )
@@ -1818,18 +2029,18 @@ jobs:
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.security, size: 60, color: Color(0xFFF4B41A)),
+                        const Icon(Icons.shield, size: 60, color: Color(0xFFD4AF37)),
                         const SizedBox(height: 20),
                         TextField(controller: _p, obscureText: true, decoration: const InputDecoration(labelText: 'Staff PIN', border: OutlineInputBorder()), textAlign: TextAlign.center),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37)),
                           onPressed: () async {
                             final r = await (await DB.instance.db).query('staff', where: 'pin = ?', whereArgs: [_p.text]);
                             if (r.isNotEmpty && mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Dashboard()));
                             else ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid PIN')));
                           },
-                          child: const Text('Login')
+                          child: const Text('Login', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
                         )
                       ]
                     )
@@ -1849,13 +2060,14 @@ jobs:
           import 'admin_chat.dart';
           import 'manage_clubs.dart';
           import 'release_reports.dart';
+          import 'enter_marks.dart';
 
           class Dashboard extends StatelessWidget {
             const Dashboard({super.key});
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Staff Dashboard'), backgroundColor: const Color(0xFF0A3D91)),
+                appBar: AppBar(title: const Text('Staff Dashboard', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)))),
                 body: SingleChildScrollView(
                   child: Column(
                     children: [
@@ -1863,7 +2075,7 @@ jobs:
                         margin: const EdgeInsets.all(16),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green)),
-                        child: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 12), Expanded(child: Text('Biology marks submitted. All marks viable.', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)))])
+                        child: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 12), Expanded(child: Text('Biology marks submitted. All marks viable.', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))])
                       ),
                       GridView.count(
                         shrinkWrap: true,
@@ -1873,8 +2085,9 @@ jobs:
                         mainAxisSpacing: 16,
                         crossAxisSpacing: 16,
                         children: [
+                          _t(context, 'Enter Marks', Icons.edit_document, const EnterMarksScreen()),
                           _t(context, 'Broadcast & Live', Icons.campaign, const BroadcastScreen()),
-                          _t(context, 'Scan Marks', Icons.document_scanner, const OcrMarksScreen()),
+                          _t(context, 'Scan Marks (OCR)', Icons.document_scanner, const OcrMarksScreen()),
                           _t(context, 'Validation', Icons.warning, const ValidationScreen()),
                           _t(context, 'School Chat', Icons.chat, const AdminChat()),
                           _t(context, 'Manage Staff', Icons.people, const ManageStaff()),
@@ -1889,18 +2102,150 @@ jobs:
             }
             Widget _t(BuildContext c, String t, IconData i, Widget s) => InkWell(
               onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => s)),
-              child: Card(
-                color: const Color(0xFF1E1E1E),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131A26),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.05)),
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(i, size: 40, color: const Color(0xFFF4B41A)),
+                    Icon(i, size: 40, color: const Color(0xFFD4AF37)),
                     const SizedBox(height: 10),
                     Text(t, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
                   ]
                 )
               )
             );
+          }
+          EOF
+
+          # --- ENTER MARKS (GENERATES UNIT CODE) ---
+          cat > lib/screens/enter_marks.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'dart:math';
+
+          class EnterMarksScreen extends StatefulWidget {
+            const EnterMarksScreen({super.key});
+            @override
+            State<EnterMarksScreen> createState() => _EnterMarksScreenState();
+          }
+          class _EnterMarksScreenState extends State<EnterMarksScreen> {
+            final _name = TextEditingController();
+            final _classLevel = TextEditingController();
+            final _term = TextEditingController();
+            final _math = TextEditingController();
+            final _eng = TextEditingController();
+            final _sci = TextEditingController();
+            
+            bool _loading = false;
+
+            String _generateCode() {
+              const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+              final rand = Random();
+              return List.generate(6, (index) => chars[rand.nextInt(chars.length)]).join();
+            }
+
+            Future<void> _submit() async {
+              if (_name.text.isEmpty || _classLevel.text.isEmpty) return;
+              setState(() => _loading = true);
+
+              int mathScore = int.tryParse(_math.text) ?? 0;
+              int engScore = int.tryParse(_eng.text) ?? 0;
+              int sciScore = int.tryParse(_sci.text) ?? 0;
+              int total = mathScore + engScore + sciScore;
+              int average = total ~/ 3;
+              
+              String unitCode = _generateCode();
+
+              await FirebaseFirestore.instance.collection('marks').add({
+                'studentName': _name.text.trim(),
+                'classLevel': _classLevel.text.trim().toUpperCase(),
+                'term': _term.text.isEmpty ? 'Term 1' : _term.text.trim(),
+                'unitCode': unitCode,
+                'subjects': [
+                  {'name': 'Mathematics', 'score': mathScore, 'grade': mathScore > 80 ? 'A' : (mathScore > 60 ? 'B' : 'C')},
+                  {'name': 'English', 'score': engScore, 'grade': engScore > 80 ? 'A' : (engScore > 60 ? 'B' : 'C')},
+                  {'name': 'Science', 'score': sciScore, 'grade': sciScore > 80 ? 'A' : (sciScore > 60 ? 'B' : 'C')},
+                ],
+                'total': total,
+                'average': average,
+                'time': FieldValue.serverTimestamp(),
+              });
+
+              if (mounted) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: const Color(0xFF131A26),
+                    title: const Text('Report Generated!', style: TextStyle(color: Color(0xFFD4AF37))),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Write down this Unit Code and give it to the student. They will use it to view their marks.'),
+                        const SizedBox(height: 16),
+                        Text(unitCode, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 4)),
+                        const SizedBox(height: 16),
+                        Text('Student: ${_name.text}', style: const TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Done', style: TextStyle(color: Color(0xFFD4AF37))),
+                      )
+                    ]
+                  )
+                );
+              }
+              setState(() => _loading = false);
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Enter Student Marks')),
+                body: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      TextField(controller: _name, decoration: const InputDecoration(labelText: 'Student Full Name', border: OutlineInputBorder())),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: TextField(controller: _classLevel, decoration: const InputDecoration(labelText: 'Class (e.g. S4)', border: OutlineInputBorder()))),
+                          const SizedBox(width: 10),
+                          Expanded(child: TextField(controller: _term, decoration: const InputDecoration(labelText: 'Term (e.g. Term 1)', border: OutlineInputBorder()))),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      const Divider(),
+                      const SizedBox(height: 10),
+                      TextField(controller: _math, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Mathematics Score (0-100)', border: OutlineInputBorder())),
+                      const SizedBox(height: 10),
+                      TextField(controller: _eng, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'English Score (0-100)', border: OutlineInputBorder())),
+                      const SizedBox(height: 10),
+                      TextField(controller: _sci, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Science Score (0-100)', border: OutlineInputBorder())),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 16)),
+                          onPressed: _loading ? null : _submit,
+                          child: _loading ? const CircularProgressIndicator(color: Colors.black) : const Text('Generate Code & Save', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                      )
+                    ]
+                  )
+                )
+              );
+            }
           }
           EOF
 
@@ -1919,7 +2264,9 @@ jobs:
             final _b = TextEditingController();
             final _room = TextEditingController();
             bool _u = false;
-            
+            bool _isClubPost = false;
+            String _selectedClub = 'Admin';
+
             Future<void> _goLive() async {
               if (_room.text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a Room ID first')));
@@ -1941,35 +2288,63 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Broadcast & Live')),
-                body: Padding(
+                appBar: AppBar(title: const Text('Broadcast & Post')),
+                body: SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const Text('Live Class', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
+                      const SizedBox(height: 8),
                       TextField(controller: _room, decoration: const InputDecoration(labelText: 'Live Room ID (e.g. S4-Chem)', border: OutlineInputBorder())),
                       const SizedBox(height: 10),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(double.infinity, 50)),
                         onPressed: _goLive,
                         icon: const Icon(Icons.videocam, color: Colors.white),
-                        label: const Text('GO LIVE NOW', style: TextStyle(color: Colors.white))
+                        label: const Text('GO LIVE NOW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
                       ),
                       const Divider(height: 40),
-                      TextField(controller: _t, decoration: const InputDecoration(labelText: 'Broadcast Title', border: OutlineInputBorder())),
+                      const Text('Feed Post / Announcement', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Text('Post as: '),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _isClubPost ? _selectedClub : 'Admin',
+                              dropdownColor: const Color(0xFF131A26),
+                              items: ['Admin', 'Whole School', 'Debate Club', 'Writers Club'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                              onChanged: (v) => setState(() { _isClubPost = v != 'Admin'; _selectedClub = v!; }),
+                            ),
+                          )
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(controller: _t, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
                       const SizedBox(height: 16),
                       TextField(controller: _b, maxLines: 4, decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
                       const SizedBox(height: 16),
-                      SwitchListTile(title: const Text('Urgent'), value: _u, onChanged: (v) => setState(() => _u = v)),
+                      SwitchListTile(title: const Text('Urgent (Floating Ticker)'), value: _u, onChanged: (v) => setState(() => _u = v)),
                       const SizedBox(height: 20),
                       ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), minimumSize: const Size(double.infinity, 50)),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), minimumSize: const Size(double.infinity, 50)),
                         onPressed: () async {
                           if (_t.text.isNotEmpty) {
-                            await FirebaseFirestore.instance.collection('announcements').add({'title': _t.text, 'body': _b.text, 'urgent': _u, 'time': FieldValue.serverTimestamp()});
+                            await FirebaseFirestore.instance.collection('feed_posts').add({
+                              'author': _isClubPost ? _selectedClub : 'Admin',
+                              'authorType': _isClubPost ? 'club' : 'admin',
+                              'text': _b.text,
+                              'time': FieldValue.serverTimestamp(),
+                            });
+                            if (_u) {
+                              await FirebaseFirestore.instance.collection('announcements').add({'title': _t.text, 'body': _b.text, 'urgent': true, 'time': FieldValue.serverTimestamp()});
+                            }
                             if (mounted) Navigator.pop(context);
                           }
                         },
-                        child: const Text('Broadcast Text', style: TextStyle(color: Colors.black))
+                        child: const Text('Broadcast Now', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
                       )
                     ]
                   )
@@ -2001,7 +2376,7 @@ jobs:
               showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  backgroundColor: const Color(0xFF1E1E1E),
+                  backgroundColor: const Color(0xFF131A26),
                   title: Text('Promote Head for $clubName', style: const TextStyle(color: Colors.white)),
                   content: TextField(
                     controller: search,
@@ -2011,14 +2386,14 @@ jobs:
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37)),
                       onPressed: () async {
                         if (search.text.isNotEmpty) {
                           await FirebaseFirestore.instance.collection('clubs').doc(clubId).update({'head': search.text});
                           if (mounted) Navigator.pop(ctx);
                         }
                       },
-                      child: const Text('Promote', style: TextStyle(color: Colors.black))
+                      child: const Text('Promote', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
                     )
                   ]
                 )
@@ -2037,7 +2412,7 @@ jobs:
                         children: [
                           Expanded(child: TextField(controller: _c, decoration: const InputDecoration(labelText: 'New Club Name', border: OutlineInputBorder()))),
                           const SizedBox(width: 10),
-                          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: _add, child: const Text('Create', style: TextStyle(color: Colors.black))),
+                          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37)), onPressed: _add, child: const Text('Create', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
                         ]
                       )
                     ),
@@ -2055,13 +2430,13 @@ jobs:
                               final head = d['head'] ?? 'None';
                               
                               return Card(
-                                color: const Color(0xFF1E1E1E),
+                                color: const Color(0xFF131A26),
                                 child: ListTile(
-                                  leading: const Icon(Icons.groups, color: Color(0xFFF4B41A)), 
+                                  leading: const Icon(Icons.groups, color: Color(0xFFD4AF37)), 
                                   title: Text(clubName, style: const TextStyle(color: Colors.white)), 
                                   subtitle: Text('Head: $head', style: const TextStyle(color: Colors.grey)),
                                   trailing: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91)),
+                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A365D)),
                                     onPressed: () => _promote(clubId, clubName),
                                     child: const Text('Appoint Head', style: TextStyle(color: Colors.white, fontSize: 12))
                                   ),
@@ -2084,7 +2459,6 @@ jobs:
           import 'package:image_picker/image_picker.dart';
           import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
           import 'dart:io';
-          import 'package:cloud_firestore/cloud_firestore.dart';
 
           class OcrMarksScreen extends StatefulWidget {
             const OcrMarksScreen({super.key});
@@ -2092,7 +2466,7 @@ jobs:
             State<OcrMarksScreen> createState() => _OcrMarksScreenState();
           }
           class _OcrMarksScreenState extends State<OcrMarksScreen> {
-            String _text = 'No image scanned.';
+            String _text = 'No image scanned. Take a photo of the physical marksheet.';
             bool _loading = false;
             void _scan() async {
               final img = await ImagePicker().pickImage(source: ImageSource.camera);
@@ -2102,25 +2476,33 @@ jobs:
               final res = await rec.processImage(InputImage.fromFile(File(img.path)));
               await rec.close();
               setState(() { _text = res.text; _loading = false; });
-              await FirebaseFirestore.instance.collection('marks').add({'raw': res.text, 'time': FieldValue.serverTimestamp()});
             }
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('ML Kit OCR Scanner')),
+                appBar: AppBar(title: const Text('Scan Physical Marksheet')),
                 body: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      Expanded(child: Container(width: double.infinity, padding: const EdgeInsets.all(10), color: Colors.black, child: SingleChildScrollView(child: Text(_text, style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace'))))),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity, 
+                          padding: const EdgeInsets.all(10), 
+                          decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(12)),
+                          child: SingleChildScrollView(child: Text(_text, style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace')))
+                        )
+                      ),
                       const SizedBox(height: 20),
-                      if (_loading) const CircularProgressIndicator(),
+                      if (_loading) const CircularProgressIndicator(color: Color(0xFFD4AF37)),
                       ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), minimumSize: const Size(double.infinity, 50)),
-                        onPressed: _scan,
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), minimumSize: const Size(double.infinity, 50)),
+                        onPressed: _loading ? null : _scan,
                         icon: const Icon(Icons.camera_alt, color: Colors.black),
-                        label: const Text('Scan Physical Marksheet', style: TextStyle(color: Colors.black))
-                      )
+                        label: const Text('Scan Photo', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
+                      ),
+                      const SizedBox(height: 10),
+                      const Text('After scanning, go to "Enter Marks" to type the scores and generate the student Unit Code.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 12)),
                     ]
                   )
                 )
@@ -2159,7 +2541,7 @@ jobs:
               );
             }
             Widget _buildError(String title, String subtitle) => Card(
-              color: const Color(0xFF1E1E1E),
+              color: const Color(0xFF131A26),
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
                 leading: const Icon(Icons.warning, color: Colors.orange, size: 30),
@@ -2195,6 +2577,7 @@ jobs:
               showDialog(
                 context: context,
                 builder: (c) => AlertDialog(
+                  backgroundColor: const Color(0xFF131A26),
                   title: const Text('Add Staff PIN'),
                   content: TextField(controller: p),
                   actions: [
@@ -2219,7 +2602,7 @@ jobs:
                   itemCount: _s.length,
                   itemBuilder: (c, i) => ListTile(leading: const Icon(Icons.person), title: Text('Staff ${_s[i]['id']}'), subtitle: Text(_s[i]['role']))
                 ),
-                floatingActionButton: FloatingActionButton(onPressed: _add, backgroundColor: const Color(0xFFF4B41A), child: const Icon(Icons.add, color: Colors.black))
+                floatingActionButton: FloatingActionButton(onPressed: _add, backgroundColor: const Color(0xFFD4AF37), child: const Icon(Icons.add, color: Colors.black))
               );
             }
           }
@@ -2253,12 +2636,12 @@ jobs:
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.lock_open, size: 80, color: Color(0xFFF4B41A)),
+                        const Icon(Icons.lock_open, size: 80, color: Color(0xFFD4AF37)),
                         const SizedBox(height: 24),
                         const Text('Ready to Publish', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
                         const SizedBox(height: 32),
-                        _loading ? const CircularProgressIndicator() : ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), foregroundColor: Colors.black),
+                        _loading ? const CircularProgressIndicator(color: Color(0xFFD4AF37)) : ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
                           onPressed: _release,
                           child: const Text('Release All Reports Now', style: TextStyle(fontWeight: FontWeight.bold))
                         )
@@ -2304,7 +2687,7 @@ jobs:
                       child: StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance.collection('chats').doc('All').collection('msgs').orderBy('time', descending: false).snapshots(),
                         builder: (c, s) {
-                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                          if (!s.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
                           return ListView.builder(
                             itemCount: s.data!.docs.length,
                             itemBuilder: (c, i) {
@@ -2315,7 +2698,7 @@ jobs:
                                 child: Container(
                                   margin: const EdgeInsets.all(8),
                                   padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(color: isMe ? const Color(0xFF0A3D91) : Colors.grey[800], borderRadius: BorderRadius.circular(16)),
+                                  decoration: BoxDecoration(color: isMe ? const Color(0xFF1A365D) : const Color(0xFF131A26), borderRadius: BorderRadius.circular(16)),
                                   child: Text(d['text'], style: const TextStyle(color: Colors.white))
                                 )
                               );
@@ -2328,16 +2711,33 @@ jobs:
                       padding: const EdgeInsets.all(8),
                       child: Row(
                         children: [
-                          IconButton(icon: const Icon(Icons.add), onPressed: _sendMedia),
-                          Expanded(child: TextField(controller: _c, decoration: const InputDecoration(hintText: 'Broadcast...', border: OutlineInputBorder()))),
-                          IconButton(
-                            icon: const Icon(Icons.send),
-                            onPressed: () async {
-                              if (_c.text.isNotEmpty) {
-                                await FirebaseFirestore.instance.collection('chats').doc('All').collection('msgs').add({'sender': 'Admin', 'text': _c.text, 'time': FieldValue.serverTimestamp()});
-                                _c.clear();
+                          IconButton(icon: const Icon(Icons.add, color: Color(0xFFD4AF37)), onPressed: _sendMedia),
+                          Expanded(
+                            child: TextField(
+                              controller: _c,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                hintText: 'Broadcast...',
+                                hintStyle: const TextStyle(color: Colors.grey),
+                                filled: true,
+                                fillColor: const Color(0xFF131A26),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          CircleAvatar(
+                            backgroundColor: const Color(0xFFD4AF37),
+                            child: IconButton(
+                              icon: const Icon(Icons.send, color: Colors.black, size: 20),
+                              onPressed: () async {
+                                if (_c.text.isNotEmpty) {
+                                  await FirebaseFirestore.instance.collection('chats').doc('All').collection('msgs').add({'sender': 'Admin', 'text': _c.text, 'time': FieldValue.serverTimestamp()});
+                                  _c.clear();
+                                }
                               }
-                            }
+                            ),
                           )
                         ]
                       )
