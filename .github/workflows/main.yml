@@ -930,6 +930,12 @@ jobs:
           tag_name: v1.0.${{ github.run_number }}
           name: Release v1.0.${{ github.run_number }}
           files: student_app/build/app/outputs/flutter-apk/app-release.apk
+          
+      - name: Upload Student APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: platinum-pulse-apk
+          path: student_app/build/app/outputs/flutter-apk/app-release.apk
 
   # ==========================================
   # JOB 2: BUILD THE STAFF HUB (ADMIN APP)
@@ -1279,6 +1285,8 @@ jobs:
           import 'validation.dart';
           import 'manage_staff.dart';
           import 'admin_chat.dart';
+          import 'manage_clubs.dart';
+          import 'release_reports.dart';
 
           class Dashboard extends StatelessWidget {
             const Dashboard({super.key});
@@ -1297,7 +1305,8 @@ jobs:
                     _t(context, 'Validation', Icons.warning, const ValidationScreen()),
                     _t(context, 'School Chat', Icons.chat, const AdminChat()),
                     _t(context, 'Manage Staff', Icons.people, const ManageStaff()),
-                    _t(context, 'Release Reports', Icons.lock_open, const Scaffold(body: Center(child: Text('Reports Released'))))
+                    _t(context, 'Manage Clubs', Icons.groups, const ManageClubsScreen()),
+                    _t(context, 'Release Reports', Icons.lock_open, const ReleaseReportsScreen())
                   ]
                 )
               );
@@ -1508,6 +1517,111 @@ jobs:
                   itemBuilder: (c, i) => ListTile(leading: const Icon(Icons.person), title: Text('Staff ${_s[i]['id']}'), subtitle: Text(_s[i]['role']))
                 ),
                 floatingActionButton: FloatingActionButton(onPressed: _add, backgroundColor: const Color(0xFFF4B41A), child: const Icon(Icons.add, color: Colors.black))
+              );
+            }
+          }
+          EOF
+
+          # REAL MANAGE CLUBS
+          cat > lib/screens/manage_clubs.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          class ManageClubsScreen extends StatefulWidget {
+            const ManageClubsScreen({super.key});
+            @override
+            State<ManageClubsScreen> createState() => _ManageClubsScreenState();
+          }
+          class _ManageClubsScreenState extends State<ManageClubsScreen> {
+            final _c = TextEditingController();
+            void _add() async {
+              if (_c.text.isNotEmpty) {
+                await FirebaseFirestore.instance.collection('clubs').add({'name': _c.text, 'time': FieldValue.serverTimestamp()});
+                _c.clear();
+              }
+            }
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Manage Clubs')),
+                body: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(child: TextField(controller: _c, decoration: const InputDecoration(labelText: 'New Club Name', border: OutlineInputBorder()))),
+                          const SizedBox(width: 10),
+                          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: _add, child: const Text('Create', style: TextStyle(color: Colors.black))),
+                        ]
+                      )
+                    ),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('clubs').snapshots(),
+                        builder: (c, s) {
+                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                          return ListView.builder(
+                            itemCount: s.data!.docs.length,
+                            itemBuilder: (c, i) {
+                              final d = s.data!.docs[i].data() as Map<String, dynamic>;
+                              return Card(
+                                color: const Color(0xFF1E1E1E),
+                                child: ListTile(leading: const Icon(Icons.groups, color: Color(0xFFF4B41A)), title: Text(d['name'] ?? 'Unnamed', style: const TextStyle(color: Colors.white))),
+                              );
+                            }
+                          );
+                        }
+                      )
+                    )
+                  ]
+                )
+              );
+            }
+          }
+          EOF
+
+          # REAL RELEASE REPORTS
+          cat > lib/screens/release_reports.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          class ReleaseReportsScreen extends StatefulWidget {
+            const ReleaseReportsScreen({super.key});
+            @override
+            State<ReleaseReportsScreen> createState() => _ReleaseReportsScreenState();
+          }
+          class _ReleaseReportsScreenState extends State<ReleaseReportsScreen> {
+            bool _loading = false;
+            void _release() async {
+              setState(() => _loading = true);
+              await FirebaseFirestore.instance.collection('settings').doc('reports').set({'released': true});
+              if (mounted) {
+                setState(() => _loading = false);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reports Released Successfully!'), backgroundColor: Colors.green));
+              }
+            }
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Release Reports')),
+                body: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.lock_open, size: 80, color: Color(0xFFF4B41A)),
+                        const SizedBox(height: 24),
+                        const Text('Ready to Publish', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                        const SizedBox(height: 32),
+                        _loading ? const CircularProgressIndicator() : ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A), foregroundColor: Colors.black),
+                          onPressed: _release,
+                          child: const Text('Release All Reports Now', style: TextStyle(fontWeight: FontWeight.bold))
+                        )
+                      ]
+                    )
+                  )
+                )
               );
             }
           }
