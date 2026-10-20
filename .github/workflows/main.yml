@@ -1,4 +1,4 @@
-name: Build Platinum Ecosystem (Final Fixed)
+name: Build Platinum Ecosystem (Absolute Final)
 
 on:
   push:
@@ -32,12 +32,13 @@ jobs:
         run: |
           if [ ! -d "student_app" ]; then
             mkdir -p student_app/assets
-            convert -size 1024x1024 xc:"#0A3D91" student_app/assets/logo.png 2>/dev/null || printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
+            convert -size 1024x1024 xc:"#0A3D91" student_app/assets/logo.png
             flutter create --org com.platinum --project-name student_app student_app
             mkdir -p student_app/lib/screens student_app/lib/services
           fi
 
-          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
+          # 🔴 UPGRADED GRADLE
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           
           cat > student_app/android/build.gradle << 'EOF'
           allprojects {
@@ -68,6 +69,7 @@ jobs:
           }
           EOF
 
+          # 🔴 UPGRADED AGP & KOTLIN
           cat > student_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -86,8 +88,8 @@ jobs:
           }
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.3.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.24" apply false
+              id "com.android.application" version "8.5.0" apply false
+              id "org.jetbrains.kotlin.android" version "2.0.10" apply false
               id "com.google.gms.google-services" version "4.5.0" apply false
           }
           include ":app"
@@ -164,7 +166,7 @@ jobs:
             google_fonts: ^6.2.1
             sqflite: ^2.3.3+1
             path: ^1.9.0
-            jitsi_meet_flutter_sdk: ^10.3.0
+            jitsi_meet_flutter_sdk: 10.3.0
             url_launcher: ^6.3.0
             file_picker: 8.1.6
             shared_preferences: ^2.2.3
@@ -939,12 +941,13 @@ jobs:
         run: |
           if [ ! -d "admin_app" ]; then
             mkdir -p admin_app/assets
-            convert -size 1024x1024 xc:"#121212" admin_app/assets/logo.png 2>/dev/null || printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
+            convert -size 1024x1024 xc:"#121212" admin_app/assets/logo.png
             flutter create --org com.platinum --project-name admin_app admin_app
             mkdir -p admin_app/lib/screens admin_app/lib/services
           fi
           
-          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.4-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
+          # 🔴 UPGRADED GRADLE
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
           
           cat > admin_app/android/build.gradle << 'EOF'
           allprojects {
@@ -975,6 +978,7 @@ jobs:
           }
           EOF
 
+          # 🔴 UPGRADED AGP & KOTLIN
           cat > admin_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -993,8 +997,8 @@ jobs:
           }
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.3.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.24" apply false
+              id "com.android.application" version "8.5.0" apply false
+              id "org.jetbrains.kotlin.android" version "2.0.10" apply false
               id "com.google.gms.google-services" version "4.5.0" apply false
           }
           include ":app"
@@ -1066,9 +1070,9 @@ jobs:
             google_fonts: ^6.2.1
             firebase_core: ^3.1.0
             cloud_firestore: ^5.0.1
-            google_mlkit_text_recognition: ^0.13.0
+            google_mlkit_text_recognition: 0.13.0
             file_picker: 8.1.6
-            jitsi_meet_flutter_sdk: ^10.3.0
+            jitsi_meet_flutter_sdk: 10.3.0
             firebase_storage: ^12.0.1
           dev_dependencies:
             flutter_test:
