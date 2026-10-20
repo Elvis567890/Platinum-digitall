@@ -32,8 +32,7 @@ jobs:
         run: |
           if [ ! -d "student_app" ]; then
             mkdir -p student_app/assets
-            # 🔴 FIX: Generate a solid color image instead of text to avoid font issues
-            convert -size 1024x1024 xc:"#0A3D91" student_app/assets/logo.png
+            convert -size 1024x1024 xc:"#0A3D91" student_app/assets/logo.png 2>/dev/null || printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
             flutter create --org com.platinum --project-name student_app student_app
             mkdir -p student_app/lib/screens student_app/lib/services
           fi
@@ -88,7 +87,6 @@ jobs:
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
               id "com.android.application" version "8.3.0" apply false
-              # 🔴 FIX: Update Kotlin version to 1.9.24
               id "org.jetbrains.kotlin.android" version "1.9.24" apply false
               id "com.google.gms.google-services" version "4.5.0" apply false
           }
@@ -98,7 +96,6 @@ jobs:
           grep -q "android.newDsl=false" student_app/android/gradle.properties || echo "android.newDsl=false" >> student_app/android/gradle.properties
           grep -q "android.builtInKotlin=false" student_app/android/gradle.properties || echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
           
-          # 🔴 PERFECT MANIFEST INJECTION
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' student_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application tools:replace="android:label"/' student_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="student_app"/android:label="Platinum Pulse"/g' student_app/android/app/src/main/AndroidManifest.xml
@@ -926,6 +923,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -940,8 +939,7 @@ jobs:
         run: |
           if [ ! -d "admin_app" ]; then
             mkdir -p admin_app/assets
-            # 🔴 FIX: Generate a solid color image instead of text to avoid font issues
-            convert -size 1024x1024 xc:"#121212" admin_app/assets/logo.png
+            convert -size 1024x1024 xc:"#121212" admin_app/assets/logo.png 2>/dev/null || printf "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
             flutter create --org com.platinum --project-name admin_app admin_app
             mkdir -p admin_app/lib/screens admin_app/lib/services
           fi
@@ -996,7 +994,6 @@ jobs:
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
               id "com.android.application" version "8.3.0" apply false
-              # 🔴 FIX: Update Kotlin version to 1.9.24
               id "org.jetbrains.kotlin.android" version "1.9.24" apply false
               id "com.google.gms.google-services" version "4.5.0" apply false
           }
@@ -1006,7 +1003,6 @@ jobs:
           grep -q "android.newDsl=false" admin_app/android/gradle.properties || echo "android.newDsl=false" >> admin_app/android/gradle.properties
           grep -q "android.builtInKotlin=false" admin_app/android/gradle.properties || echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
           
-          # 🔴 PERFECT MANIFEST INJECTION FOR ADMIN
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application tools:replace="android:label"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff"/g' admin_app/android/app/src/main/AndroidManifest.xml
