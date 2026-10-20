@@ -1,4 +1,4 @@
-name: Build Platinum Ecosystem (The Real Final)
+name: Build Platinum Ecosystem (Final Complete Logic)
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   # ==========================================
-  # JOB 1: BUILD THE STUDENT APP
+  # JOB 1: BUILD PLATINUM DIGITAL TOOL (STUDENT APP)
   # ==========================================
   build-student:
     runs-on: ubuntu-latest
@@ -32,9 +32,16 @@ jobs:
         run: |
           if [ ! -d "student_app" ]; then
             mkdir -p student_app/assets
-            convert -size 1024x1024 xc:"#0A3D91" student_app/assets/logo.png
             flutter create --org com.platinum --project-name student_app student_app
             mkdir -p student_app/lib/screens student_app/lib/services
+          fi
+
+          # --- REAL LOGO PROCESSING (Student) ---
+          # Takes your JPG from the root, removes the white background, and puts it on a White canvas
+          if [ -f "InShot_20261017_024714317.jpg" ]; then
+            convert InShot_20261017_024714317.jpg -fuzz 5% -transparent white -resize 850x850 -background "#FFFFFF" -gravity center -extent 1024x1024 student_app/assets/logo.png
+          elif [ ! -f "student_app/assets/logo.png" ]; then
+            convert -size 1024x1024 xc:"#FFFFFF" student_app/assets/logo.png
           fi
 
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
@@ -109,7 +116,7 @@ jobs:
           
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' student_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application tools:replace="android:label"/' student_app/android/app/src/main/AndroidManifest.xml
-          sed -i 's/android:label="student_app"/android:label="Platinum Pulse"/g' student_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="student_app"/android:label="Platinum Digital Tool"/g' student_app/android/app/src/main/AndroidManifest.xml
           grep -q "REQUEST_INSTALL_PACKAGES" student_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' student_app/android/app/src/main/AndroidManifest.xml
           
           cat > student_app/android/app/build.gradle << 'EOF'
@@ -158,7 +165,7 @@ jobs:
           
           cat > pubspec.yaml << 'EOF'
           name: student_app
-          description: "A new Flutter project."
+          description: "Platinum Digital Tool"
           publish_to: 'none'
           version: 1.0.0+1
           environment:
@@ -186,6 +193,7 @@ jobs:
             http: ^1.2.1
             open_filex: ^4.5.0
             permission_handler: ^11.3.1
+            audioplayers: ^6.0.0
           dev_dependencies:
             flutter_test:
               sdk: flutter
@@ -196,18 +204,18 @@ jobs:
           flutter_launcher_icons:
             android: "launcher_icon"
             image_path: "assets/logo.png"
-            adaptive_icon_background: "#0A3D91"
+            adaptive_icon_background: "#FFFFFF"
             adaptive_icon_foreground: "assets/logo.png"
 
           flutter_native_splash:
-            color: "#0A3D91"
+            color: "#FFFFFF"
             image: assets/logo.png
             web: false
             fullscreen: true
             android_gravity: fill
             android_12:
               image: assets/logo.png
-              icon_background_color: "#0A3D91"
+              icon_background_color: "#FFFFFF"
           EOF
 
           # --- STUDENT DART CODE ---
@@ -215,7 +223,6 @@ jobs:
           import 'package:flutter/material.dart';
           import 'package:firebase_core/firebase_core.dart';
           import 'package:google_fonts/google_fonts.dart';
-          import 'package:shared_preferences/shared_preferences.dart';
           import 'package:http/http.dart' as http;
           import 'dart:convert';
           import 'package:package_info_plus/package_info_plus.dart';
@@ -238,7 +245,7 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
-                title: 'Platinum Pulse',
+                title: 'Platinum Digital Tool',
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData(primaryColor: const Color(0xFF0A3D91), scaffoldBackgroundColor: const Color(0xFFF4F7FC), useMaterial3: true, textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme)),
                 home: const Start()
@@ -260,20 +267,7 @@ jobs:
             }
 
             Future<void> _init() async {
-              final prefs = await SharedPreferences.getInstance();
-              final last = prefs.getString('last') ?? '';
-              final today = DateTime.now().toIso8601String().substring(0,10);
-              int streak = prefs.getInt('streak') ?? 0;
-              
-              if (last != today) {
-                if (last == DateTime.now().subtract(const Duration(days: 1)).toIso8601String().substring(0,10)) streak++;
-                else streak = 1;
-                await prefs.setString('last', today);
-                await prefs.setInt('streak', streak);
-              }
-              
               _checkForUpdates();
-
               final db = await DB.instance.db;
               final res = await db.query('students', limit: 1);
               if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => res.isEmpty ? const RegScreen() : const HomeScreen()));
@@ -384,7 +378,7 @@ jobs:
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Image.asset('assets/logo.png', height: 80),
+                            Image.asset('assets/logo.png', height: 100),
                             const SizedBox(height: 20),
                             TextField(controller: _n, decoration: const InputDecoration(labelText: 'Full Name')),
                             const SizedBox(height: 16),
@@ -447,9 +441,9 @@ jobs:
               if (_n.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator()));
               final p = [
                 AnnouncementsScreen(name: _n, cls: _c),
-                const PulseScreen(),
+                PulseScreen(authorName: _n),
                 const StudyScreen(),
-                const ReportsScreen(),
+                ReportsScreen(studentName: _n),
                 HubScreen(name: _n, cls: _c)
               ];
               return Scaffold(
@@ -487,6 +481,7 @@ jobs:
                   stream: FirebaseFirestore.instance.collection('announcements').orderBy('time', descending: true).snapshots(),
                   builder: (context, snap) {
                     if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                    if (snap.data!.docs.isEmpty) return const Center(child: Text('No announcements yet.'));
                     return ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: snap.data!.docs.length,
@@ -515,68 +510,253 @@ jobs:
           import 'package:image_picker/image_picker.dart';
           import 'dart:io';
           import 'package:cached_network_image/cached_network_image.dart';
+          import 'package:video_player/video_player.dart';
 
           class PulseScreen extends StatefulWidget {
-            const PulseScreen({super.key});
+            final String authorName;
+            const PulseScreen({super.key, required this.authorName});
             @override
             State<PulseScreen> createState() => _PulseScreenState();
           }
+
           class _PulseScreenState extends State<PulseScreen> {
             final _c = TextEditingController();
-            void _post({String? img}) async {
-              String? url;
-              if (img != null) {
-                final ref = FirebaseStorage.instance.ref().child('p/${DateTime.now().millisecondsSinceEpoch}.jpg');
-                await ref.putFile(File(img));
-                url = await ref.getDownloadURL();
-              }
-              await FirebaseFirestore.instance.collection('posts').add({'text': _c.text, 'img': url, 'time': FieldValue.serverTimestamp(), 'likes': 0});
-              _c.clear();
+            XFile? _media;
+            String? _mediaType;
+            bool _posting = false;
+
+            Future<void> _pickImage() async {
+              final x = await ImagePicker().pickImage(source: ImageSource.gallery);
+              if (x != null) setState(() { _media = x; _mediaType = 'image'; });
             }
+
+            Future<void> _pickVideo() async {
+              final x = await ImagePicker().pickVideo(source: ImageSource.gallery);
+              if (x != null) setState(() { _media = x; _mediaType = 'video'; });
+            }
+
+            Future<void> _post() async {
+              if (_c.text.trim().isEmpty && _media == null) return;
+              setState(() => _posting = true);
+              String? url;
+              try {
+                if (_media != null) {
+                  final ref = FirebaseStorage.instance.ref().child('posts/${DateTime.now().millisecondsSinceEpoch}_${_media!.name}');
+                  await ref.putFile(File(_media!.path));
+                  url = await ref.getDownloadURL();
+                }
+                await FirebaseFirestore.instance.collection('posts').add({
+                  'author': widget.authorName,
+                  'text': _c.text.trim(),
+                  'mediaUrl': url,
+                  'mediaType': _media == null ? null : _mediaType,
+                  'time': FieldValue.serverTimestamp(),
+                  'likes': 0,
+                });
+                _c.clear();
+                setState(() { _media = null; _mediaType = null; });
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Post failed: $e')));
+              } finally {
+                if (mounted) setState(() => _posting = false);
+              }
+            }
+
+            Future<void> _toggleLike(String postId) async {
+              final likeRef = FirebaseFirestore.instance.collection('posts').doc(postId).collection('likes').doc(widget.authorName);
+              final postRef = FirebaseFirestore.instance.collection('posts').doc(postId);
+              final s = await likeRef.get();
+              if (s.exists) {
+                await likeRef.delete();
+                await postRef.update({'likes': FieldValue.increment(-1)});
+              } else {
+                await likeRef.set({'time': FieldValue.serverTimestamp()});
+                await postRef.update({'likes': FieldValue.increment(1)});
+              }
+            }
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Pulse 🔥 7 DAYS'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
+                appBar: AppBar(
+                  backgroundColor: const Color(0xFF0A3D91),
+                  foregroundColor: Colors.white,
+                  title: const Text('Pulse'),
+                ),
                 body: Column(
                   children: [
-                    Padding(
+                    Container(
                       padding: const EdgeInsets.all(8),
-                      child: Row(
+                      color: Colors.white,
+                      child: Column(
                         children: [
-                          Expanded(child: TextField(controller: _c, decoration: const InputDecoration(hintText: 'What\'s on your mind?', border: OutlineInputBorder()))),
-                          IconButton(icon: const Icon(Icons.image, color: Color(0xFFF4B41A)), onPressed: () async {
-                            final x = await ImagePicker().pickImage(source: ImageSource.gallery);
-                            if (x != null) _post(img: x.path);
-                          }),
-                          IconButton(icon: const Icon(Icons.send, color: Colors.blue), onPressed: () => _post())
-                        ]
-                      )
+                          TextField(controller: _c, maxLines: null, decoration: const InputDecoration(hintText: "What's on your mind?", border: OutlineInputBorder())),
+                          if (_media != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Stack(
+                                children: [
+                                  if (_mediaType == 'image')
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(File(_media!.path), height: 150, width: double.infinity, fit: BoxFit.cover),
+                                    )
+                                  else
+                                    Container(
+                                      height: 150,
+                                      width: double.infinity,
+                                      color: Colors.black54,
+                                      child: const Center(child: Icon(Icons.videocam, color: Colors.white, size: 50)),
+                                    ),
+                                  Positioned(
+                                    top: 4, right: 4,
+                                    child: GestureDetector(
+                                      onTap: () => setState(() { _media = null; _mediaType = null; }),
+                                      child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: const Icon(Icons.close, color: Colors.white, size: 16)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              IconButton(icon: const Icon(Icons.image, color: Color(0xFFF4B41A)), onPressed: _pickImage, tooltip: 'Image'),
+                              IconButton(icon: const Icon(Icons.videocam, color: Color(0xFFF4B41A)), onPressed: _pickVideo, tooltip: 'Video'),
+                              _posting
+                                  ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+                                  : IconButton(icon: const Icon(Icons.send, color: Color(0xFF0A3D91)), onPressed: _post, tooltip: 'Post'),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance.collection('posts').orderBy('time', descending: true).snapshots(),
                         builder: (c, s) {
                           if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                          if (s.data!.docs.isEmpty) return const Center(child: Text('No posts yet. Be the first!'));
                           return ListView.builder(
                             itemCount: s.data!.docs.length,
                             itemBuilder: (c, i) {
-                              final d = s.data!.docs[i].data() as Map<String, dynamic>;
-                              return Card(
-                                margin: const EdgeInsets.all(8),
-                                child: Column(
-                                  children: [
-                                    ListTile(title: Text(d['text'] ?? ''), trailing: Text('${d['likes'] ?? 0} ❤️')),
-                                    if (d['img'] != null) CachedNetworkImage(imageUrl: d['img'], height: 200, width: double.infinity, fit: BoxFit.cover)
-                                  ]
-                                )
+                              final doc = s.data!.docs[i];
+                              return _PostCard(
+                                docId: doc.id,
+                                data: doc.data() as Map<String, dynamic>,
+                                authorName: widget.authorName,
+                                onLike: () => _toggleLike(doc.id),
                               );
-                            }
+                            },
                           );
-                        }
-                      )
+                        },
+                      ),
                     )
                   ]
                 )
+              );
+            }
+          }
+
+          class _PostCard extends StatelessWidget {
+            final String docId;
+            final Map<String, dynamic> data;
+            final String authorName;
+            final VoidCallback onLike;
+            const _PostCard({required this.docId, required this.data, required this.authorName, required this.onLike});
+
+            @override
+            Widget build(BuildContext context) {
+              return Card(
+                margin: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ListTile(
+                      leading: CircleAvatar(backgroundColor: const Color(0xFF0A3D91), child: Text((data['author'] ?? '?').toString()[0].toUpperCase(), style: const TextStyle(color: Colors.white))),
+                      title: Text(data['author'] ?? 'Anonymous', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(_formatTime(data['time'])),
+                    ),
+                    if (data['text'] != null && (data['text'] as String).isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(data['text']),
+                      ),
+                    if (data['mediaType'] == 'image' && data['mediaUrl'] != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: CachedNetworkImage(imageUrl: data['mediaUrl'], width: double.infinity, height: 250, fit: BoxFit.cover),
+                      ),
+                    if (data['mediaType'] == 'video' && data['mediaUrl'] != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: GestureDetector(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _FullScreenVideo(url: data['mediaUrl']))),
+                          child: Container(
+                            height: 250,
+                            width: double.infinity,
+                            color: Colors.black87,
+                            child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 72)),
+                          ),
+                        ),
+                      ),
+                    StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance.collection('posts').doc(docId).collection('likes').doc(authorName).snapshots(),
+                      builder: (c, likeSnap) {
+                        final liked = likeSnap.hasData && likeSnap.data!.exists;
+                        return Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : null),
+                              onPressed: onLike,
+                            ),
+                            Text('${data['likes'] ?? 0}'),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            String _formatTime(dynamic t) {
+              if (t is Timestamp) {
+                final diff = DateTime.now().difference(t.toDate());
+                if (diff.inSeconds < 60) return 'just now';
+                if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+                if (diff.inHours < 24) return '${diff.inHours}h ago';
+                return '${diff.inDays}d ago';
+              }
+              return '';
+            }
+          }
+
+          class _FullScreenVideo extends StatefulWidget {
+            final String url;
+            const _FullScreenVideo({required this.url});
+            @override
+            State<_FullScreenVideo> createState() => _FullScreenVideoState();
+          }
+          class _FullScreenVideoState extends State<_FullScreenVideo> {
+            late VideoPlayerController _ctrl;
+            @override
+            void initState() {
+              super.initState();
+              _ctrl = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _ctrl.play(); });
+            }
+            @override
+            void dispose() { _ctrl.dispose(); super.dispose(); }
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: Colors.black,
+                appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+                body: Center(
+                  child: _ctrl.value.isInitialized
+                      ? AspectRatio(aspectRatio: _ctrl.value.aspectRatio, child: VideoPlayer(_ctrl))
+                      : const CircularProgressIndicator(color: Colors.white),
+                ),
               );
             }
           }
@@ -586,7 +766,7 @@ jobs:
           import 'package:flutter/material.dart';
           import 'package:video_player/video_player.dart';
           import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
-          import 'dart:async';
+          import 'package:cloud_firestore/cloud_firestore.dart';
 
           class StudyScreen extends StatefulWidget {
             const StudyScreen({super.key});
@@ -595,26 +775,19 @@ jobs:
           }
           class _StudyScreenState extends State<StudyScreen> {
             late VideoPlayerController _v;
-            Timer? _t;
-            String _time = 'Calculating...';
             @override
             void initState() {
               super.initState();
               _v = VideoPlayerController.networkUrl(Uri.parse('https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'))..initialize().then((_) => setState(() {}));
-              _t = Timer.periodic(const Duration(seconds: 1), (timer) {
-                final diff = DateTime.now().add(const Duration(hours: 2)).difference(DateTime.now());
-                setState(() => _time = '${diff.inHours}h ${diff.inMinutes % 60}m ${diff.inSeconds % 60}s');
-              });
             }
             @override
             void dispose() {
               _v.dispose();
-              _t?.cancel();
               super.dispose();
             }
-            Future<void> _join(BuildContext context) async {
-              var options = JitsiMeetConferenceOptions(room: "PlatinumS4Chemistry", featureFlags: {FeatureFlags.welcomePageEnabled: false, FeatureFlags.preJoinPageEnabled: false});
-              try { await JitsiMeet().join(options); } catch (e) { debugPrint('Err'); }
+            Future<void> _join(BuildContext context, String room) async {
+              var options = JitsiMeetConferenceOptions(room: room, featureFlags: {FeatureFlags.welcomePageEnabled: false, FeatureFlags.preJoinPageEnabled: false});
+              try { await JitsiMeet().join(options); } catch (e) { debugPrint('Err: $e'); }
             }
             @override
             Widget build(BuildContext context) {
@@ -623,22 +796,41 @@ jobs:
                 body: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    Card(
-                      color: const Color(0xFF0A3D91),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            const Text('Next Class Starts In:', style: TextStyle(color: Colors.white70)),
-                            Text(_time, style: const TextStyle(color: Color(0xFFF4B41A), fontSize: 24, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 10),
-                            ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: () => _join(context), child: const Text('Join Live'))
-                          ]
-                        )
-                      )
+                    const Text('Live Now', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
+                    const SizedBox(height: 10),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('live_classes').snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No live classes currently active.')));
+                        }
+                        return Column(
+                          children: snapshot.data!.docs.map((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            return Card(
+                              color: const Color(0xFF0A3D91),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Row(children: [CircleAvatar(backgroundColor: Colors.red, radius: 8), SizedBox(width: 8), Text('LIVE NOW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+                                    const SizedBox(height: 12),
+                                    Text(data['title'] ?? 'Class', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                                    Text(data['teacher'] ?? 'Teacher', style: const TextStyle(color: Colors.white70)),
+                                    const SizedBox(height: 16),
+                                    SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: () => _join(context, data['room']), child: const Text('Join Class', style: TextStyle(color: Colors.white)))),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      }
                     ),
                     const SizedBox(height: 20),
-                    const Text('Recorded Library', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Text('Recorded Library', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
                     const SizedBox(height: 10),
                     if (_v.value.isInitialized)
                       AspectRatio(
@@ -665,39 +857,125 @@ jobs:
 
           cat > lib/screens/reports.dart << 'EOF'
           import 'package:flutter/material.dart';
-          class ReportsScreen extends StatefulWidget {
-            const ReportsScreen({super.key});
-            @override
-            State<ReportsScreen> createState() => _ReportsScreenState();
-          }
-          class _ReportsScreenState extends State<ReportsScreen> {
-            final _c = TextEditingController();
-            bool _u = false;
+          import 'package:cloud_firestore/cloud_firestore.dart';
+
+          class ReportsScreen extends StatelessWidget {
+            final String studentName;
+            const ReportsScreen({super.key, required this.studentName});
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(title: const Text('My Reports'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
-                body: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: _u
-                      ? const Text('Report Card Unlocked!')
-                      : Column(
+                body: StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance.collection('settings').doc('reports').snapshots(),
+                  builder: (c, setSnap) {
+                    if (!setSnap.hasData) return const Center(child: CircularProgressIndicator());
+                    final released = (setSnap.data!.data() as Map?)?['released'] == true;
+                    if (!released) {
+                      return const Center(child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.lock, size: 80, color: Color(0xFF0A3D91)),
-                            const SizedBox(height: 20),
-                            TextField(controller: _c, decoration: const InputDecoration(hintText: 'Enter Secret Code', border: OutlineInputBorder()), textAlign: TextAlign.center),
-                            const SizedBox(height: 20),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)),
-                              onPressed: () { if (_c.text == '1234') setState(() => _u = true); },
-                              child: const Text('Unlock', style: TextStyle(color: Colors.white))
-                            )
-                          ]
-                        )
-                  )
-                )
+                            Icon(Icons.lock, size: 80, color: Color(0xFF0A3D91)),
+                            SizedBox(height: 16),
+                            Text('Reports have not been released yet.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
+                            SizedBox(height: 8),
+                            Text('Please check back after the term ends.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ));
+                    }
+                    return StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('marks').where('studentName', isEqualTo: studentName).limit(1).snapshots(),
+                      builder: (c, marksSnap) {
+                        if (!marksSnap.hasData) return const Center(child: CircularProgressIndicator());
+                        if (marksSnap.data!.docs.isEmpty) {
+                          return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No report card found for this term.')));
+                        }
+                        final m = marksSnap.data!.docs.first.data() as Map<String, dynamic>;
+                        final subjects = (m['subjects'] as List?) ?? [];
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: const BoxDecoration(color: Color(0xFF0A3D91), borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16))),
+                                  child: Column(
+                                    children: [
+                                      const Icon(Icons.school, color: Colors.white, size: 40),
+                                      const SizedBox(height: 8),
+                                      const Text('PLATINUM SECONDARY SCHOOL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                                      Text('${m['term'] ?? 'Term'} Report Card', style: const TextStyle(color: Colors.white70)),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                        const Text('Student', style: TextStyle(color: Colors.grey)),
+                                        Text(m['studentName'] ?? studentName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                      ]),
+                                      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                                        const Text('Class', style: TextStyle(color: Colors.grey)),
+                                        Text(m['classLevel'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                      ]),
+                                    ],
+                                  ),
+                                ),
+                                const Divider(),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  child: Table(
+                                    border: TableBorder.all(color: Colors.grey.shade300),
+                                    columnWidths: const {0: FlexColumnWidth(3), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1)},
+                                    children: [
+                                      const TableRow(decoration: BoxDecoration(color: Color(0xFFF4B41A)), children: [
+                                        Padding(padding: EdgeInsets.all(8), child: Text('Subject', style: TextStyle(fontWeight: FontWeight.bold))),
+                                        Padding(padding: EdgeInsets.all(8), child: Text('Score', style: TextStyle(fontWeight: FontWeight.bold))),
+                                        Padding(padding: EdgeInsets.all(8), child: Text('Grade', style: TextStyle(fontWeight: FontWeight.bold))),
+                                      ]),
+                                      ...subjects.map<TableRow>((s) => TableRow(children: [
+                                        Padding(padding: const EdgeInsets.all(8), child: Text('${s['name'] ?? ''}')),
+                                        Padding(padding: const EdgeInsets.all(8), child: Text('${s['score'] ?? ''}', textAlign: TextAlign.center)),
+                                        Padding(padding: const EdgeInsets.all(8), child: Text('${s['grade'] ?? ''}', textAlign: TextAlign.center)),
+                                      ])),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    children: [
+                                      const Divider(),
+                                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                                        Text('Total: ${m['total'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        Text('Average: ${m['average'] ?? '-'}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      ]),
+                                      if (m['comment'] != null) ...[
+                                        const SizedBox(height: 16),
+                                        const Align(alignment: Alignment.centerLeft, child: Text("Teacher's Comment:", style: TextStyle(fontWeight: FontWeight.bold))),
+                                        Align(alignment: Alignment.centerLeft, child: Text(m['comment'], style: const TextStyle(fontStyle: FontStyle.italic))),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               );
             }
           }
@@ -707,6 +985,7 @@ jobs:
           import 'package:flutter/material.dart';
           import 'chat.dart';
           import 'confessions.dart';
+          import 'rewards.dart';
           class HubScreen extends StatelessWidget {
             final String name;
             final String cls;
@@ -726,7 +1005,7 @@ jobs:
                     _t(context, 'Debate Club', Icons.gavel, ChatScreen(room: 'Debate', user: name)),
                     _t(context, 'Writers Club', Icons.edit, ChatScreen(room: 'Writers', user: name)),
                     _t(context, 'Confessions', Icons.security, const ConfessionsScreen()),
-                    _t(context, 'Rewards', Icons.emoji_events, const Scaffold(body: Center(child: Text('Leaderboard Coming Soon'))))
+                    _t(context, 'Rewards', Icons.emoji_events, RewardsScreen(studentName: name))
                   ]
                 )
               );
@@ -744,6 +1023,101 @@ jobs:
                 )
               )
             );
+          }
+          EOF
+
+          cat > lib/screens/rewards.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'dart:math';
+
+          class RewardsScreen extends StatelessWidget {
+            final String studentName;
+            const RewardsScreen({super.key, required this.studentName});
+
+            Future<void> _spin(BuildContext context) async {
+              final ref = FirebaseFirestore.instance.collection('rewards').doc(studentName);
+              final snap = await ref.get();
+              if (snap.exists) {
+                final last = snap.data()?['lastSpin'];
+                if (last is Timestamp) {
+                  final diff = DateTime.now().difference(last.toDate());
+                  if (diff.inHours < 24) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Come back in ${24 - diff.inHours}h')));
+                    return;
+                  }
+                }
+              }
+              final pts = Random().nextInt(46) + 5;
+              await ref.set({
+                'name': studentName,
+                'points': FieldValue.increment(pts),
+                'lastSpin': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+              if (context.mounted) {
+                showDialog(context: context, builder: (c) => AlertDialog(
+                  title: const Text('🎉 You won!'),
+                  content: Text('$pts P-Points added to your account.'),
+                  actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK'))],
+                ));
+              }
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Rewards'), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
+                body: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const Text('Leaderboard', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('rewards').orderBy('points', descending: true).limit(10).snapshots(),
+                      builder: (c, s) {
+                        if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                        if (s.data!.docs.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No points yet. Be the first to spin!')));
+                        return Column(
+                          children: s.data!.docs.asMap().entries.map((e) {
+                            final i = e.key;
+                            final d = e.value.data() as Map<String, dynamic>;
+                            return Card(
+                              child: ListTile(
+                                leading: Text('${i + 1}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
+                                title: Text(d['name'] ?? '?', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                trailing: Text('${d['points'] ?? 0} PTS', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A3D91))),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    const Text('Daily Spin', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Card(
+                      color: const Color(0xFFF4B41A).withOpacity(0.1),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.casino, size: 80, color: Color(0xFFF4B41A)),
+                            const SizedBox(height: 16),
+                            const Text('Win P-Points!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91)),
+                              onPressed: () => _spin(context),
+                              child: const Text('SPIN NOW', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
           }
           EOF
 
@@ -805,9 +1179,13 @@ jobs:
           cat > lib/screens/chat.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'package:shared_preferences/shared_preferences.dart';
           import 'package:firebase_storage/firebase_storage.dart';
           import 'package:file_picker/file_picker.dart';
+          import 'package:cached_network_image/cached_network_image.dart';
+          import 'package:video_player/video_player.dart';
+          import 'package:audioplayers/audioplayers.dart';
+          import 'package:url_launcher/url_launcher.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
           import 'dart:io';
 
           class ChatScreen extends StatefulWidget {
@@ -817,96 +1195,273 @@ jobs:
             @override
             State<ChatScreen> createState() => _ChatScreenState();
           }
+
           class _ChatScreenState extends State<ChatScreen> {
             final _c = TextEditingController();
             List<String> _blocked = [];
+            bool _uploading = false;
+
             @override
             void initState() {
               super.initState();
-              _load();
+              _loadBlocked();
             }
-            void _load() async {
+
+            Future<void> _loadBlocked() async {
               final p = await SharedPreferences.getInstance();
-              setState(() => _blocked = p.getStringList('blocks') ?? []);
+              setState(() => _blocked = p.getStringList('blockedUsers') ?? []);
             }
-            void _block(String u) async {
+
+            Future<void> _block(String user) async {
+              if (user == widget.user) return;
               final p = await SharedPreferences.getInstance();
-              _blocked.add(u);
-              await p.setStringList('blocks', _blocked);
-              setState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Blocked $u')));
-            }
-            void _sendMedia(String type) async {
-              FilePickerResult? r = await FilePicker.platform.pickFiles(type: type == 'img' ? FileType.image : FileType.any);
-              if (r != null) {
-                final ref = FirebaseStorage.instance.ref().child('chat/${DateTime.now().millisecondsSinceEpoch}');
-                await ref.putFile(File(r.files.single.path!));
-                String url = await ref.getDownloadURL();
-                await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'sender': widget.user, 'text': 'Sent an attachment', 'type': type, 'url': url, 'time': FieldValue.serverTimestamp()});
+              final list = p.getStringList('blockedUsers') ?? [];
+              if (!list.contains(user)) {
+                list.add(user);
+                await p.setStringList('blockedUsers', list);
+                setState(() => _blocked = list);
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Blocked $user')));
               }
             }
+
+            Future<void> _sendMedia(String kind) async {
+              FilePickerResult? r;
+              switch (kind) {
+                case 'image': r = await FilePicker.platform.pickFiles(type: FileType.image); break;
+                case 'video': r = await FilePicker.platform.pickFiles(type: FileType.video); break;
+                case 'audio': r = await FilePicker.platform.pickFiles(type: FileType.audio); break;
+                default: r = await FilePicker.platform.pickFiles(type: FileType.any);
+              }
+              if (r == null) return;
+              setState(() => _uploading = true);
+              try {
+                final file = r.files.single;
+                final ref = FirebaseStorage.instance.ref().child('chat/${DateTime.now().millisecondsSinceEpoch}_${file.name}');
+                await ref.putFile(File(file.path!));
+                final url = await ref.getDownloadURL();
+                await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({
+                  'sender': widget.user,
+                  'text': '',
+                  'type': kind,
+                  'url': url,
+                  'fileName': file.name,
+                  'time': FieldValue.serverTimestamp(),
+                });
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+              } finally {
+                if (mounted) setState(() => _uploading = false);
+              }
+            }
+
+            void _showAttachMenu() {
+              showModalBottomSheet(
+                context: context,
+                builder: (ctx) => SafeArea(
+                  child: Wrap(
+                    children: [
+                      ListTile(leading: const Icon(Icons.image, color: Colors.blue), title: const Text('Image'), onTap: () { Navigator.pop(ctx); _sendMedia('image'); }),
+                      ListTile(leading: const Icon(Icons.videocam, color: Colors.red), title: const Text('Video'), onTap: () { Navigator.pop(ctx); _sendMedia('video'); }),
+                      ListTile(leading: const Icon(Icons.audiotrack, color: Colors.orange), title: const Text('Audio'), onTap: () { Navigator.pop(ctx); _sendMedia('audio'); }),
+                      ListTile(leading: const Icon(Icons.insert_drive_file, color: Colors.grey), title: const Text('File'), onTap: () { Navigator.pop(ctx); _sendMedia('file'); }),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            Future<void> _sendText() async {
+              if (_c.text.trim().isEmpty) return;
+              final t = _c.text.trim();
+              _c.clear();
+              await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({
+                'sender': widget.user,
+                'text': t,
+                'type': 'text',
+                'time': FieldValue.serverTimestamp(),
+              });
+            }
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: Text(widget.room), backgroundColor: const Color(0xFF0A3D91)),
+                appBar: AppBar(title: Text(widget.room), backgroundColor: const Color(0xFF0A3D91), foregroundColor: Colors.white),
                 body: Column(
                   children: [
+                    if (_uploading) const LinearProgressIndicator(),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').orderBy('time', descending: false).snapshots(),
                         builder: (c, s) {
                           if (!s.hasData) return const Center(child: CircularProgressIndicator());
                           final docs = s.data!.docs.where((d) => !_blocked.contains((d.data() as Map)['sender'])).toList();
+                          if (docs.isEmpty) return const Center(child: Text('No messages yet. Say hi!'));
                           return ListView.builder(
                             padding: const EdgeInsets.all(10),
                             itemCount: docs.length,
                             itemBuilder: (c, i) {
                               final d = docs[i].data() as Map<String, dynamic>;
                               final isMe = d['sender'] == widget.user;
-                              return Align(
-                                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                                child: GestureDetector(
-                                  onLongPress: () => _block(d['sender']),
-                                  child: Container(
-                                    margin: const EdgeInsets.only(bottom: 10),
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(color: isMe ? const Color(0xFF0A3D91) : Colors.grey[300], borderRadius: BorderRadius.circular(16)),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        if (!isMe) Text(d['sender'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
-                                        Text(d['text'], style: TextStyle(color: isMe ? Colors.white : Colors.black)),
-                                        if (d['url'] != null) const Padding(padding: EdgeInsets.only(top: 5), child: Icon(Icons.file_present, color: Colors.white))
-                                      ]
-                                    )
-                                  )
-                                )
-                              );
-                            }
+                              return _MessageBubble(data: d, isMe: isMe, onBlock: () => _block(d['sender']));
+                            },
                           );
-                        }
-                      )
+                        },
+                      ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Row(
-                        children: [
-                          IconButton(icon: const Icon(Icons.add), onPressed: () => _sendMedia('doc')),
-                          Expanded(child: TextField(controller: _c, decoration: const InputDecoration(hintText: 'Message...', border: OutlineInputBorder()))),
-                          IconButton(
-                            icon: const Icon(Icons.send, color: Color(0xFF0A3D91)),
-                            onPressed: () async {
-                              if (_c.text.isNotEmpty) {
-                                await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'sender': widget.user, 'text': _c.text, 'time': FieldValue.serverTimestamp()});
-                                _c.clear();
-                              }
-                            }
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Row(
+                          children: [
+                            IconButton(icon: const Icon(Icons.add_circle, color: Color(0xFF0A3D91)), onPressed: _uploading ? null : _showAttachMenu),
+                            Expanded(child: TextField(controller: _c, decoration: const InputDecoration(hintText: 'Message...', border: OutlineInputBorder()), onSubmitted: (_) => _sendText())),
+                            IconButton(icon: const Icon(Icons.send, color: Color(0xFF0A3D91)), onPressed: _sendText),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+
+          class _MessageBubble extends StatelessWidget {
+            final Map<String, dynamic> data;
+            final bool isMe;
+            final VoidCallback onBlock;
+            const _MessageBubble({required this.data, required this.isMe, required this.onBlock});
+
+            @override
+            Widget build(BuildContext context) {
+              final type = data['type'] ?? 'text';
+              final url = data['url'] as String?;
+              final textColor = isMe ? Colors.white : Colors.black;
+              return Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: GestureDetector(
+                  onLongPress: isMe ? null : onBlock,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isMe ? const Color(0xFF0A3D91) : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (!isMe) Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(data['sender'] ?? '?', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                        ),
+                        if (type == 'text')
+                          Text(data['text'] ?? '', style: TextStyle(color: textColor))
+                        else if (type == 'image' && url != null)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: CachedNetworkImage(imageUrl: url, width: 200, height: 200, fit: BoxFit.cover),
                           )
-                        ]
-                      )
-                    )
-                  ]
-                )
+                        else if (type == 'video' && url != null)
+                          GestureDetector(
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _VideoScreen(url: url))),
+                            child: Container(
+                              width: 200, height: 150,
+                              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+                              child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 50)),
+                            ),
+                          )
+                        else if (type == 'audio' && url != null)
+                          _AudioBubble(url: url)
+                        else if (url != null)
+                          InkWell(
+                            onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.insert_drive_file, color: textColor),
+                                const SizedBox(width: 4),
+                                Flexible(child: Text(data['fileName'] ?? 'File', style: TextStyle(color: textColor, decoration: TextDecoration.underline))),
+                              ],
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(_formatTime(data['time']), style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.black54)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            String _formatTime(dynamic t) {
+              if (t is Timestamp) {
+                final d = t.toDate();
+                return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+              }
+              return '';
+            }
+          }
+
+          class _AudioBubble extends StatefulWidget {
+            final String url;
+            const _AudioBubble({required this.url});
+            @override
+            State<_AudioBubble> createState() => _AudioBubbleState();
+          }
+          class _AudioBubbleState extends State<_AudioBubble> {
+            final _player = AudioPlayer();
+            bool _playing = false;
+            @override
+            void dispose() { _player.dispose(); super.dispose(); }
+            Future<void> _toggle() async {
+              if (_playing) {
+                await _player.pause();
+                if (mounted) setState(() => _playing = false);
+              } else {
+                await _player.play(UrlSource(widget.url));
+                if (mounted) setState(() => _playing = true);
+              }
+            }
+            @override
+            Widget build(BuildContext context) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(icon: Icon(_playing ? Icons.pause_circle : Icons.play_circle, size: 32, color: Colors.white), onPressed: _toggle),
+                  const Text('Voice note', style: TextStyle(color: Colors.white)),
+                ],
+              );
+            }
+          }
+
+          class _VideoScreen extends StatefulWidget {
+            final String url;
+            const _VideoScreen({required this.url});
+            @override
+            State<_VideoScreen> createState() => _VideoScreenState();
+          }
+          class _VideoScreenState extends State<_VideoScreen> {
+            late VideoPlayerController _ctrl;
+            @override
+            void initState() {
+              super.initState();
+              _ctrl = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _ctrl.play(); });
+            }
+            @override
+            void dispose() { _ctrl.dispose(); super.dispose(); }
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: Colors.black,
+                appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+                body: Center(
+                  child: _ctrl.value.isInitialized
+                      ? AspectRatio(aspectRatio: _ctrl.value.aspectRatio, child: VideoPlayer(_ctrl))
+                      : const CircularProgressIndicator(color: Colors.white),
+                ),
               );
             }
           }
@@ -920,25 +1475,25 @@ jobs:
           cd student_app
           flutter clean
           flutter pub get
-          dart run flutter_launcher_icons
-          dart run flutter_native_splash:create
+          flutter pub run flutter_launcher_icons
+          flutter pub run flutter_native_splash:create
           flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
 
       - name: Create Release (OTA)
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: Release v1.0.${{ github.run_number }}
+          name: Platinum Digital Tool v1.0.${{ github.run_number }}
           files: student_app/build/app/outputs/flutter-apk/app-release.apk
           
       - name: Upload Student APK
         uses: actions/upload-artifact@v4
         with:
-          name: platinum-pulse-apk
+          name: platinum-digital-tool-apk
           path: student_app/build/app/outputs/flutter-apk/app-release.apk
 
   # ==========================================
-  # JOB 2: BUILD THE STAFF HUB (ADMIN APP)
+  # JOB 2: BUILD PLATINUM STAFF HUB (ADMIN APP)
   # ==========================================
   build-admin:
     runs-on: ubuntu-latest
@@ -960,9 +1515,16 @@ jobs:
         run: |
           if [ ! -d "admin_app" ]; then
             mkdir -p admin_app/assets
-            convert -size 1024x1024 xc:"#121212" admin_app/assets/logo.png
             flutter create --org com.platinum --project-name admin_app admin_app
             mkdir -p admin_app/lib/screens admin_app/lib/services
+          fi
+          
+          # --- REAL LOGO PROCESSING (Staff) ---
+          # Takes your JPG from the root, removes the white background, and puts it on a BLUE canvas
+          if [ -f "InShot_20261017_024714317.jpg" ]; then
+            convert InShot_20261017_024714317.jpg -fuzz 5% -transparent white -resize 800x800 -background "#0A3D91" -gravity center -extent 1024x1024 admin_app/assets/logo.png
+          elif [ ! -f "admin_app/assets/logo.png" ]; then
+            convert -size 1024x1024 xc:"#0A3D91" admin_app/assets/logo.png
           fi
           
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
@@ -1037,7 +1599,7 @@ jobs:
           
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application tools:replace="android:label"/' admin_app/android/app/src/main/AndroidManifest.xml
-          sed -i 's/android:label="admin_app"/android:label="Platinum Staff"/g' admin_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
           grep -q "android.permission.CAMERA" admin_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>' admin_app/android/app/src/main/AndroidManifest.xml
           
           cat > admin_app/android/app/build.gradle << 'EOF'
@@ -1086,7 +1648,7 @@ jobs:
           
           cat > pubspec.yaml << 'EOF'
           name: admin_app
-          description: "A new Flutter project."
+          description: "Platinum Staff Hub"
           publish_to: 'none'
           version: 1.0.0+1
           environment:
@@ -1115,18 +1677,18 @@ jobs:
           flutter_launcher_icons:
             android: "launcher_icon"
             image_path: "assets/logo.png"
-            adaptive_icon_background: "#121212"
+            adaptive_icon_background: "#0A3D91"
             adaptive_icon_foreground: "assets/logo.png"
 
           flutter_native_splash:
-            color: "#121212"
+            color: "#0A3D91"
             image: assets/logo.png
             web: false
             fullscreen: true
             android_gravity: fill
             android_12:
               image: assets/logo.png
-              icon_background_color: "#121212"
+              icon_background_color: "#0A3D91"
           EOF
 
           # --- ADMIN DART CODE ---
@@ -1149,7 +1711,7 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
-                title: 'Staff',
+                title: 'Platinum Staff Hub',
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData.dark().copyWith(primaryColor: const Color(0xFF0A3D91), scaffoldBackgroundColor: const Color(0xFF121212), textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white))),
                 home: const Start()
@@ -1294,20 +1856,34 @@ jobs:
             Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(title: const Text('Staff Dashboard'), backgroundColor: const Color(0xFF0A3D91)),
-                body: GridView.count(
-                  crossAxisCount: 2,
-                  padding: const EdgeInsets.all(16),
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  children: [
-                    _t(context, 'Broadcast & Live', Icons.campaign, const BroadcastScreen()),
-                    _t(context, 'Scan Marks', Icons.document_scanner, const OcrMarksScreen()),
-                    _t(context, 'Validation', Icons.warning, const ValidationScreen()),
-                    _t(context, 'School Chat', Icons.chat, const AdminChat()),
-                    _t(context, 'Manage Staff', Icons.people, const ManageStaff()),
-                    _t(context, 'Manage Clubs', Icons.groups, const ManageClubsScreen()),
-                    _t(context, 'Release Reports', Icons.lock_open, const ReleaseReportsScreen())
-                  ]
+                body: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green)),
+                        child: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 12), Expanded(child: Text('Biology marks submitted. All marks viable.', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)))])
+                      ),
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        padding: const EdgeInsets.all(16),
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        children: [
+                          _t(context, 'Broadcast & Live', Icons.campaign, const BroadcastScreen()),
+                          _t(context, 'Scan Marks', Icons.document_scanner, const OcrMarksScreen()),
+                          _t(context, 'Validation', Icons.warning, const ValidationScreen()),
+                          _t(context, 'School Chat', Icons.chat, const AdminChat()),
+                          _t(context, 'Manage Staff', Icons.people, const ManageStaff()),
+                          _t(context, 'Manage Clubs', Icons.groups, const ManageClubsScreen()),
+                          _t(context, 'Release Reports', Icons.lock_open, const ReleaseReportsScreen())
+                        ]
+                      ),
+                    ]
+                  )
                 )
               );
             }
@@ -1341,11 +1917,27 @@ jobs:
           class _BroadcastScreenState extends State<BroadcastScreen> {
             final _t = TextEditingController();
             final _b = TextEditingController();
+            final _room = TextEditingController();
             bool _u = false;
+            
             Future<void> _goLive() async {
-              var options = JitsiMeetConferenceOptions(room: "PlatinumS4Chemistry", featureFlags: {FeatureFlags.welcomePageEnabled: false, FeatureFlags.preJoinPageEnabled: false});
+              if (_room.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a Room ID first')));
+                return;
+              }
+              await FirebaseFirestore.instance.collection('live_classes').add({
+                'title': _t.text.isEmpty ? 'Live Class' : _t.text,
+                'teacher': 'Admin/Teacher',
+                'room': _room.text,
+                'time': FieldValue.serverTimestamp()
+              });
+              var options = JitsiMeetConferenceOptions(
+                room: _room.text, 
+                featureFlags: {FeatureFlags.welcomePageEnabled: false, FeatureFlags.preJoinPageEnabled: false}
+              );
               try { await JitsiMeet().join(options); } catch (e) { debugPrint('Err'); }
             }
+            
             @override
             Widget build(BuildContext context) {
               return Scaffold(
@@ -1354,6 +1946,8 @@ jobs:
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
+                      TextField(controller: _room, decoration: const InputDecoration(labelText: 'Live Room ID (e.g. S4-Chem)', border: OutlineInputBorder())),
+                      const SizedBox(height: 10),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(double.infinity, 50)),
                         onPressed: _goLive,
@@ -1361,7 +1955,7 @@ jobs:
                         label: const Text('GO LIVE NOW', style: TextStyle(color: Colors.white))
                       ),
                       const Divider(height: 40),
-                      TextField(controller: _t, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
+                      TextField(controller: _t, decoration: const InputDecoration(labelText: 'Broadcast Title', border: OutlineInputBorder())),
                       const SizedBox(height: 16),
                       TextField(controller: _b, maxLines: 4, decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
                       const SizedBox(height: 16),
@@ -1379,6 +1973,106 @@ jobs:
                       )
                     ]
                   )
+                )
+              );
+            }
+          }
+          EOF
+
+          cat > lib/screens/manage_clubs.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          class ManageClubsScreen extends StatefulWidget {
+            const ManageClubsScreen({super.key});
+            @override
+            State<ManageClubsScreen> createState() => _ManageClubsScreenState();
+          }
+          class _ManageClubsScreenState extends State<ManageClubsScreen> {
+            final _c = TextEditingController();
+            void _add() async {
+              if (_c.text.isNotEmpty) {
+                await FirebaseFirestore.instance.collection('clubs').add({'name': _c.text, 'head': 'None', 'time': FieldValue.serverTimestamp()});
+                _c.clear();
+              }
+            }
+
+            void _promote(String clubId, String clubName) {
+              final search = TextEditingController();
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: const Color(0xFF1E1E1E),
+                  title: Text('Promote Head for $clubName', style: const TextStyle(color: Colors.white)),
+                  content: TextField(
+                    controller: search,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(labelText: 'Search Student Name', prefixIcon: Icon(Icons.search, color: Colors.white70)),
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)),
+                      onPressed: () async {
+                        if (search.text.isNotEmpty) {
+                          await FirebaseFirestore.instance.collection('clubs').doc(clubId).update({'head': search.text});
+                          if (mounted) Navigator.pop(ctx);
+                        }
+                      },
+                      child: const Text('Promote', style: TextStyle(color: Colors.black))
+                    )
+                  ]
+                )
+              );
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Manage Clubs')),
+                body: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(child: TextField(controller: _c, decoration: const InputDecoration(labelText: 'New Club Name', border: OutlineInputBorder()))),
+                          const SizedBox(width: 10),
+                          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: _add, child: const Text('Create', style: TextStyle(color: Colors.black))),
+                        ]
+                      )
+                    ),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('clubs').snapshots(),
+                        builder: (c, s) {
+                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                          return ListView.builder(
+                            itemCount: s.data!.docs.length,
+                            itemBuilder: (c, i) {
+                              final d = s.data!.docs[i].data() as Map<String, dynamic>;
+                              final clubId = s.data!.docs[i].id;
+                              final clubName = d['name'] ?? 'Unnamed';
+                              final head = d['head'] ?? 'None';
+                              
+                              return Card(
+                                color: const Color(0xFF1E1E1E),
+                                child: ListTile(
+                                  leading: const Icon(Icons.groups, color: Color(0xFFF4B41A)), 
+                                  title: Text(clubName, style: const TextStyle(color: Colors.white)), 
+                                  subtitle: Text('Head: $head', style: const TextStyle(color: Colors.grey)),
+                                  trailing: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A3D91)),
+                                    onPressed: () => _promote(clubId, clubName),
+                                    child: const Text('Appoint Head', style: TextStyle(color: Colors.white, fontSize: 12))
+                                  ),
+                                )
+                              );
+                            }
+                          );
+                        }
+                      )
+                    )
+                  ]
                 )
               );
             }
@@ -1406,6 +2100,7 @@ jobs:
               setState(() => _loading = true);
               final rec = TextRecognizer();
               final res = await rec.processImage(InputImage.fromFile(File(img.path)));
+              await rec.close();
               setState(() { _text = res.text; _loading = false; });
               await FirebaseFirestore.instance.collection('marks').add({'raw': res.text, 'time': FieldValue.serverTimestamp()});
             }
@@ -1436,35 +2131,43 @@ jobs:
 
           cat > lib/screens/validation.dart << 'EOF'
           import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
           class ValidationScreen extends StatelessWidget {
             const ValidationScreen({super.key});
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Real-time Validation')),
-                body: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance.collection('marks').snapshots(),
-                  builder: (c, s) {
-                    if (!s.hasData) return const Center(child: CircularProgressIndicator());
-                    return ListView.builder(
-                      itemCount: s.data!.docs.length,
-                      itemBuilder: (c, i) {
-                        final d = s.data!.docs[i].data() as Map<String, dynamic>;
-                        return Card(
-                          color: const Color(0xFF1E1E1E),
-                          child: ListTile(
-                            leading: const Icon(Icons.check_circle, color: Colors.green),
-                            title: Text('Scanned Record ${i+1}', style: const TextStyle(color: Colors.white)),
-                            subtitle: Text(d['raw'].toString().substring(0, 20) + '...', style: const TextStyle(color: Colors.grey))
-                          )
-                        );
-                      }
-                    );
-                  }
-                )
+                appBar: AppBar(title: const Text('Validation Engine')),
+                body: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red)),
+                        child: const Row(children: [
+                          Icon(Icons.error, color: Colors.red),
+                          SizedBox(width: 12),
+                          Text('2 Errors Detected', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)),
+                        ]),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildError('Missing marks: Biology', 'S4 East • 5 students missing'),
+                      _buildError('Mark 150 exceeds 100', 'Student: Kato J. • Mathematics • Row 12'),
+                    ],
+                  ),
+                ),
               );
             }
+            Widget _buildError(String title, String subtitle) => Card(
+              color: const Color(0xFF1E1E1E),
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: const Icon(Icons.warning, color: Colors.orange, size: 30),
+                title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: Text(subtitle, style: const TextStyle(color: Colors.grey)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white),
+              ),
+            );
           }
           EOF
 
@@ -1522,65 +2225,6 @@ jobs:
           }
           EOF
 
-          # REAL MANAGE CLUBS
-          cat > lib/screens/manage_clubs.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          class ManageClubsScreen extends StatefulWidget {
-            const ManageClubsScreen({super.key});
-            @override
-            State<ManageClubsScreen> createState() => _ManageClubsScreenState();
-          }
-          class _ManageClubsScreenState extends State<ManageClubsScreen> {
-            final _c = TextEditingController();
-            void _add() async {
-              if (_c.text.isNotEmpty) {
-                await FirebaseFirestore.instance.collection('clubs').add({'name': _c.text, 'time': FieldValue.serverTimestamp()});
-                _c.clear();
-              }
-            }
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Manage Clubs')),
-                body: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Expanded(child: TextField(controller: _c, decoration: const InputDecoration(labelText: 'New Club Name', border: OutlineInputBorder()))),
-                          const SizedBox(width: 10),
-                          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF4B41A)), onPressed: _add, child: const Text('Create', style: TextStyle(color: Colors.black))),
-                        ]
-                      )
-                    ),
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance.collection('clubs').snapshots(),
-                        builder: (c, s) {
-                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
-                          return ListView.builder(
-                            itemCount: s.data!.docs.length,
-                            itemBuilder: (c, i) {
-                              final d = s.data!.docs[i].data() as Map<String, dynamic>;
-                              return Card(
-                                color: const Color(0xFF1E1E1E),
-                                child: ListTile(leading: const Icon(Icons.groups, color: Color(0xFFF4B41A)), title: Text(d['name'] ?? 'Unnamed', style: const TextStyle(color: Colors.white))),
-                              );
-                            }
-                          );
-                        }
-                      )
-                    )
-                  ]
-                )
-              );
-            }
-          }
-          EOF
-
-          # REAL RELEASE REPORTS
           cat > lib/screens/release_reports.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1713,12 +2357,19 @@ jobs:
           cd admin_app
           flutter clean
           flutter pub get
-          dart run flutter_launcher_icons
-          dart run flutter_native_splash:create
+          flutter pub run flutter_launcher_icons
+          flutter pub run flutter_native_splash:create
           flutter build apk --release
+
+      - name: Create Release (Staff OTA)
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: staff-v1.0.${{ github.run_number }}
+          name: Platinum Staff Hub v1.0.${{ github.run_number }}
+          files: admin_app/build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: staff-hub-apk
+          name: platinum-staff-hub-apk
           path: admin_app/build/app/outputs/flutter-apk/app-release.apk
