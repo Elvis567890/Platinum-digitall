@@ -37,9 +37,9 @@ jobs:
             mkdir -p student_app/lib/screens student_app/lib/services
           fi
 
-          # Upgrade Gradle
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
           
+          # Root build.gradle - REMOVED kotlinOptions
           cat > student_app/android/build.gradle << 'EOF'
           allprojects {
               repositories {
@@ -56,7 +56,7 @@ jobs:
               afterEvaluate { project ->
                   if (project.extensions.findByName("android") != null) {
                       project.android {
-                          compileSdk 35
+                          compileSdk 34
                           compileOptions {
                               sourceCompatibility JavaVersion.VERSION_17
                               targetCompatibility JavaVersion.VERSION_17
@@ -66,11 +66,6 @@ jobs:
                   tasks.withType(JavaCompile).configureEach {
                       sourceCompatibility = "17"
                       targetCompatibility = "17"
-                  }
-                  tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-                      kotlinOptions {
-                          jvmTarget = "17"
-                      }
                   }
               }
           }
@@ -82,7 +77,6 @@ jobs:
           }
           EOF
 
-          # Upgrade AGP & Kotlin
           cat > student_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -108,22 +102,18 @@ jobs:
           include ":app"
           EOF
 
-          # Ensure AndroidX and settings are enabled
           grep -q "android.newDsl=false" student_app/android/gradle.properties || echo "android.newDsl=false" >> student_app/android/gradle.properties
           grep -q "android.builtInKotlin=false" student_app/android/gradle.properties || echo "android.builtInKotlin=false" >> student_app/android/gradle.properties
           grep -q "android.useAndroidX=true" student_app/android/gradle.properties || echo "android.useAndroidX=true" >> student_app/android/gradle.properties
           grep -q "android.enableJetifier=true" student_app/android/gradle.properties || echo "android.enableJetifier=true" >> student_app/android/gradle.properties
-          grep -q "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=2g" student_app/android/gradle.properties || echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=2g" >> student_app/android/gradle.properties
-          
-          # 🔴 THE ULTIMATE FIX: IGNORE JVM TARGET MISMATCH
           grep -q "kotlin.jvm.target.validation.mode = IGNORE" student_app/android/gradle.properties || echo "kotlin.jvm.target.validation.mode = IGNORE" >> student_app/android/gradle.properties
           
-          # Fix Manifest XML
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' student_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application tools:replace="android:label"/' student_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="student_app"/android:label="Platinum Pulse"/g' student_app/android/app/src/main/AndroidManifest.xml
           grep -q "REQUEST_INSTALL_PACKAGES" student_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' student_app/android/app/src/main/AndroidManifest.xml
           
+          # App build.gradle - REMOVED kotlinOptions
           cat > student_app/android/app/build.gradle << 'EOF'
           plugins {
               id "com.android.application"
@@ -133,16 +123,15 @@ jobs:
           }
           android {
               namespace = "com.platinum.student_app"
-              compileSdk = 35
+              compileSdk = 34
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
-              kotlinOptions { jvmTarget = "17" }
               defaultConfig {
                   applicationId = "com.afrinode.platinum"
                   minSdk = 24
-                  targetSdk = 35
+                  targetSdk = 34
                   versionCode = flutter.versionCode
                   versionName = flutter.versionName
                   multiDexEnabled = true
@@ -968,9 +957,9 @@ jobs:
             mkdir -p admin_app/lib/screens admin_app/lib/services
           fi
           
-          # Upgrade Gradle
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
           
+          # Root build.gradle - REMOVED kotlinOptions
           cat > admin_app/android/build.gradle << 'EOF'
           allprojects {
               repositories {
@@ -987,7 +976,7 @@ jobs:
               afterEvaluate { project ->
                   if (project.extensions.findByName("android") != null) {
                       project.android {
-                          compileSdk 35
+                          compileSdk 34
                           compileOptions {
                               sourceCompatibility JavaVersion.VERSION_17
                               targetCompatibility JavaVersion.VERSION_17
@@ -997,11 +986,6 @@ jobs:
                   tasks.withType(JavaCompile).configureEach {
                       sourceCompatibility = "17"
                       targetCompatibility = "17"
-                  }
-                  tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-                      kotlinOptions {
-                          jvmTarget = "17"
-                      }
                   }
               }
           }
@@ -1013,7 +997,6 @@ jobs:
           }
           EOF
 
-          # Upgrade AGP & Kotlin
           cat > admin_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -1039,22 +1022,18 @@ jobs:
           include ":app"
           EOF
           
-          # Ensure AndroidX and settings are enabled
           grep -q "android.newDsl=false" admin_app/android/gradle.properties || echo "android.newDsl=false" >> admin_app/android/gradle.properties
           grep -q "android.builtInKotlin=false" admin_app/android/gradle.properties || echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
           grep -q "android.useAndroidX=true" admin_app/android/gradle.properties || echo "android.useAndroidX=true" >> admin_app/android/gradle.properties
           grep -q "android.enableJetifier=true" admin_app/android/gradle.properties || echo "android.enableJetifier=true" >> admin_app/android/gradle.properties
-          grep -q "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=2g" admin_app/android/gradle.properties || echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=2g" >> admin_app/android/gradle.properties
-          
-          # 🔴 THE ULTIMATE FIX: IGNORE JVM TARGET MISMATCH
           grep -q "kotlin.jvm.target.validation.mode = IGNORE" admin_app/android/gradle.properties || echo "kotlin.jvm.target.validation.mode = IGNORE" >> admin_app/android/gradle.properties
           
-          # Fix Manifest XML
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application tools:replace="android:label"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff"/g' admin_app/android/app/src/main/AndroidManifest.xml
           grep -q "android.permission.CAMERA" admin_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>' admin_app/android/app/src/main/AndroidManifest.xml
           
+          # App build.gradle - REMOVED kotlinOptions
           cat > admin_app/android/app/build.gradle << 'EOF'
           plugins {
               id "com.android.application"
@@ -1064,16 +1043,15 @@ jobs:
           }
           android {
               namespace = "com.platinum.admin_app"
-              compileSdk = 35
+              compileSdk = 34
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
-              kotlinOptions { jvmTarget = "17" }
               defaultConfig {
                   applicationId = "com.afrinode.platinumadmin"
                   minSdk = 24
-                  targetSdk = 35
+                  targetSdk = 34
                   versionCode = flutter.versionCode
                   versionName = flutter.versionName
                   multiDexEnabled = true
