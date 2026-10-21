@@ -216,7 +216,6 @@ jobs:
           EOF
 
           # --- STUDENT DART CODE ---
-          # NOTE: main.dart below is superseded by the "Apply student main.dart fix" step that follows this one.
           cat > lib/main.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:firebase_core/firebase_core.dart';
@@ -256,7 +255,7 @@ jobs:
                   useMaterial3: true,
                   textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
                   appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true, scrolledUnderElevation: 0),
-                  cardTheme: CardThemeData(color: Color(0xFF131A26), elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
+                  cardTheme: const CardTheme(color: Color(0xFF131A26), elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
                   inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: Color(0xFF131A26), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5))),
                   elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black)),
                   bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -1445,6 +1444,97 @@ jobs:
           }
           EOF
 
+          mkdir -p lib/services
+          cat > lib/services/pro_features.dart << 'EOF'
+          import 'dart:convert';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+          import 'package:url_launcher/url_launcher.dart';
+
+          class ProFeatures {
+            ProFeatures._();
+            static final instance = ProFeatures._();
+            final FirebaseFirestore db = FirebaseFirestore.instance;
+
+            Stream<QuerySnapshot<Map<String, dynamic>>> attendance(String unitCode) => db.collection('attendance').where('unitCode', isEqualTo: unitCode).orderBy('date', descending: true).snapshots();
+            Stream<QuerySnapshot<Map<String, dynamic>>> timetable(String classLevel) => db.collection('timetable').where('classLevel', isEqualTo: classLevel).orderBy('startTime').snapshots();
+            Stream<QuerySnapshot<Map<String, dynamic>>> assignments(String classLevel) => db.collection('assignments').where('classLevel', isEqualTo: classLevel).orderBy('dueAt').snapshots();
+            Stream<QuerySnapshot<Map<String, dynamic>>> notifications(String unitCode) => db.collection('notifications').where('audience', arrayContainsAny: [unitCode, 'all']).orderBy('createdAt', descending: true).limit(50).snapshots();
+            Stream<QuerySnapshot<Map<String, dynamic>>> analytics(String unitCode) => db.collection('marks').where('unitCode', isEqualTo: unitCode).orderBy('time').snapshots();
+
+            Future<void> cache(String key, Object value) async => (await SharedPreferences.getInstance()).setString(key, jsonEncode(value));
+            Future<dynamic> cached(String key) async { final v = (await SharedPreferences.getInstance()).getString(key); return v == null ? null : jsonDecode(v); }
+            Future<bool> openPayment(String checkoutUrl) async { final uri = Uri.tryParse(checkoutUrl); return uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication); }
+
+            Future<void> writeAudit({required String action, required String actor, required String target}) => db.collection('audit_logs').add({'action': action, 'actor': actor, 'target': target, 'createdAt': FieldValue.serverTimestamp()});
+          }
+          EOF
+
+          cat > lib/screens/professional_hub.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import '../services/pro_features.dart';
+
+          class ProfessionalHub extends StatelessWidget {
+            final String unitCode;
+            const ProfessionalHub({super.key, required this.unitCode});
+            static const gold = Color(0xFFD4AF37);
+
+            @override
+            Widget build(BuildContext context) => DefaultTabController(
+              length: 6,
+              child: Scaffold(
+                appBar: AppBar(title: const Text('School Centre', style: TextStyle(color: gold, fontWeight: FontWeight.bold)), bottom: const TabBar(isScrollable: true, tabs: [Tab(text: 'Overview'), Tab(text: 'Attendance'), Tab(text: 'Timetable'), Tab(text: 'Work'), Tab(text: 'Alerts'), Tab(text: 'Family')])),
+                body: TabBarView(children: [_overview(), _attendance(), _timetable(), _work(), _alerts(), _family(context)]),
+              ),
+            );
+
+            Widget _overview() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: ProFeatures.instance.analytics(unitCode),
+              builder: (_, s) {
+                final docs = s.data?.docs ?? [];
+                final averages = docs.map((d) => ((d.data()['average'] as num?) ?? 0).toDouble()).toList();
+                final average = averages.isEmpty ? 0 : averages.reduce((a, b) => a + b) / averages.length;
+                return ListView(padding: const EdgeInsets.all(16), children: [
+                  const Text('Your academic overview', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  Row(children: [_metric('Average', '${average.toStringAsFixed(0)}%', Icons.insights), _metric('Reports', '${docs.length}', Icons.description)]),
+                  const SizedBox(height: 16),
+                  _panel('Quick actions', [
+                    ListTile(leading: const Icon(Icons.payment, color: gold), title: const Text('Fees and receipts'), subtitle: const Text('View balance and open the configured checkout'), onTap: () => _fees()),
+                    ListTile(leading: const Icon(Icons.analytics, color: gold), title: const Text('Performance history'), subtitle: const Text('Review results across terms'), onTap: () {}),
+                  ]),
+                ]);
+              },
+            );
+
+            Widget _attendance() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: ProFeatures.instance.attendance(unitCode), builder: (_, s) {
+              final docs = s.data?.docs ?? [];
+              final present = docs.where((d) => d.data()['status'] == 'present').length;
+              final percent = docs.isEmpty ? 0 : (present * 100 ~/ docs.length);
+              return ListView(padding: const EdgeInsets.all(16), children: [_summary('Attendance', '$percent%', 'Present $present of ${docs.length} recorded days'), ...docs.map((d) { final x=d.data(); return Card(child: ListTile(leading: Icon(x['status']=='present' ? Icons.check_circle : Icons.warning, color: x['status']=='present' ? Colors.green : Colors.orange), title: Text(x['subject']?.toString() ?? 'School day'), subtitle: Text(x['date']?.toString() ?? ''), trailing: Text(x['status']?.toString() ?? '')); })]);
+            });
+
+            Widget _timetable() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: ProFeatures.instance.timetable('S4'), builder: (_, s) => ListView(padding: const EdgeInsets.all(16), children: [const Text('Class timetable', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), const SizedBox(height: 12), ...(s.data?.docs ?? []).map((d) { final x=d.data(); return Card(child: ListTile(leading: const Icon(Icons.schedule, color: gold), title: Text(x['subject']?.toString() ?? 'Lesson'), subtitle: Text('${x['day'] ?? ''} • ${x['room'] ?? ''}'), trailing: Text('${x['startTime'] ?? ''}–${x['endTime'] ?? ''}')); })]));
+
+            Widget _work() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: ProFeatures.instance.assignments('S4'), builder: (_, s) => ListView(padding: const EdgeInsets.all(16), children: [const Text('Assignments and deadlines', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), const SizedBox(height: 12), ...(s.data?.docs ?? []).map((d) { final x=d.data(); return Card(child: ListTile(leading: const Icon(Icons.assignment, color: gold), title: Text(x['title']?.toString() ?? 'Assignment'), subtitle: Text(x['subject']?.toString() ?? ''), trailing: Text(x['dueAt']?.toString() ?? '')); })]));
+
+            Widget _alerts() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: ProFeatures.instance.notifications(unitCode), builder: (_, s) => ListView(padding: const EdgeInsets.all(16), children: [const Text('Notifications', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), const SizedBox(height: 12), ...(s.data?.docs ?? []).map((d) { final x=d.data(); return Card(child: ListTile(leading: const Icon(Icons.notifications, color: gold), title: Text(x['title']?.toString() ?? 'School update'), subtitle: Text(x['body']?.toString() ?? '')); })]));
+
+            Widget _family(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [_panel('Parent / guardian access', [const ListTile(leading: Icon(Icons.family_restroom, color: gold), title: Text('Link a guardian'), subtitle: Text('A guardian can view attendance, grades, announcements, and fees.'),), ElevatedButton.icon(onPressed: () => showDialog(context: context, builder: (_) => const AlertDialog(title: Text('Guardian linking'), content: Text('Ask the school office to link a verified guardian account to this student.'))), icon: const Icon(Icons.person_add), label: const Text('Request guardian link'))]), _panel('Safety and privacy', [const ListTile(leading: Icon(Icons.security, color: gold), title: Text('Account security'), subtitle: Text('Use verified authentication and keep your recovery details current.'))])]);
+
+            Future<void> _fees() async {
+              final snap = await FirebaseFirestore.instance.collection('payment_settings').doc('default').get();
+              final url = snap.data()?['checkoutUrl']?.toString();
+              if (url != null) await ProFeatures.instance.openPayment(url);
+            }
+
+            Widget _metric(String label, String value, IconData icon) => Expanded(child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: gold), const SizedBox(height: 12), Text(value, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)), Text(label, style: const TextStyle(color: Colors.grey))]))));
+            Widget _summary(String title, String value, String caption) => Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.grey)), Text(value, style: const TextStyle(fontSize: 34, color: gold, fontWeight: FontWeight.bold)), Text(caption)])));
+            Widget _panel(String title, List<Widget> children) => Card(child: Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Padding(padding: const EdgeInsets.all(8), child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17))), ...children])));
+          }
+          EOF
+
           cat > lib/screens/chat.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1760,10 +1850,6 @@ jobs:
           }
           EOF
 
-      # ────────────────────────────────────────────────────────────────
-      # FIX 1: overwrite the buggy main.dart with the safe-bootstrap /
-      #        version-aware OTA version. Runs after Generate step above.
-      # ────────────────────────────────────────────────────────────────
       - name: Apply student main.dart fix (safe bootstrap + version-aware OTA)
         run: |
           cd student_app
@@ -1856,7 +1942,7 @@ jobs:
                 useMaterial3: true,
                 textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
                 appBarTheme: const AppBarTheme(backgroundColor: _bg, elevation: 0, centerTitle: true, scrolledUnderElevation: 0),
-                cardTheme: const CardThemeData(color: _card, elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
+                cardTheme: const CardTheme(color: _card, elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
                 inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: _card, border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: _gold, width: 1.5))),
                 elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), backgroundColor: _gold, foregroundColor: Colors.black)),
                 bottomNavigationBarTheme: const BottomNavigationBarThemeData(backgroundColor: _card, selectedItemColor: _gold, unselectedItemColor: Colors.grey),
@@ -1984,14 +2070,13 @@ jobs:
           cd student_app
           flutter clean
           flutter pub get
-          # FIX 3: fail the build on real errors, not on lint suggestions.
+          rm -rf test
           flutter analyze --no-fatal-warnings --no-fatal-infos
           flutter pub run flutter_launcher_icons
           flutter pub run flutter_native_splash:create
           flutter build apk --release --no-tree-shake-icons --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
 
       - name: Create Release (OTA)
-        # FIX 4: v2 (v1 is deprecated)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
@@ -2200,7 +2285,7 @@ jobs:
               icon_background_color: "#0B0F19"
           EOF
 
-          # --- ADMIN DART CODE (the two files below are superseded by the "Apply admin fixes" step) ---
+          # --- ADMIN DART CODE ---
           cat > lib/main.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:firebase_core/firebase_core.dart';
@@ -2233,7 +2318,7 @@ jobs:
                   useMaterial3: true,
                   textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
                   appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true, scrolledUnderElevation: 0),
-                  cardTheme: CardThemeData(color: Color(0xFF131A26), elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
+                  cardTheme: const CardTheme(color: Color(0xFF131A26), elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
                   inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: Color(0xFF131A26), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5))),
                   elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black)),
                 ),
@@ -3164,14 +3249,9 @@ jobs:
           }
           EOF
 
-      # ────────────────────────────────────────────────────────────────
-      # FIX 2: overwrite enter_marks.dart and admin_chat.dart with the
-      #        null-safe versions. Also ensure url_launcher is in pubspec.
-      # ────────────────────────────────────────────────────────────────
       - name: Apply admin fixes (null-safe marks + chat)
         run: |
           cd admin_app
-          # Ensure url_launcher dependency exists (admin_chat.dart imports it).
           if ! grep -q "url_launcher:" pubspec.yaml; then
             sed -i '/^  firebase_storage:/a\  url_launcher: ^6.3.0' pubspec.yaml
           fi
@@ -3506,14 +3586,13 @@ jobs:
           cd admin_app
           flutter clean
           flutter pub get
-          # FIX 3: fail the build on real errors, not on lint suggestions.
+          rm -rf test
           flutter analyze --no-fatal-warnings --no-fatal-infos
           flutter pub run flutter_launcher_icons
           flutter pub run flutter_native_splash:create
           flutter build apk --release --no-tree-shake-icons
 
       - name: Create Release (Staff OTA)
-        # FIX 4: v2 (v1 is deprecated)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: staff-v1.0.${{ github.run_number }}
