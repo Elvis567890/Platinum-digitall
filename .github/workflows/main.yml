@@ -43,7 +43,7 @@ jobs:
           fi
 
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' student_app/android/gradle/wrapper/gradle-wrapper.properties
-          
+
           cat > student_app/android/build.gradle << 'EOF'
           allprojects {
               repositories {
@@ -101,7 +101,6 @@ jobs:
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
               id "com.android.application" version "8.5.0" apply false
               id "org.jetbrains.kotlin.android" version "2.0.10" apply false
-              id "com.google.gms.google-services" version "4.5.0" apply false
           }
           include ":app"
           EOF
@@ -111,18 +110,17 @@ jobs:
           grep -q "android.useAndroidX=true" student_app/android/gradle.properties || echo "android.useAndroidX=true" >> student_app/android/gradle.properties
           grep -q "android.enableJetifier=true" student_app/android/gradle.properties || echo "android.enableJetifier=true" >> student_app/android/gradle.properties
           grep -q "kotlin.jvm.target.validation.mode = IGNORE" student_app/android/gradle.properties || echo "kotlin.jvm.target.validation.mode = IGNORE" >> student_app/android/gradle.properties
-          
+
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' student_app/android/app/src/main/AndroidManifest.xml
-          sed -i 's/<application/<application android:requestLegacyExternalStorage="true" tools:replace="android:label"/' student_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:usesCleartextTraffic="true" android:requestLegacyExternalStorage="true" tools:replace="android:label"/' student_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="student_app"/android:label="Platinum Digital App"/g' student_app/android/app/src/main/AndroidManifest.xml
-          grep -q "REQUEST_INSTALL_PACKAGES" student_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' student_app/android/app/src/main/AndroidManifest.xml
-          
+          grep -q "REQUEST_INSTALL_PACKAGES" student_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/>\n    <uses-permission android:name="android.permission.BLUETOOTH"\/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' student_app/android/app/src/main/AndroidManifest.xml
+
           cat > student_app/android/app/build.gradle << 'EOF'
           plugins {
               id "com.android.application"
               id "kotlin-android"
               id "dev.flutter.flutter-gradle-plugin"
-              id "com.google.gms.google-services"
           }
           android {
               namespace = "com.platinum.student_app"
@@ -160,7 +158,7 @@ jobs:
           EOF
 
           cd student_app
-          
+
           cat > pubspec.yaml << 'EOF'
           name: student_app
           description: "Platinum Digital App"
@@ -173,6 +171,7 @@ jobs:
               sdk: flutter
             cupertino_icons: ^1.0.6
             firebase_core: ^3.1.0
+            firebase_auth: ^5.1.0
             cloud_firestore: ^5.0.1
             firebase_storage: ^12.0.1
             image_picker: ^1.1.2
@@ -217,9 +216,11 @@ jobs:
           EOF
 
           # --- STUDENT DART CODE ---
+          # NOTE: main.dart below is superseded by the "Apply student main.dart fix" step that follows this one.
           cat > lib/main.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:firebase_core/firebase_core.dart';
+          import 'package:firebase_auth/firebase_auth.dart';
           import 'package:google_fonts/google_fonts.dart';
           import 'package:http/http.dart' as http;
           import 'dart:convert';
@@ -235,6 +236,9 @@ jobs:
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
             await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDl-dfyyRT9kdxJOCm4ZM6QYmnY1cgXI0M", appId: "1:374715668746:android:b985232e1b3a6d0d4342f3", messagingSenderId: "374715668746", projectId: "payment-sas", storageBucket: "payment-sas.firebasestorage.app"));
+            if (FirebaseAuth.instance.currentUser == null) {
+              await FirebaseAuth.instance.signInAnonymously();
+            }
             runApp(const App());
           }
 
@@ -251,7 +255,10 @@ jobs:
                   scaffoldBackgroundColor: const Color(0xFF0B0F19),
                   useMaterial3: true,
                   textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
-                  appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true),
+                  appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true, scrolledUnderElevation: 0),
+                  cardTheme: CardThemeData(color: Color(0xFF131A26), elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
+                  inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: Color(0xFF131A26), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5))),
+                  elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black)),
                   bottomNavigationBarTheme: const BottomNavigationBarThemeData(
                     backgroundColor: Color(0xFF131A26),
                     selectedItemColor: Color(0xFFD4AF37),
@@ -280,7 +287,6 @@ jobs:
               _checkForUpdates();
               final prefs = await SharedPreferences.getInstance();
               final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-              
               if (mounted) {
                 if (isLoggedIn) {
                   Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
@@ -296,10 +302,14 @@ jobs:
                 final res = await http.get(Uri.parse('https://api.github.com/repos/Elvis567890/Platinum-digitall/releases/latest'));
                 if (res.statusCode == 200) {
                   final data = jsonDecode(res.body);
-                  String latest = data['tag_name'].toString().replaceAll('v', '');
-                  String apkUrl = data['assets'][0]['browser_download_url'];
-                  
-                  if (latest != pInfo.version && mounted) {
+                  final latest = data['tag_name'].toString().replaceFirst(RegExp(r'^v'), '');
+                  final assets = (data['assets'] as List?) ?? const [];
+                  Map? apkAsset;
+                  for (final asset in assets) {
+                    if (asset is Map && asset['name'].toString().endsWith('.apk')) { apkAsset = asset; break; }
+                  }
+                  final apkUrl = apkAsset?['browser_download_url']?.toString();
+                  if (apkUrl != null && latest != pInfo.version && mounted) {
                     showDialog(
                       context: context,
                       barrierDismissible: false,
@@ -329,7 +339,6 @@ jobs:
               if (await Permission.requestInstallPackages.status != PermissionStatus.granted) {
                 await Permission.requestInstallPackages.request();
               }
-              
               showDialog(context: context, barrierDismissible: false, builder: (ctx) => const AlertDialog(
                 content: Column(mainAxisSize: MainAxisSize.min, children: [
                   CircularProgressIndicator(color: Color(0xFFD4AF37)),
@@ -337,10 +346,9 @@ jobs:
                   Text("Downloading Update in Background...")
                 ])
               ));
-
               try {
-                final dir = await getExternalStorageDirectory();
-                final path = '${dir!.path}/update.apk';
+                final dir = await getApplicationDocumentsDirectory();
+                final path = '${dir.path}/update.apk';
                 await Dio().download(url, path);
                 if (mounted) Navigator.pop(context);
                 OpenFilex.open(path);
@@ -359,6 +367,7 @@ jobs:
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
           import 'package:shared_preferences/shared_preferences.dart';
+          import 'dart:math';
           import 'home.dart';
 
           class LoginScreen extends StatefulWidget {
@@ -367,26 +376,79 @@ jobs:
             State<LoginScreen> createState() => _LoginScreenState();
           }
           class _LoginScreenState extends State<LoginScreen> {
+            final _firstName = TextEditingController();
+            final _lastName = TextEditingController();
             final _code = TextEditingController();
+            bool _isRegistering = false;
             bool _loading = false;
+
+            Future<void> _register() async {
+              if (_firstName.text.trim().isEmpty || _lastName.text.trim().isEmpty) return;
+              setState(() => _loading = true);
+              String generatedCode = "PDT-${Random().nextInt(8999) + 1000}";
+              try {
+                await FirebaseFirestore.instance.collection('students').add({
+                  'firstName': _firstName.text.trim(),
+                  'lastName': _lastName.text.trim(),
+                  'unitCode': generatedCode,
+                  'time': FieldValue.serverTimestamp(),
+                });
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('isLoggedIn', true);
+                await prefs.setString('unitCode', generatedCode);
+                await prefs.setString('firstName', _firstName.text.trim());
+                await prefs.setString('lastName', _lastName.text.trim());
+                if (mounted) {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: const Color(0xFF131A26),
+                      title: const Text('Registration Successful!', style: TextStyle(color: Color(0xFFD4AF37))),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('This is your unique Report Code. Write it down! You need it to view your results.'),
+                          const SizedBox(height: 16),
+                          Text(generatedCode, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2)),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+                          },
+                          child: const Text('I have saved it', style: TextStyle(color: Color(0xFFD4AF37))),
+                        )
+                      ]
+                    )
+                  );
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              } finally {
+                if (mounted) setState(() => _loading = false);
+              }
+            }
 
             Future<void> _login() async {
               if (_code.text.trim().isEmpty) return;
               setState(() => _loading = true);
-              
               try {
-                final snap = await FirebaseFirestore.instance.collection('marks')
+                final snap = await FirebaseFirestore.instance.collection('students')
                     .where('unitCode', isEqualTo: _code.text.trim().toUpperCase())
                     .limit(1).get();
-
                 if (snap.docs.isNotEmpty) {
+                  final data = snap.docs.first.data();
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setBool('isLoggedIn', true);
-                  await prefs.setString('unitCode', _code.text.trim().toUpperCase());
-                  
+                  await prefs.setString('unitCode', data['unitCode']);
+                  await prefs.setString('firstName', data['firstName']);
+                  await prefs.setString('lastName', data['lastName']);
                   if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
                 } else {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid Unit Code. Contact your Teacher.'), backgroundColor: Colors.redAccent));
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid Code. Please register.'), backgroundColor: Colors.redAccent));
                 }
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -403,46 +465,81 @@ jobs:
                     gradient: LinearGradient(colors: [Color(0xFF0B0F19), Color(0xFF131A26)], begin: Alignment.topCenter, end: Alignment.bottomCenter)
                   ),
                   child: Center(
-                    child: Container(
-                      margin: const EdgeInsets.all(24),
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF131A26).withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white10),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20)],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Image.asset('assets/logo.png', height: 100),
-                          const SizedBox(height: 20),
-                          const Text('Student Portal', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit')),
-                          const SizedBox(height: 8),
-                          const Text('Enter the unique Unit Code given to you by your teacher.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 12)),
-                          const SizedBox(height: 24),
-                          TextField(
-                            controller: _code,
-                            style: const TextStyle(color: Colors.white, letterSpacing: 4, fontWeight: FontWeight.bold, fontSize: 20),
-                            textAlign: TextAlign.center,
-                            decoration: InputDecoration(
-                              labelText: 'Unit Code (e.g. A7X9P2)',
-                              labelStyle: const TextStyle(color: Colors.grey, letterSpacing: 0, fontSize: 14, fontWeight: FontWeight.normal),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white24)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
+                    child: SingleChildScrollView(
+                      child: Container(
+                        margin: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131A26).withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.white10),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20)],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset('assets/logo.png', height: 100),
+                            const SizedBox(height: 20),
+                            Text(_isRegistering ? 'Register Student' : 'Student Login', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit')),
+                            const SizedBox(height: 8),
+                            Text(
+                              _isRegistering ? 'Enter your real names exactly as they appear on the school register.' : 'Enter the unique Report Code given to you after registration.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.grey, fontSize: 12),
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                              onPressed: _loading ? null : _login,
-                              child: _loading ? const CircularProgressIndicator(color: Colors.black) : const Text('Access App', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(height: 24),
+                            if (_isRegistering) ...[
+                              TextField(
+                                controller: _firstName,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  labelText: 'First Name',
+                                  labelStyle: const TextStyle(color: Colors.grey),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white24)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              TextField(
+                                controller: _lastName,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  labelText: 'Last Name / Surname',
+                                  labelStyle: const TextStyle(color: Colors.grey),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white24)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
+                                ),
+                              ),
+                            ] else ...[
+                              TextField(
+                                controller: _code,
+                                style: const TextStyle(color: Colors.white, letterSpacing: 4, fontWeight: FontWeight.bold, fontSize: 20),
+                                textAlign: TextAlign.center,
+                                decoration: InputDecoration(
+                                  labelText: 'Report Code (e.g. PDT-1234)',
+                                  labelStyle: const TextStyle(color: Colors.grey, letterSpacing: 0, fontSize: 14, fontWeight: FontWeight.normal),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white24)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                                onPressed: _loading ? null : (_isRegistering ? _register : _login),
+                                child: _loading ? const CircularProgressIndicator(color: Colors.black) : Text(_isRegistering ? 'Register & Get Code' : 'Access App', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                              ),
                             ),
-                          )
-                        ]
+                            const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: () => setState(() => _isRegistering = !_isRegistering),
+                              child: Text(_isRegistering ? 'Already have a code? Login' : 'New student? Register here', style: const TextStyle(color: Colors.grey)),
+                            )
+                          ]
+                        )
                       )
                     )
                   )
@@ -687,21 +784,19 @@ jobs:
                         );
                       },
                     ),
-                    
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance.collection('feed_posts').orderBy('time', descending: true).snapshots(),
                         builder: (c, s) {
                           if (!s.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
                           if (s.data!.docs.isEmpty) return const Center(child: Text('No posts yet. Start the conversation!', style: TextStyle(color: Colors.grey)));
-                          
                           return ListView.builder(
                             padding: const EdgeInsets.all(16),
                             itemCount: s.data!.docs.length,
                             itemBuilder: (c, i) {
                               final doc = s.data!.docs[i];
                               final data = doc.data() as Map<String, dynamic>;
-                              return _FeedCard(data: data);
+                              return _FeedCard(id: doc.id, data: data);
                             },
                           );
                         },
@@ -714,9 +809,9 @@ jobs:
           }
 
           class _FeedCard extends StatefulWidget {
+            final String id;
             final Map<String, dynamic> data;
-            const _FeedCard({required this.data});
-
+            const _FeedCard({required this.id, required this.data});
             @override
             State<_FeedCard> createState() => _FeedCardState();
           }
@@ -724,6 +819,12 @@ jobs:
           class _FeedCardState extends State<_FeedCard> {
             VideoPlayerController? _videoController;
             bool _isPlaying = false;
+
+            Future<void> _like() async {
+              await FirebaseFirestore.instance.collection('feed_posts').doc(widget.id).update({
+                'likes': FieldValue.increment(1),
+              });
+            }
 
             @override
             void initState() {
@@ -813,7 +914,7 @@ jobs:
                         children: [
                           IconButton(
                             icon: const Icon(Icons.favorite_border, color: Colors.grey),
-                            onPressed: () {},
+                            onPressed: _like,
                           ),
                           Text('${widget.data['likes'] ?? 0}', style: const TextStyle(color: Colors.grey)),
                         ],
@@ -828,31 +929,41 @@ jobs:
 
           cat > lib/screens/study.dart << 'EOF'
           import 'package:flutter/material.dart';
-          import 'package:video_player/video_player.dart';
           import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:url_launcher/url_launcher.dart';
 
-          class StudyScreen extends StatefulWidget {
+          class StudyScreen extends StatelessWidget {
             const StudyScreen({super.key});
-            @override
-            State<StudyScreen> createState() => _StudyScreenState();
-          }
-          class _StudyScreenState extends State<StudyScreen> {
-            late VideoPlayerController _v;
-            @override
-            void initState() {
-              super.initState();
-              _v = VideoPlayerController.networkUrl(Uri.parse('https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'))..initialize().then((_) => setState(() {}));
-            }
-            @override
-            void dispose() {
-              _v.dispose();
-              super.dispose();
-            }
+
             Future<void> _join(BuildContext context, String room) async {
-              var options = JitsiMeetConferenceOptions(room: room, featureFlags: {FeatureFlags.welcomePageEnabled: false, FeatureFlags.preJoinPageEnabled: false});
-              try { await JitsiMeet().join(options); } catch (e) { debugPrint('Err: $e'); }
+              final cleanRoom = room.trim();
+              if (cleanRoom.isEmpty) return;
+              final options = JitsiMeetConferenceOptions(
+                room: cleanRoom,
+                featureFlags: {
+                  FeatureFlags.welcomePageEnabled: false,
+                  FeatureFlags.preJoinPageEnabled: false,
+                },
+              );
+              try {
+                await JitsiMeet().join(options);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to join class: $e')));
+                }
+              }
             }
+
+            Future<void> _openResource(BuildContext context, String url) async {
+              final uri = Uri.tryParse(url);
+              if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This resource link is unavailable.')));
+                }
+              }
+            }
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
@@ -863,78 +974,58 @@ jobs:
                     const Text('Live Classes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 10),
                     StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance.collection('live_classes').snapshots(),
+                      stream: FirebaseFirestore.instance.collection('live_classes').orderBy('time', descending: true).snapshots(),
                       builder: (context, snapshot) {
-                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        if (snapshot.hasError) return const Text('Live classes are temporarily unavailable.', style: TextStyle(color: Colors.orangeAccent));
+                        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
+                        if (snapshot.data!.docs.isEmpty) return const _EmptyCard(text: 'No live classes currently active.');
+                        return Column(children: snapshot.data!.docs.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final room = data['room']?.toString() ?? '';
                           return Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.05))),
-                            child: const Text('No live classes currently active.', style: TextStyle(color: Colors.grey)),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.redAccent.withOpacity(0.3))),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Row(children: [CircleAvatar(backgroundColor: Colors.redAccent, radius: 6), SizedBox(width: 8), Text('LIVE NOW', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12))]),
+                              const SizedBox(height: 12),
+                              Text(data['title']?.toString() ?? 'Class', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                              Text(data['teacher']?.toString() ?? 'Teacher', style: const TextStyle(color: Colors.grey)),
+                              const SizedBox(height: 16),
+                              SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: room.isEmpty ? null : () => _join(context, room), child: const Text('Join Class', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)))),
+                            ]),
                           );
-                        }
-                        return Column(
-                          children: snapshot.data!.docs.map((doc) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF131A26),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(children: [
-                                    const CircleAvatar(backgroundColor: Colors.redAccent, radius: 6),
-                                    const SizedBox(width: 8),
-                                    const Text('LIVE NOW', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12)),
-                                  ]),
-                                  const SizedBox(height: 12),
-                                  Text(data['title'] ?? 'Class', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                                  Text(data['teacher'] ?? 'Teacher', style: const TextStyle(color: Colors.grey)),
-                                  const SizedBox(height: 16),
-                                  SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => _join(context, data['room']), child: const Text('Join Class', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)))),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        );
-                      }
+                        }).toList());
+                      },
                     ),
                     const SizedBox(height: 24),
                     const Text('Digital Library', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 40),
-                          const SizedBox(width: 16),
-                          const Expanded(child: Text('S4 Biology Textbook.pdf', style: TextStyle(fontWeight: FontWeight.bold))),
-                          IconButton(icon: const Icon(Icons.download, color: Color(0xFFD4AF37)), onPressed: () {}),
-                        ],
-                      ),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('resources').orderBy('createdAt', descending: true).snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) return const _EmptyCard(text: 'The digital library is temporarily unavailable.');
+                        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
+                        if (snapshot.data!.docs.isEmpty) return const _EmptyCard(text: 'No resources have been published yet.');
+                        return Column(children: snapshot.data!.docs.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final url = data['url']?.toString() ?? '';
+                          final kind = data['type']?.toString() ?? 'file';
+                          return Card(color: const Color(0xFF131A26), child: ListTile(leading: Icon(kind == 'image' ? Icons.image : Icons.picture_as_pdf, color: kind == 'image' ? Colors.blueAccent : Colors.redAccent, size: 40), title: Text(data['title']?.toString() ?? 'Resource', style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(data['description']?.toString() ?? 'Open resource', maxLines: 1, overflow: TextOverflow.ellipsis), trailing: IconButton(icon: const Icon(Icons.download, color: Color(0xFFD4AF37)), onPressed: url.isEmpty ? null : () => _openResource(context, url))));
+                        }).toList());
+                      },
                     ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.image, color: Colors.blueAccent, size: 40),
-                          const SizedBox(width: 16),
-                          const Expanded(child: Text('Term 2 Timetable.png', style: TextStyle(fontWeight: FontWeight.bold))),
-                          IconButton(icon: const Icon(Icons.download, color: Color(0xFFD4AF37)), onPressed: () {}),
-                        ],
-                      ),
-                    )
-                  ]
-                )
+                  ],
+                ),
               );
             }
+          }
+
+          class _EmptyCard extends StatelessWidget {
+            final String text;
+            const _EmptyCard({required this.text});
+            @override
+            Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16)), child: Text(text, style: const TextStyle(color: Colors.grey)));
           }
           EOF
 
@@ -992,7 +1083,6 @@ jobs:
             @override
             Widget build(BuildContext context) {
               if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))));
-
               return Scaffold(
                 appBar: AppBar(
                   title: const Text('Groups Hub', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
@@ -1054,10 +1144,8 @@ jobs:
                 stream: FirebaseFirestore.instance.collection('clubs').snapshots(),
                 builder: (c, snapshot) {
                   if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
-                  
                   final clubs = snapshot.data!.docs.map((d) => d['name'] as String).toList();
                   final allGroups = ['All', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', ...clubs];
-
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: allGroups.length,
@@ -1066,7 +1154,6 @@ jobs:
                       final isSubscribed = _subscribed.contains(group);
                       final isClass = group.startsWith('S') && group.length == 2;
                       final isSchool = group == 'All';
-
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
@@ -1108,6 +1195,7 @@ jobs:
           import 'package:cloud_firestore/cloud_firestore.dart';
           import 'package:shared_preferences/shared_preferences.dart';
           import 'login.dart';
+          import 'professional_hub.dart';
 
           class ProfileScreen extends StatelessWidget {
             final String code;
@@ -1145,11 +1233,14 @@ jobs:
                     _buildMenuTile(Icons.description, 'View Report Card', () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => ReportCardScreen(unitCode: code)));
                     }),
+                    _buildMenuTile(Icons.dashboard_customize, 'School Centre', () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ProfessionalHub(unitCode: code)));
+                    }),
                     _buildMenuTile(Icons.receipt_long, 'Fee Receipts', () {
                       _showFeeReceipts(context);
                     }),
-                    _buildMenuTile(Icons.lock_outline, 'Security Settings', () {}),
-                    _buildMenuTile(Icons.help_outline, 'Help & Support', () {}),
+                    _buildMenuTile(Icons.lock_outline, 'Security Settings', () => _showSecurity(context)),
+                    _buildMenuTile(Icons.help_outline, 'Help & Support', () => _showSupport(context)),
                     const SizedBox(height: 32),
                     SizedBox(
                       width: double.infinity,
@@ -1170,6 +1261,14 @@ jobs:
               );
             }
 
+            void _showSecurity(BuildContext context) {
+              showDialog(context: context, builder: (_) => const AlertDialog(title: Text('Security Settings'), content: Text('Your report code is stored locally on this device. Log out from this screen to remove the local session.'),));
+            }
+
+            void _showSupport(BuildContext context) {
+              showDialog(context: context, builder: (_) => const AlertDialog(title: Text('Help & Support'), content: Text('For account or results support, contact the school administration.'),));
+            }
+
             void _showFeeReceipts(BuildContext context) {
               showModalBottomSheet(
                 context: context,
@@ -1183,19 +1282,13 @@ jobs:
                     children: [
                       const Text('Fee Receipts', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
                       const SizedBox(height: 16),
-                      ListTile(
-                        leading: const Icon(Icons.check_circle, color: Colors.greenAccent),
-                        title: const Text('Term 1 Fees - Paid'),
-                        subtitle: const Text('Receipt #: 84729'),
-                        trailing: const Icon(Icons.download, color: Colors.white),
-                        onTap: () {},
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.pending, color: Colors.orangeAccent),
-                        title: const Text('Term 2 Fees - Pending'),
-                        subtitle: const Text('Balance: UGX 150,000'),
-                        trailing: const Icon(Icons.payment, color: Colors.white),
-                        onTap: () {},
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('fee_receipts').where('unitCode', isEqualTo: code).orderBy('createdAt', descending: true).snapshots(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
+                          if (snapshot.data!.docs.isEmpty) return const Text('No fee receipts have been published yet.', style: TextStyle(color: Colors.grey));
+                          return Column(children: snapshot.data!.docs.map((doc) { final d = doc.data() as Map<String, dynamic>; final paid = d['status'] == 'paid'; return ListTile(leading: Icon(paid ? Icons.check_circle : Icons.pending, color: paid ? Colors.greenAccent : Colors.orangeAccent), title: Text('${d['term'] ?? 'Term'} Fees - ${paid ? 'Paid' : 'Pending'}'), subtitle: Text(d['receiptNumber']?.toString() ?? 'No receipt number'), trailing: Text(d['amount']?.toString() ?? ''),); }).toList());
+                        },
                       ),
                     ],
                   ),
@@ -1294,7 +1387,7 @@ jobs:
                                     children: [
                                       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                         const Text('Student', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                        Text(m['studentName'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                                        Text('${m['firstName']} ${m['lastName']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                                       ]),
                                       Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                                         const Text('Class', style: TextStyle(color: Colors.grey, fontSize: 12)),
@@ -1667,6 +1760,222 @@ jobs:
           }
           EOF
 
+      # ────────────────────────────────────────────────────────────────
+      # FIX 1: overwrite the buggy main.dart with the safe-bootstrap /
+      #        version-aware OTA version. Runs after Generate step above.
+      # ────────────────────────────────────────────────────────────────
+      - name: Apply student main.dart fix (safe bootstrap + version-aware OTA)
+        run: |
+          cd student_app
+          cat > lib/main.dart << 'EOF_MAIN'
+          import 'dart:convert';
+          import 'dart:io';
+
+          import 'package:dio/dio.dart';
+          import 'package:firebase_auth/firebase_auth.dart';
+          import 'package:firebase_core/firebase_core.dart';
+          import 'package:flutter/material.dart';
+          import 'package:google_fonts/google_fonts.dart';
+          import 'package:http/http.dart' as http;
+          import 'package:open_filex/open_filex.dart';
+          import 'package:package_info_plus/package_info_plus.dart';
+          import 'package:path_provider/path_provider.dart';
+          import 'package:permission_handler/permission_handler.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+
+          import 'screens/home.dart';
+          import 'screens/login.dart';
+
+          const _gold = Color(0xFFD4AF37);
+          const _bg = Color(0xFF0B0F19);
+          const _card = Color(0xFF131A26);
+          const _otaRepo = 'Elvis567890/Platinum-digitall';
+
+          void main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+            try {
+              await Firebase.initializeApp(
+                options: const FirebaseOptions(
+                  apiKey: 'AIzaSyDl-dfyyRT9kdxJOCm4ZM6QYmnY1cgXI0M',
+                  appId: '1:374715668746:android:b985232e1b3a6d0d4342f3',
+                  messagingSenderId: '374715668746',
+                  projectId: 'payment-sas',
+                  storageBucket: 'payment-sas.firebasestorage.app',
+                ),
+              );
+              if (FirebaseAuth.instance.currentUser == null) {
+                await FirebaseAuth.instance.signInAnonymously();
+              }
+              runApp(const App());
+            } catch (e) {
+              runApp(BootstrapErrorApp(error: e.toString()));
+            }
+          }
+
+          class BootstrapErrorApp extends StatelessWidget {
+            final String error;
+            const BootstrapErrorApp({super.key, required this.error});
+            @override
+            Widget build(BuildContext context) => MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData.dark(useMaterial3: true),
+              home: Scaffold(
+                backgroundColor: _bg,
+                body: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.error_outline, color: _gold, size: 64),
+                      const SizedBox(height: 16),
+                      const Text('Could not start the app', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      Text('Check your network connection and try again.\n\n$error', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black),
+                        onPressed: () => main(),
+                        child: const Text('Retry'),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          class App extends StatelessWidget {
+            const App({super.key});
+            @override
+            Widget build(BuildContext context) => MaterialApp(
+              title: 'Platinum Digital App',
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                brightness: Brightness.dark,
+                primaryColor: _bg,
+                scaffoldBackgroundColor: _bg,
+                useMaterial3: true,
+                textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
+                appBarTheme: const AppBarTheme(backgroundColor: _bg, elevation: 0, centerTitle: true, scrolledUnderElevation: 0),
+                cardTheme: const CardThemeData(color: _card, elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
+                inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: _card, border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: _gold, width: 1.5))),
+                elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), backgroundColor: _gold, foregroundColor: Colors.black)),
+                bottomNavigationBarTheme: const BottomNavigationBarThemeData(backgroundColor: _card, selectedItemColor: _gold, unselectedItemColor: Colors.grey),
+              ),
+              home: const Start(),
+            );
+          }
+
+          class Start extends StatefulWidget {
+            const Start({super.key});
+            @override
+            State<Start> createState() => _StartState();
+          }
+
+          class _StartState extends State<Start> {
+            @override
+            void initState() {
+              super.initState();
+              WidgetsBinding.instance.addPostFrameCallback((_) => _init());
+            }
+
+            Future<void> _init() async {
+              _checkForUpdates();
+              final prefs = await SharedPreferences.getInstance();
+              final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+              if (!mounted) return;
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => isLoggedIn ? const HomeScreen() : const LoginScreen()));
+            }
+
+            Future<void> _checkForUpdates() async {
+              try {
+                final pInfo = await PackageInfo.fromPlatform();
+                final res = await http.get(Uri.parse('https://api.github.com/repos/$_otaRepo/releases'), headers: {'Accept': 'application/vnd.github+json'}).timeout(const Duration(seconds: 12));
+                if (res.statusCode != 200) return;
+                final list = jsonDecode(res.body);
+                if (list is! List) return;
+                final tagRe = RegExp(r'^v(\d+\.\d+\.\d+)$');
+                String? bestVersion; String? bestUrl; int bestSize = 0;
+                for (final r in list) {
+                  if (r is! Map) continue;
+                  if (r['draft'] == true || r['prerelease'] == true) continue;
+                  final m = tagRe.firstMatch((r['tag_name'] ?? '').toString());
+                  if (m == null) continue;
+                  final v = m.group(1)!;
+                  if (_cmp(v, pInfo.version) <= 0) continue;
+                  final assets = (r['assets'] as List?) ?? const [];
+                  Map? apk;
+                  for (final a in assets) {
+                    if (a is Map && (a['name'] ?? '').toString().toLowerCase().endsWith('.apk')) { apk = a; break; }
+                  }
+                  if (apk == null) continue;
+                  if (bestVersion == null || _cmp(v, bestVersion) > 0) {
+                    bestVersion = v;
+                    bestUrl = apk['browser_download_url']?.toString();
+                    bestSize = (apk['size'] as num?)?.toInt() ?? 0;
+                  }
+                }
+                if (bestVersion == null || bestUrl == null || bestUrl.isEmpty) return;
+                if (!mounted) return;
+                _promptUpdate(bestVersion, bestUrl, bestSize);
+              } catch (e) { debugPrint('OTA check failed: $e'); }
+            }
+
+            void _promptUpdate(String version, String url, int sizeBytes) {
+              final sizeMb = sizeBytes > 0 ? (sizeBytes / (1024 * 1024)).toStringAsFixed(1) : '?';
+              showDialog<void>(context: context, barrierDismissible: false, builder: (ctx) => AlertDialog(
+                title: const Text('Update available'),
+                content: Text('Version $version is available.\n\nDownload size: $sizeMb MB'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Later')),
+                  ElevatedButton(onPressed: () { Navigator.pop(ctx); _download(url); }, child: const Text('Update now')),
+                ],
+              ));
+            }
+
+            Future<void> _download(String url) async {
+              var status = await Permission.requestInstallPackages.status;
+              if (!status.isGranted) { status = await Permission.requestInstallPackages.request(); }
+              if (!status.isGranted) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Install permission denied. Enable "Install unknown apps" for this app in system settings.')));
+                return;
+              }
+              if (!mounted) return;
+              showDialog<void>(context: context, barrierDismissible: false, builder: (ctx) => const AlertDialog(
+                content: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(color: _gold), SizedBox(height: 20), Text('Downloading update...')]),
+              ));
+              try {
+                Directory? dir;
+                try { dir = await getExternalStorageDirectory(); } catch (_) {}
+                dir ??= await getApplicationDocumentsDirectory();
+                final path = '${dir.path}/platinum-update-${DateTime.now().millisecondsSinceEpoch}.apk';
+                final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 30), receiveTimeout: const Duration(minutes: 5), headers: {'Accept': 'application/octet-stream'}));
+                await dio.download(url, path);
+                if (mounted) Navigator.of(context, rootNavigator: true).pop();
+                final result = await OpenFilex.open(path);
+                if (result.type != ResultType.done && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not launch installer: ${result.message}')));
+                }
+              } catch (e) {
+                if (mounted) Navigator.of(context, rootNavigator: true).pop();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+              }
+            }
+
+            int _cmp(String a, String b) {
+              final pa = a.split('.').map((x) => int.tryParse(x) ?? 0).toList();
+              final pb = b.split('.').map((x) => int.tryParse(x) ?? 0).toList();
+              for (var i = 0; i < pa.length || i < pb.length; i++) {
+                final d = (i < pa.length ? pa[i] : 0) - (i < pb.length ? pb[i] : 0);
+                if (d != 0) return d;
+              }
+              return 0;
+            }
+
+            @override
+            Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator(color: _gold)));
+          }
+          EOF_MAIN
+
       - name: Decode Google Services JSON (Student)
         run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | tr -d '[:space:]' | base64 -d > student_app/android/app/google-services.json
 
@@ -1675,17 +1984,20 @@ jobs:
           cd student_app
           flutter clean
           flutter pub get
+          # FIX 3: fail the build on real errors, not on lint suggestions.
+          flutter analyze --no-fatal-warnings --no-fatal-infos
           flutter pub run flutter_launcher_icons
           flutter pub run flutter_native_splash:create
           flutter build apk --release --no-tree-shake-icons --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
 
       - name: Create Release (OTA)
-        uses: softprops/action-gh-release@v1
+        # FIX 4: v2 (v1 is deprecated)
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: Platinum Digital App v1.0.${{ github.run_number }}
           files: student_app/build/app/outputs/flutter-apk/app-release.apk
-          
+
       - name: Upload Student APK
         uses: actions/upload-artifact@v4
         with:
@@ -1718,15 +2030,15 @@ jobs:
             flutter create --org com.platinum --project-name admin_app admin_app
             mkdir -p admin_app/lib/screens admin_app/lib/services
           fi
-          
+
           if [ -f "InShot_20261017_024714317.jpg" ]; then
             convert InShot_20261017_024714317.jpg -fuzz 5% -transparent white -resize 800x800 -background "#0B0F19" -gravity center -extent 1024x1024 admin_app/assets/logo.png
           elif [ ! -f "admin_app/assets/logo.png" ]; then
             convert -size 1024x1024 xc:"#0B0F19" admin_app/assets/logo.png
           fi
-          
+
           sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-all.zip/g' admin_app/android/gradle/wrapper/gradle-wrapper.properties
-          
+
           cat > admin_app/android/build.gradle << 'EOF'
           allprojects {
               repositories {
@@ -1784,28 +2096,26 @@ jobs:
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
               id "com.android.application" version "8.5.0" apply false
               id "org.jetbrains.kotlin.android" version "2.0.10" apply false
-              id "com.google.gms.google-services" version "4.5.0" apply false
           }
           include ":app"
           EOF
-          
+
           grep -q "android.newDsl=false" admin_app/android/gradle.properties || echo "android.newDsl=false" >> admin_app/android/gradle.properties
           grep -q "android.builtInKotlin=false" admin_app/android/gradle.properties || echo "android.builtInKotlin=false" >> admin_app/android/gradle.properties
           grep -q "android.useAndroidX=true" admin_app/android/gradle.properties || echo "android.useAndroidX=true" >> admin_app/android/gradle.properties
           grep -q "android.enableJetifier=true" admin_app/android/gradle.properties || echo "android.enableJetifier=true" >> admin_app/android/gradle.properties
           grep -q "kotlin.jvm.target.validation.mode = IGNORE" admin_app/android/gradle.properties || echo "kotlin.jvm.target.validation.mode = IGNORE" >> admin_app/android/gradle.properties
-          
+
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' admin_app/android/app/src/main/AndroidManifest.xml
-          sed -i 's/<application/<application android:requestLegacyExternalStorage="true" tools:replace="android:label"/' admin_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:usesCleartextTraffic="true" android:requestLegacyExternalStorage="true" tools:replace="android:label"/' admin_app/android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="admin_app"/android:label="Platinum Staff Hub"/g' admin_app/android/app/src/main/AndroidManifest.xml
-          grep -q "android.permission.CAMERA" admin_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' admin_app/android/app/src/main/AndroidManifest.xml
-          
+          grep -q "android.permission.CAMERA" admin_app/android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.CAMERA"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.BLUETOOTH"\/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"\/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\/>' admin_app/android/app/src/main/AndroidManifest.xml
+
           cat > admin_app/android/app/build.gradle << 'EOF'
           plugins {
               id "com.android.application"
               id "kotlin-android"
               id "dev.flutter.flutter-gradle-plugin"
-              id "com.google.gms.google-services"
           }
           android {
               namespace = "com.platinum.admin_app"
@@ -1843,7 +2153,7 @@ jobs:
           EOF
 
           cd admin_app
-          
+
           cat > pubspec.yaml << 'EOF'
           name: admin_app
           description: "Platinum Staff Hub"
@@ -1860,6 +2170,7 @@ jobs:
             image_picker: ^1.1.2
             google_fonts: ^6.2.1
             firebase_core: ^3.1.0
+            firebase_auth: ^5.1.0
             cloud_firestore: ^5.0.1
             google_mlkit_text_recognition: 0.13.0
             file_picker: 8.1.6
@@ -1889,10 +2200,11 @@ jobs:
               icon_background_color: "#0B0F19"
           EOF
 
-          # --- ADMIN DART CODE ---
+          # --- ADMIN DART CODE (the two files below are superseded by the "Apply admin fixes" step) ---
           cat > lib/main.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:firebase_core/firebase_core.dart';
+          import 'package:firebase_auth/firebase_auth.dart';
           import 'package:google_fonts/google_fonts.dart';
           import 'services/db.dart';
           import 'screens/login.dart';
@@ -1901,6 +2213,9 @@ jobs:
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
             await Firebase.initializeApp(options: const FirebaseOptions(apiKey: "AIzaSyDl-dfyyRT9kdxJOCm4ZM6QYmnY1cgXI0M", appId: "1:374715668746:android:234cb73082daea324342f3", messagingSenderId: "374715668746", projectId: "payment-sas", storageBucket: "payment-sas.firebasestorage.app"));
+            if (FirebaseAuth.instance.currentUser == null) {
+              await FirebaseAuth.instance.signInAnonymously();
+            }
             runApp(const AdminApp());
           }
 
@@ -1917,7 +2232,10 @@ jobs:
                   scaffoldBackgroundColor: const Color(0xFF0B0F19),
                   useMaterial3: true,
                   textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
-                  appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true),
+                  appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true, scrolledUnderElevation: 0),
+                  cardTheme: CardThemeData(color: Color(0xFF131A26), elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
+                  inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: Color(0xFF131A26), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5))),
+                  elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black)),
                 ),
                 home: const Start()
               );
@@ -2055,13 +2373,22 @@ jobs:
           import 'manage_clubs.dart';
           import 'release_reports.dart';
           import 'enter_marks.dart';
+          import 'settings.dart';
 
           class Dashboard extends StatelessWidget {
             const Dashboard({super.key});
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Staff Dashboard', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)))),
+                appBar: AppBar(
+                  title: const Text('Staff Dashboard', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.settings, color: Color(0xFFD4AF37)),
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                    )
+                  ],
+                ),
                 body: SingleChildScrollView(
                   child: Column(
                     children: [
@@ -2079,7 +2406,7 @@ jobs:
                             SizedBox(width: 12), 
                             Expanded(
                               child: Text(
-                                'Biology marks submitted. All marks viable.', 
+                                'System Online. All services active.', 
                                 style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)
                               )
                             )
@@ -2130,10 +2457,81 @@ jobs:
           }
           EOF
 
+          cat > lib/screens/settings.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import '../services/db.dart';
+          import 'login.dart';
+
+          class SettingsScreen extends StatelessWidget {
+            const SettingsScreen({super.key});
+
+            Future<void> _changePin(BuildContext context) async {
+              final p = TextEditingController();
+              showDialog(
+                context: context,
+                builder: (c) => AlertDialog(
+                  backgroundColor: const Color(0xFF131A26),
+                  title: const Text('Change Your PIN', style: TextStyle(color: Colors.white)),
+                  content: TextField(
+                    controller: p,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(labelText: 'New PIN', border: OutlineInputBorder()),
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37)),
+                      onPressed: () async {
+                        if (p.text.length >= 4) {
+                          final db = await DB.instance.db;
+                          final res = await db.query('staff', where: 'role = ?', whereArgs: ['super'], limit: 1);
+                          if (res.isNotEmpty) {
+                            await db.update('staff', {'pin': p.text}, where: 'id = ?', whereArgs: [res.first['id']]);
+                            if (context.mounted) {
+                              Navigator.pop(c);
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PIN Updated Successfully!'), backgroundColor: Colors.green));
+                            }
+                          }
+                        }
+                      },
+                      child: const Text('Save', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    )
+                  ]
+                )
+              );
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Settings')),
+                body: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.lock, color: Color(0xFFD4AF37)),
+                      title: const Text('Change Super Admin PIN'),
+                      onTap: () => _changePin(context),
+                      trailing: const Icon(Icons.chevron_right),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.redAccent),
+                      title: const Text('Log Out'),
+                      onTap: () {
+                        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
+                      },
+                    )
+                  ],
+                ),
+              );
+            }
+          }
+          EOF
+
           cat > lib/screens/enter_marks.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'dart:math';
 
           class EnterMarksScreen extends StatefulWidget {
             const EnterMarksScreen({super.key});
@@ -2141,78 +2539,62 @@ jobs:
             State<EnterMarksScreen> createState() => _EnterMarksScreenState();
           }
           class _EnterMarksScreenState extends State<EnterMarksScreen> {
-            final _name = TextEditingController();
+            String? _selectedStudentCode;
+            String? _selectedStudentName;
             final _classLevel = TextEditingController();
             final _term = TextEditingController();
             final _math = TextEditingController();
             final _eng = TextEditingController();
             final _sci = TextEditingController();
-            
             bool _loading = false;
 
-            String _generateCode() {
-              const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-              final rand = Random();
-              return List.generate(6, (index) => chars[rand.nextInt(chars.length)]).join();
-            }
-
             Future<void> _submit() async {
-              if (_name.text.isEmpty || _classLevel.text.isEmpty) return;
+              if (_selectedStudentCode == null || _classLevel.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a student and enter class.')));
+                return;
+              }
               setState(() => _loading = true);
-
-              int mathScore = int.tryParse(_math.text) ?? 0;
-              int engScore = int.tryParse(_eng.text) ?? 0;
-              int sciScore = int.tryParse(_sci.text) ?? 0;
-              int total = mathScore + engScore + sciScore;
-              int average = total ~/ 3;
-              
-              String unitCode = _generateCode();
-
+              final mathScore = int.tryParse(_math.text);
+              final engScore = int.tryParse(_eng.text);
+              final sciScore = int.tryParse(_sci.text);
+              if ([mathScore, engScore, sciScore].any((v) => v == null || v < 0 || v > 100)) {
+                if (mounted) {
+                  setState(() => _loading = false);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Scores must be whole numbers from 0 to 100.')));
+                }
+                return;
+              }
+              final math = mathScore!;
+              final eng = engScore!;
+              final sci = sciScore!;
+              final total = math + eng + sci;
+              final average = total ~/ 3;
+              try {
               await FirebaseFirestore.instance.collection('marks').add({
-                'studentName': _name.text.trim(),
+                'unitCode': _selectedStudentCode,
+                'firstName': _selectedStudentName!.split(' ')[0],
+                'lastName': _selectedStudentName!.split(' ').sublist(1).join(' '),
+                'studentName': _selectedStudentName,
                 'classLevel': _classLevel.text.trim().toUpperCase(),
                 'term': _term.text.isEmpty ? 'Term 1' : _term.text.trim(),
-                'unitCode': unitCode,
                 'subjects': [
-                  {'name': 'Mathematics', 'score': mathScore, 'grade': mathScore > 80 ? 'A' : (mathScore > 60 ? 'B' : 'C')},
-                  {'name': 'English', 'score': engScore, 'grade': engScore > 80 ? 'A' : (engScore > 60 ? 'B' : 'C')},
-                  {'name': 'Science', 'score': sciScore, 'grade': sciScore > 80 ? 'A' : (sciScore > 60 ? 'B' : 'C')},
+                  {'name': 'Mathematics', 'score': math, 'grade': math >= 80 ? 'A' : (math >= 60 ? 'B' : 'C')},
+                  {'name': 'English', 'score': eng, 'grade': eng >= 80 ? 'A' : (eng >= 60 ? 'B' : 'C')},
+                  {'name': 'Science', 'score': sci, 'grade': sci >= 80 ? 'A' : (sci >= 60 ? 'B' : 'C')},
                 ],
                 'total': total,
                 'average': average,
                 'time': FieldValue.serverTimestamp(),
               });
-
               if (mounted) {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: const Color(0xFF131A26),
-                    title: const Text('Report Generated!', style: TextStyle(color: Color(0xFFD4AF37))),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Write down this Unit Code and give it to the student. They will use it to view their marks.'),
-                        const SizedBox(height: 16),
-                        Text(unitCode, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 4)),
-                        const SizedBox(height: 16),
-                        Text('Student: ${_name.text}', style: const TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          Navigator.pop(context);
-                        },
-                        child: const Text('Done', style: TextStyle(color: Color(0xFFD4AF37))),
-                      )
-                    ]
-                  )
-                );
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marks Saved Successfully!'), backgroundColor: Colors.green));
+                Navigator.pop(context);
               }
-              setState(() => _loading = false);
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save marks: $e')));
+              } finally {
+                if (mounted) setState(() => _loading = false);
+              }
             }
 
             @override
@@ -2223,7 +2605,33 @@ jobs:
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      TextField(controller: _name, decoration: const InputDecoration(labelText: 'Student Full Name', border: OutlineInputBorder())),
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('students').snapshots(),
+                        builder: (c, s) {
+                          if (!s.hasData) return const CircularProgressIndicator();
+                          final students = s.data!.docs.map((d) {
+                            final data = d.data() as Map;
+                            return {
+                              'code': data['unitCode'],
+                              'name': '${data['firstName']} ${data['lastName']}',
+                            };
+                          }).toList();
+                          return DropdownButtonFormField<String>(
+                            decoration: const InputDecoration(labelText: 'Select Registered Student', border: OutlineInputBorder()),
+                            value: _selectedStudentCode,
+                            items: students.map((st) => DropdownMenuItem<String>(
+                              value: st['code'] as String,
+                              child: Text(st['name'] as String),
+                            )).toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedStudentCode = val;
+                                _selectedStudentName = students.firstWhere((st) => st['code'] == val)['name'];
+                              });
+                            },
+                          );
+                        }
+                      ),
                       const SizedBox(height: 10),
                       Row(
                         children: [
@@ -2246,7 +2654,7 @@ jobs:
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 16)),
                           onPressed: _loading ? null : _submit,
-                          child: _loading ? const CircularProgressIndicator(color: Colors.black) : const Text('Generate Code & Save', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          child: _loading ? const CircularProgressIndicator(color: Colors.black) : const Text('Save Marks', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
                       )
                     ]
@@ -2292,7 +2700,7 @@ jobs:
               );
               try { await JitsiMeet().join(options); } catch (e) { debugPrint('Err'); }
             }
-            
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
@@ -2436,7 +2844,6 @@ jobs:
                               final clubId = s.data!.docs[i].id;
                               final clubName = d['name'] ?? 'Unnamed';
                               final head = d['head'] ?? 'None';
-                              
                               return Card(
                                 color: const Color(0xFF131A26),
                                 child: ListTile(
@@ -2757,6 +3164,340 @@ jobs:
           }
           EOF
 
+      # ────────────────────────────────────────────────────────────────
+      # FIX 2: overwrite enter_marks.dart and admin_chat.dart with the
+      #        null-safe versions. Also ensure url_launcher is in pubspec.
+      # ────────────────────────────────────────────────────────────────
+      - name: Apply admin fixes (null-safe marks + chat)
+        run: |
+          cd admin_app
+          # Ensure url_launcher dependency exists (admin_chat.dart imports it).
+          if ! grep -q "url_launcher:" pubspec.yaml; then
+            sed -i '/^  firebase_storage:/a\  url_launcher: ^6.3.0' pubspec.yaml
+          fi
+
+          cat > lib/screens/enter_marks.dart << 'EOF_MARKS'
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:flutter/material.dart';
+
+          const _gold = Color(0xFFD4AF37);
+
+          class EnterMarksScreen extends StatefulWidget {
+            const EnterMarksScreen({super.key});
+            @override
+            State<EnterMarksScreen> createState() => _EnterMarksScreenState();
+          }
+
+          class _EnterMarksScreenState extends State<EnterMarksScreen> {
+            String? _selectedStudentCode;
+            String? _selectedStudentName;
+            final _classLevel = TextEditingController();
+            final _term = TextEditingController();
+            final _math = TextEditingController();
+            final _eng = TextEditingController();
+            final _sci = TextEditingController();
+            bool _loading = false;
+
+            @override
+            void dispose() {
+              _classLevel.dispose(); _term.dispose(); _math.dispose(); _eng.dispose(); _sci.dispose();
+              super.dispose();
+            }
+
+            Future<void> _submit() async {
+              if (_selectedStudentCode == null || _selectedStudentName == null) { _toast('Please select a student.'); return; }
+              final classLevel = _classLevel.text.trim().toUpperCase();
+              if (classLevel.isEmpty) { _toast('Please enter the class (for example S4).'); return; }
+              final mathScore = int.tryParse(_math.text.trim());
+              final engScore = int.tryParse(_eng.text.trim());
+              final sciScore = int.tryParse(_sci.text.trim());
+              if ([mathScore, engScore, sciScore].any((v) => v == null || v < 0 || v > 100)) { _toast('All scores must be whole numbers from 0 to 100.'); return; }
+              final math = mathScore!; final eng = engScore!; final sci = sciScore!;
+              final total = math + eng + sci;
+              final average = total ~/ 3;
+              final nameParts = _selectedStudentName!.split(RegExp(r'\s+'));
+              final firstName = nameParts.first;
+              final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+              setState(() => _loading = true);
+              try {
+                await FirebaseFirestore.instance.collection('marks').add({
+                  'unitCode': _selectedStudentCode,
+                  'firstName': firstName,
+                  'lastName': lastName,
+                  'studentName': _selectedStudentName,
+                  'classLevel': classLevel,
+                  'term': _term.text.trim().isEmpty ? 'Term 1' : _term.text.trim(),
+                  'subjects': [
+                    {'name': 'Mathematics', 'score': math, 'grade': _grade(math)},
+                    {'name': 'English', 'score': eng, 'grade': _grade(eng)},
+                    {'name': 'Science', 'score': sci, 'grade': _grade(sci)},
+                  ],
+                  'total': total,
+                  'average': average,
+                  'time': FieldValue.serverTimestamp(),
+                });
+                if (!mounted) return;
+                _toast('Marks saved successfully.', success: true);
+                Navigator.pop(context);
+              } catch (e) {
+                if (mounted) _toast('Could not save marks: $e');
+              } finally {
+                if (mounted) setState(() => _loading = false);
+              }
+            }
+
+            String _grade(int score) => score >= 80 ? 'A' : (score >= 60 ? 'B' : 'C');
+
+            void _toast(String message, {bool success = false}) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: success ? Colors.green : null));
+            }
+
+            @override
+            Widget build(BuildContext context) => Scaffold(
+              appBar: AppBar(title: const Text('Enter Student Marks')),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  _StudentPicker(selectedCode: _selectedStudentCode, onChanged: (code, name) => setState(() { _selectedStudentCode = code; _selectedStudentName = name; })),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: TextField(controller: _classLevel, textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(labelText: 'Class (e.g. S4)'))),
+                    const SizedBox(width: 10),
+                    Expanded(child: TextField(controller: _term, decoration: const InputDecoration(labelText: 'Term (e.g. Term 1)'))),
+                  ]),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 10),
+                  _scoreField(_math, 'Mathematics'),
+                  const SizedBox(height: 10),
+                  _scoreField(_eng, 'English'),
+                  const SizedBox(height: 10),
+                  _scoreField(_sci, 'Science'),
+                  const SizedBox(height: 24),
+                  SizedBox(height: 52, child: ElevatedButton(
+                    onPressed: _loading ? null : _submit,
+                    child: _loading ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2.5)) : const Text('Save Marks', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  )),
+                ]),
+              ),
+            );
+
+            Widget _scoreField(TextEditingController controller, String label) => TextField(controller: controller, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: '$label score (0-100)'));
+          }
+
+          class _StudentPicker extends StatelessWidget {
+            final String? selectedCode;
+            final void Function(String? code, String? name) onChanged;
+            const _StudentPicker({required this.selectedCode, required this.onChanged});
+            @override
+            Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance.collection('students').snapshots(),
+              builder: (context, snap) {
+                if (snap.hasError) return Text('Could not load students: ${snap.error}');
+                if (!snap.hasData) return const LinearProgressIndicator(color: _gold);
+                final students = <Map<String, String>>[];
+                final seen = <String>{};
+                for (final doc in snap.data!.docs) {
+                  final data = doc.data();
+                  final code = (data['unitCode'] ?? '').toString().trim();
+                  if (code.isEmpty || !seen.add(code)) continue;
+                  final first = (data['firstName'] ?? '').toString().trim();
+                  final last = (data['lastName'] ?? '').toString().trim();
+                  final name = [first, last].where((s) => s.isNotEmpty).join(' ');
+                  students.add({'code': code, 'name': name.isEmpty ? code : name});
+                }
+                final exists = selectedCode != null && students.any((s) => s['code'] == selectedCode);
+                if (!exists && selectedCode != null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) => onChanged(null, null));
+                }
+                return DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Select registered student'),
+                  value: exists ? selectedCode : null,
+                  isExpanded: true,
+                  items: students.map((s) => DropdownMenuItem<String>(value: s['code'], child: Text('${s['name']}  ·  ${s['code']}', overflow: TextOverflow.ellipsis))).toList(),
+                  onChanged: (code) {
+                    if (code == null) { onChanged(null, null); return; }
+                    onChanged(code, students.firstWhere((s) => s['code'] == code)['name']);
+                  },
+                );
+              },
+            );
+          }
+          EOF_MARKS
+
+          cat > lib/screens/admin_chat.dart << 'EOF_CHAT'
+          import 'dart:io';
+
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:file_picker/file_picker.dart';
+          import 'package:firebase_storage/firebase_storage.dart';
+          import 'package:flutter/material.dart';
+          import 'package:url_launcher/url_launcher.dart';
+
+          const _gold = Color(0xFFD4AF37);
+          const _card = Color(0xFF131A26);
+          const _bubbleMe = Color(0xFF1A365D);
+
+          class AdminChat extends StatefulWidget {
+            const AdminChat({super.key});
+            @override
+            State<AdminChat> createState() => _AdminChatState();
+          }
+
+          class _AdminChatState extends State<AdminChat> {
+            final _controller = TextEditingController();
+            bool _uploading = false;
+            bool _sending = false;
+
+            @override
+            void dispose() { _controller.dispose(); super.dispose(); }
+
+            Future<void> _sendMedia() async {
+              try {
+                final picked = await FilePicker.platform.pickFiles(type: FileType.any);
+                if (picked == null || picked.files.single.path == null) return;
+                setState(() => _uploading = true);
+                final file = picked.files.single;
+                final ref = FirebaseStorage.instance.ref().child('chat/${DateTime.now().millisecondsSinceEpoch}_${file.name}');
+                await ref.putFile(File(file.path!));
+                final url = await ref.getDownloadURL();
+                await FirebaseFirestore.instance.collection('chats').doc('All').collection('msgs').add({
+                  'sender': 'Admin', 'text': file.name, 'type': 'file', 'url': url, 'fileName': file.name, 'time': FieldValue.serverTimestamp(),
+                });
+              } catch (e) {
+                if (mounted) _toast('Upload failed: $e');
+              } finally {
+                if (mounted) setState(() => _uploading = false);
+              }
+            }
+
+            Future<void> _sendText() async {
+              final text = _controller.text.trim();
+              if (text.isEmpty || _sending) return;
+              _controller.clear();
+              setState(() => _sending = true);
+              try {
+                await FirebaseFirestore.instance.collection('chats').doc('All').collection('msgs').add({
+                  'sender': 'Admin', 'text': text, 'type': 'text', 'time': FieldValue.serverTimestamp(),
+                });
+              } catch (e) {
+                if (mounted) _toast('Send failed: $e');
+              } finally {
+                if (mounted) setState(() => _sending = false);
+              }
+            }
+
+            void _toast(String message) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+            }
+
+            @override
+            Widget build(BuildContext context) => Scaffold(
+              appBar: AppBar(title: const Text('School Chat')),
+              body: Column(children: [
+                if (_uploading) const LinearProgressIndicator(color: _gold, minHeight: 2),
+                Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance.collection('chats').doc('All').collection('msgs').orderBy('time', descending: false).snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) return Center(child: Padding(padding: const EdgeInsets.all(16), child: Text('Could not load messages: ${snapshot.error}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.orangeAccent))));
+                    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: _gold));
+                    final docs = snapshot.data!.docs;
+                    if (docs.isEmpty) return const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.grey)));
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: docs.length,
+                      itemBuilder: (context, i) => _Bubble(data: docs[i].data(), isMe: (docs[i].data()['sender'] ?? '') == 'Admin'),
+                    );
+                  },
+                )),
+                SafeArea(child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                  child: Row(children: [
+                    IconButton(icon: const Icon(Icons.attach_file, color: _gold), onPressed: _uploading ? null : _sendMedia),
+                    Expanded(child: TextField(
+                      controller: _controller,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendText(),
+                      decoration: InputDecoration(hintText: 'Broadcast...', hintStyle: const TextStyle(color: Colors.grey), filled: true, fillColor: _card, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)),
+                    )),
+                    const SizedBox(width: 8),
+                    CircleAvatar(backgroundColor: _gold, child: IconButton(icon: const Icon(Icons.send, color: Colors.black, size: 20), onPressed: _sending ? null : _sendText)),
+                  ]),
+                )),
+              ]),
+            );
+          }
+
+          class _Bubble extends StatelessWidget {
+            final Map<String, dynamic> data;
+            final bool isMe;
+            const _Bubble({required this.data, required this.isMe});
+
+            @override
+            Widget build(BuildContext context) {
+              final rawText = (data['text'] ?? '').toString();
+              final type = (data['type'] ?? 'text').toString();
+              final url = (data['url'] ?? '').toString();
+              final fileName = (data['fileName'] ?? '').toString();
+              String body = rawText;
+              if (body.isEmpty) {
+                body = type == 'image' ? 'Image' : (type == 'video' ? 'Video' : (type == 'audio' ? 'Audio' : 'Attachment'));
+              }
+              Widget content;
+              if (url.isNotEmpty && ['file','doc','image','video','audio'].contains(type)) {
+                content = InkWell(
+                  onTap: () async {
+                    try {
+                      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                    } catch (e) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open attachment: $e')));
+                    }
+                  },
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.attachment, color: _gold, size: 18),
+                    const SizedBox(width: 8),
+                    Flexible(child: Text(fileName.isNotEmpty ? fileName : body, style: const TextStyle(color: Colors.lightBlueAccent, decoration: TextDecoration.underline), overflow: TextOverflow.ellipsis)),
+                  ]),
+                );
+              } else {
+                content = Text(body, style: const TextStyle(color: Colors.white));
+              }
+              return Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  decoration: BoxDecoration(
+                    color: isMe ? _bubbleMe : _card,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
+                      bottomRight: isMe ? Radius.zero : const Radius.circular(16),
+                    ),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    if (!isMe) Padding(padding: const EdgeInsets.only(bottom: 4), child: Text((data['sender'] ?? '?').toString(), style: const TextStyle(fontSize: 11, color: _gold, fontWeight: FontWeight.bold))),
+                    content,
+                    Padding(padding: const EdgeInsets.only(top: 4), child: Text(_formatTime(data['time']), style: const TextStyle(fontSize: 10, color: Colors.grey))),
+                  ]),
+                ),
+              );
+            }
+
+            String _formatTime(dynamic t) {
+              if (t is Timestamp) {
+                final d = t.toDate();
+                return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+              }
+              return '';
+            }
+          }
+          EOF_CHAT
+
       - name: Decode Google Services JSON (Admin)
         run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | tr -d '[:space:]' | base64 -d > admin_app/android/app/google-services.json
 
@@ -2765,12 +3506,15 @@ jobs:
           cd admin_app
           flutter clean
           flutter pub get
+          # FIX 3: fail the build on real errors, not on lint suggestions.
+          flutter analyze --no-fatal-warnings --no-fatal-infos
           flutter pub run flutter_launcher_icons
           flutter pub run flutter_native_splash:create
           flutter build apk --release --no-tree-shake-icons
 
       - name: Create Release (Staff OTA)
-        uses: softprops/action-gh-release@v1
+        # FIX 4: v2 (v1 is deprecated)
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: staff-v1.0.${{ github.run_number }}
           name: Platinum Staff Hub v1.0.${{ github.run_number }}
