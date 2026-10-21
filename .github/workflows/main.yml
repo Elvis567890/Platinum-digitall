@@ -256,7 +256,7 @@ jobs:
                   textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
                   appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true, scrolledUnderElevation: 0),
                   cardTheme: const CardTheme(color: Color(0xFF131A26), elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
-                  inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: Color(0xFF131A26), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5))),
+                  inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: const Color(0xFF131A26), border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5))),
                   elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black)),
                   bottomNavigationBarTheme: const BottomNavigationBarThemeData(
                     backgroundColor: Color(0xFF131A26),
@@ -1484,8 +1484,30 @@ jobs:
             Widget build(BuildContext context) => DefaultTabController(
               length: 6,
               child: Scaffold(
-                appBar: AppBar(title: const Text('School Centre', style: TextStyle(color: gold, fontWeight: FontWeight.bold)), bottom: const TabBar(isScrollable: true, tabs: [Tab(text: 'Overview'), Tab(text: 'Attendance'), Tab(text: 'Timetable'), Tab(text: 'Work'), Tab(text: 'Alerts'), Tab(text: 'Family')])),
-                body: TabBarView(children: [_overview(), _attendance(), _timetable(), _work(), _alerts(), _family(context)]),
+                appBar: AppBar(
+                  title: const Text('School Centre', style: TextStyle(color: gold, fontWeight: FontWeight.bold)),
+                  bottom: const TabBar(
+                    isScrollable: true,
+                    tabs: [
+                      Tab(text: 'Overview'),
+                      Tab(text: 'Attendance'),
+                      Tab(text: 'Timetable'),
+                      Tab(text: 'Work'),
+                      Tab(text: 'Alerts'),
+                      Tab(text: 'Family'),
+                    ],
+                  ),
+                ),
+                body: TabBarView(
+                  children: [
+                    _overview(),
+                    _attendance(),
+                    _timetable(),
+                    _work(),
+                    _alerts(),
+                    _family(context),
+                  ],
+                ),
               ),
             );
 
@@ -1495,33 +1517,161 @@ jobs:
                 final docs = s.data?.docs ?? [];
                 final averages = docs.map((d) => ((d.data()['average'] as num?) ?? 0).toDouble()).toList();
                 final average = averages.isEmpty ? 0 : averages.reduce((a, b) => a + b) / averages.length;
-                return ListView(padding: const EdgeInsets.all(16), children: [
-                  const Text('Your academic overview', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  Row(children: [_metric('Average', '${average.toStringAsFixed(0)}%', Icons.insights), _metric('Reports', '${docs.length}', Icons.description)]),
-                  const SizedBox(height: 16),
-                  _panel('Quick actions', [
-                    ListTile(leading: const Icon(Icons.payment, color: gold), title: const Text('Fees and receipts'), subtitle: const Text('View balance and open the configured checkout'), onTap: () => _fees()),
-                    ListTile(leading: const Icon(Icons.analytics, color: gold), title: const Text('Performance history'), subtitle: const Text('Review results across terms'), onTap: () {}),
-                  ]),
-                ]);
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const Text('Your academic overview', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        _metric('Average', '${average.toStringAsFixed(0)}%', Icons.insights),
+                        _metric('Reports', '${docs.length}', Icons.description),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _panel('Quick actions', [
+                      ListTile(
+                        leading: const Icon(Icons.payment, color: gold),
+                        title: const Text('Fees and receipts'),
+                        subtitle: const Text('View balance and open the configured checkout'),
+                        onTap: () => _fees(),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.analytics, color: gold),
+                        title: const Text('Performance history'),
+                        subtitle: const Text('Review results across terms'),
+                        onTap: () {},
+                      ),
+                    ]),
+                  ],
+                );
               },
             );
 
-            Widget _attendance() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: ProFeatures.instance.attendance(unitCode), builder: (_, s) {
-              final docs = s.data?.docs ?? [];
-              final present = docs.where((d) => d.data()['status'] == 'present').length;
-              final percent = docs.isEmpty ? 0 : (present * 100 ~/ docs.length);
-              return ListView(padding: const EdgeInsets.all(16), children: [_summary('Attendance', '$percent%', 'Present $present of ${docs.length} recorded days'), ...docs.map((d) { final x=d.data(); return Card(child: ListTile(leading: Icon(x['status']=='present' ? Icons.check_circle : Icons.warning, color: x['status']=='present' ? Colors.green : Colors.orange), title: Text(x['subject']?.toString() ?? 'School day'), subtitle: Text(x['date']?.toString() ?? ''), trailing: Text(x['status']?.toString() ?? '')); })]);
-            });
+            Widget _attendance() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: ProFeatures.instance.attendance(unitCode),
+              builder: (_, s) {
+                final docs = s.data?.docs ?? [];
+                final present = docs.where((d) => d.data()['status'] == 'present').length;
+                final percent = docs.isEmpty ? 0 : (present * 100 ~/ docs.length);
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _summary('Attendance', '$percent%', 'Present $present of ${docs.length} recorded days'),
+                    ...docs.map((d) {
+                      final x = d.data();
+                      return Card(
+                        child: ListTile(
+                          leading: Icon(
+                            x['status'] == 'present' ? Icons.check_circle : Icons.warning,
+                            color: x['status'] == 'present' ? Colors.green : Colors.orange,
+                          ),
+                          title: Text(x['subject']?.toString() ?? 'School day'),
+                          subtitle: Text(x['date']?.toString() ?? ''),
+                          trailing: Text(x['status']?.toString() ?? ''),
+                        ),
+                      );
+                    }),
+                  ],
+                );
+              },
+            );
 
-            Widget _timetable() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: ProFeatures.instance.timetable('S4'), builder: (_, s) => ListView(padding: const EdgeInsets.all(16), children: [const Text('Class timetable', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), const SizedBox(height: 12), ...(s.data?.docs ?? []).map((d) { final x=d.data(); return Card(child: ListTile(leading: const Icon(Icons.schedule, color: gold), title: Text(x['subject']?.toString() ?? 'Lesson'), subtitle: Text('${x['day'] ?? ''} • ${x['room'] ?? ''}'), trailing: Text('${x['startTime'] ?? ''}–${x['endTime'] ?? ''}')); })]));
+            Widget _timetable() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: ProFeatures.instance.timetable('S4'),
+              builder: (_, s) => ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const Text('Class timetable', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  ...(s.data?.docs ?? []).map((d) {
+                    final x = d.data();
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.schedule, color: gold),
+                        title: Text(x['subject']?.toString() ?? 'Lesson'),
+                        subtitle: Text("${x['day'] ?? ''} • ${x['room'] ?? ''}"),
+                        trailing: Text("${x['startTime'] ?? ''}–${x['endTime'] ?? ''}"),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
 
-            Widget _work() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: ProFeatures.instance.assignments('S4'), builder: (_, s) => ListView(padding: const EdgeInsets.all(16), children: [const Text('Assignments and deadlines', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), const SizedBox(height: 12), ...(s.data?.docs ?? []).map((d) { final x=d.data(); return Card(child: ListTile(leading: const Icon(Icons.assignment, color: gold), title: Text(x['title']?.toString() ?? 'Assignment'), subtitle: Text(x['subject']?.toString() ?? ''), trailing: Text(x['dueAt']?.toString() ?? '')); })]));
+            Widget _work() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: ProFeatures.instance.assignments('S4'),
+              builder: (_, s) => ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const Text('Assignments and deadlines', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  ...(s.data?.docs ?? []).map((d) {
+                    final x = d.data();
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.assignment, color: gold),
+                        title: Text(x['title']?.toString() ?? 'Assignment'),
+                        subtitle: Text(x['subject']?.toString() ?? ''),
+                        trailing: Text(x['dueAt']?.toString() ?? ''),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
 
-            Widget _alerts() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: ProFeatures.instance.notifications(unitCode), builder: (_, s) => ListView(padding: const EdgeInsets.all(16), children: [const Text('Notifications', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), const SizedBox(height: 12), ...(s.data?.docs ?? []).map((d) { final x=d.data(); return Card(child: ListTile(leading: const Icon(Icons.notifications, color: gold), title: Text(x['title']?.toString() ?? 'School update'), subtitle: Text(x['body']?.toString() ?? '')); })]));
+            Widget _alerts() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: ProFeatures.instance.notifications(unitCode),
+              builder: (_, s) => ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const Text('Notifications', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  ...(s.data?.docs ?? []).map((d) {
+                    final x = d.data();
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.notifications, color: gold),
+                        title: Text(x['title']?.toString() ?? 'School update'),
+                        subtitle: Text(x['body']?.toString() ?? ''),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
 
-            Widget _family(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [_panel('Parent / guardian access', [const ListTile(leading: Icon(Icons.family_restroom, color: gold), title: Text('Link a guardian'), subtitle: Text('A guardian can view attendance, grades, announcements, and fees.'),), ElevatedButton.icon(onPressed: () => showDialog(context: context, builder: (_) => const AlertDialog(title: Text('Guardian linking'), content: Text('Ask the school office to link a verified guardian account to this student.'))), icon: const Icon(Icons.person_add), label: const Text('Request guardian link'))]), _panel('Safety and privacy', [const ListTile(leading: Icon(Icons.security, color: gold), title: Text('Account security'), subtitle: Text('Use verified authentication and keep your recovery details current.'))])]);
+            Widget _family(BuildContext context) => ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _panel('Parent / guardian access', [
+                  const ListTile(
+                    leading: Icon(Icons.family_restroom, color: gold),
+                    title: Text('Link a guardian'),
+                    subtitle: Text('A guardian can view attendance, grades, announcements, and fees.'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => showDialog(
+                      context: context,
+                      builder: (_) => const AlertDialog(
+                        title: Text('Guardian linking'),
+                        content: Text('Ask the school office to link a verified guardian account to this student.'),
+                      ),
+                    ),
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('Request guardian link'),
+                  ),
+                ]),
+                _panel('Safety and privacy', [
+                  const ListTile(
+                    leading: Icon(Icons.security, color: gold),
+                    title: Text('Account security'),
+                    subtitle: Text('Use verified authentication and keep your recovery details current.'),
+                  ),
+                ]),
+              ],
+            );
 
             Future<void> _fees() async {
               final snap = await FirebaseFirestore.instance.collection('payment_settings').doc('default').get();
@@ -1529,9 +1679,52 @@ jobs:
               if (url != null) await ProFeatures.instance.openPayment(url);
             }
 
-            Widget _metric(String label, String value, IconData icon) => Expanded(child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: gold), const SizedBox(height: 12), Text(value, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)), Text(label, style: const TextStyle(color: Colors.grey))]))));
-            Widget _summary(String title, String value, String caption) => Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.grey)), Text(value, style: const TextStyle(fontSize: 34, color: gold, fontWeight: FontWeight.bold)), Text(caption)])));
-            Widget _panel(String title, List<Widget> children) => Card(child: Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Padding(padding: const EdgeInsets.all(8), child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17))), ...children])));
+            Widget _metric(String label, String value, IconData icon) => Expanded(
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(icon, color: gold),
+                      const SizedBox(height: 12),
+                      Text(value, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+                      Text(label, style: const TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ),
+            );
+
+            Widget _summary(String title, String value, String caption) => Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.grey)),
+                    Text(value, style: const TextStyle(fontSize: 34, color: gold, fontWeight: FontWeight.bold)),
+                    Text(caption),
+                  ],
+                ),
+              ),
+            );
+
+            Widget _panel(String title, List<Widget> children) => Card(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                    ),
+                    ...children,
+                  ],
+                ),
+              ),
+            );
           }
           EOF
 
@@ -2285,7 +2478,7 @@ jobs:
               icon_background_color: "#0B0F19"
           EOF
 
-          # --- ADMIN DART CODE ---
+          # --- ADMIN DART CODE (main.dart is superseded by the safe bootstrap step below) ---
           cat > lib/main.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:firebase_core/firebase_core.dart';
@@ -2319,7 +2512,7 @@ jobs:
                   textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
                   appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true, scrolledUnderElevation: 0),
                   cardTheme: const CardTheme(color: Color(0xFF131A26), elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
-                  inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: Color(0xFF131A26), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5))),
+                  inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: const Color(0xFF131A26), border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5))),
                   elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black)),
                 ),
                 home: const Start()
@@ -3249,12 +3442,130 @@ jobs:
           }
           EOF
 
-      - name: Apply admin fixes (null-safe marks + chat)
+      - name: Apply admin fixes (safe bootstrap + null-safe marks + chat)
         run: |
           cd admin_app
           if ! grep -q "url_launcher:" pubspec.yaml; then
             sed -i '/^  firebase_storage:/a\  url_launcher: ^6.3.0' pubspec.yaml
           fi
+
+          cat > lib/main.dart << 'EOF_MAIN'
+          import 'package:flutter/material.dart';
+          import 'package:firebase_core/firebase_core.dart';
+          import 'package:firebase_auth/firebase_auth.dart';
+          import 'package:google_fonts/google_fonts.dart';
+          import 'services/db.dart';
+          import 'screens/login.dart';
+          import 'screens/setup.dart';
+
+          void main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+            try {
+              await Firebase.initializeApp(
+                options: const FirebaseOptions(
+                  apiKey: "AIzaSyDl-dfyyRT9kdxJOCm4ZM6QYmnY1cgXI0M",
+                  appId: "1:374715668746:android:234cb73082daea324342f3",
+                  messagingSenderId: "374715668746",
+                  projectId: "payment-sas",
+                  storageBucket: "payment-sas.firebasestorage.app"
+                ),
+              );
+              if (FirebaseAuth.instance.currentUser == null) {
+                await FirebaseAuth.instance.signInAnonymously();
+              }
+              runApp(const AdminApp());
+            } catch (e) {
+              runApp(BootstrapErrorApp(error: e.toString()));
+            }
+          }
+
+          class BootstrapErrorApp extends StatelessWidget {
+            final String error;
+            const BootstrapErrorApp({super.key, required this.error});
+            @override
+            Widget build(BuildContext context) => MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData.dark(useMaterial3: true),
+              home: Scaffold(
+                backgroundColor: const Color(0xFF0B0F19),
+                body: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.redAccent, size: 64),
+                        const SizedBox(height: 16),
+                        const Text('Could not start the app', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Check your network connection and try again.\n\n$error',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
+                          onPressed: () => main(),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          class AdminApp extends StatelessWidget {
+            const AdminApp({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                title: 'Platinum Staff Hub',
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData(
+                  brightness: Brightness.dark,
+                  primaryColor: const Color(0xFF0B0F19),
+                  scaffoldBackgroundColor: const Color(0xFF0B0F19),
+                  useMaterial3: true,
+                  textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme.apply(bodyColor: Colors.white)),
+                  appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B0F19), elevation: 0, centerTitle: true, scrolledUnderElevation: 0),
+                  cardTheme: const CardTheme(color: Color(0xFF131A26), elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(18)))),
+                  inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: const Color(0xFF131A26), border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none), enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Colors.white12)), focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5))),
+                  elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black)),
+                ),
+                home: const Start()
+              );
+            }
+          }
+
+          class Start extends StatefulWidget {
+            const Start({super.key});
+            @override
+            State<Start> createState() => _StartState();
+          }
+          class _StartState extends State<Start> {
+            @override
+            void initState() {
+              super.initState();
+              _go();
+            }
+            void _go() async {
+              try {
+                final db = await DB.instance.db;
+                final r = await db.query('staff', limit: 1);
+                if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => r.isEmpty ? const SetupScreen() : const LoginScreen()));
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Database error: $e')));
+                }
+              }
+            }
+            @override
+            Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))));
+          }
+          EOF_MAIN
 
           cat > lib/screens/enter_marks.dart << 'EOF_MARKS'
           import 'package:cloud_firestore/cloud_firestore.dart';
