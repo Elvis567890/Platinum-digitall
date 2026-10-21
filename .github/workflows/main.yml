@@ -36,7 +36,6 @@ jobs:
             mkdir -p student_app/lib/screens student_app/lib/services
           fi
 
-          # --- REAL LOGO PROCESSING (Student) ---
           if [ -f "InShot_20261017_024714317.jpg" ]; then
             convert InShot_20261017_024714317.jpg -fuzz 5% -transparent white -resize 850x850 -background "#FFFFFF" -gravity center -extent 1024x1024 student_app/assets/logo.png
           elif [ ! -f "student_app/assets/logo.png" ]; then
@@ -356,7 +355,6 @@ jobs:
           }
           EOF
 
-          # --- LOGIN (ONLY ASKS FOR UNIT CODE) ---
           cat > lib/screens/login.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -515,7 +513,6 @@ jobs:
           }
           EOF
 
-          # --- FEED ---
           cat > lib/screens/feed.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -829,7 +826,6 @@ jobs:
           }
           EOF
 
-          # --- STUDY HUB (SIMPLIFIED: ONLY LIVE CLASSES & LIBRARY) ---
           cat > lib/screens/study.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:video_player/video_player.dart';
@@ -1107,7 +1103,6 @@ jobs:
           }
           EOF
 
-          # --- PROFILE & REPORTS (FEE RECEIPTS) ---
           cat > lib/screens/profile.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1682,7 +1677,7 @@ jobs:
           flutter pub get
           flutter pub run flutter_launcher_icons
           flutter pub run flutter_native_splash:create
-          flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
+          flutter build apk --release --no-tree-shake-icons --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
 
       - name: Create Release (OTA)
         uses: softprops/action-gh-release@v1
@@ -1724,7 +1719,6 @@ jobs:
             mkdir -p admin_app/lib/screens admin_app/lib/services
           fi
           
-          # --- REAL LOGO PROCESSING (Staff) ---
           if [ -f "InShot_20261017_024714317.jpg" ]; then
             convert InShot_20261017_024714317.jpg -fuzz 5% -transparent white -resize 800x800 -background "#0B0F19" -gravity center -extent 1024x1024 admin_app/assets/logo.png
           elif [ ! -f "admin_app/assets/logo.png" ]; then
@@ -2074,8 +2068,23 @@ jobs:
                       Container(
                         margin: const EdgeInsets.all(16),
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green)),
-                        child: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 12), Expanded(child: Text('Biology marks submitted. All marks viable.', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))])
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1), 
+                          borderRadius: BorderRadius.circular(12), 
+                          border: Border.all(color: Colors.green)
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.green), 
+                            SizedBox(width: 12), 
+                            Expanded(
+                              child: Text(
+                                'Biology marks submitted. All marks viable.', 
+                                style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)
+                              )
+                            )
+                          ]
+                        )
                       ),
                       GridView.count(
                         shrinkWrap: true,
@@ -2121,7 +2130,6 @@ jobs:
           }
           EOF
 
-          # --- ENTER MARKS (GENERATES UNIT CODE) ---
           cat > lib/screens/enter_marks.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -2759,7 +2767,7 @@ jobs:
           flutter pub get
           flutter pub run flutter_launcher_icons
           flutter pub run flutter_native_splash:create
-          flutter build apk --release
+          flutter build apk --release --no-tree-shake-icons
 
       - name: Create Release (Staff OTA)
         uses: softprops/action-gh-release@v1
