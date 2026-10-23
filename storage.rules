@@ -1,0 +1,15 @@
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Default: deny all uploads and downloads.
+    // Add authenticated, size-limited rules for approved media
+    // only after the user and staff authorization system is ready.
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
