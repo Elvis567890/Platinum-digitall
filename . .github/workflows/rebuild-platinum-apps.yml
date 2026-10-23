@@ -1,0 +1,69 @@
+
+name: Build Platinum Digital and Staff Apps
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.app.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - name: Platinum Digital App
+            directory: student_app
+          - name: Platinum Staff App
+            directory: staff_app
+
+    steps:
+      - name: Get source code
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Check app files
+        run: |
+          test -f "${{ matrix.app.directory }}/pubspec.yaml"
+          test -f "${{ matrix.app.directory }}/lib/main.dart"
+
+      - name: Generate Android project
+        working-directory: ${{ matrix.app.directory }}
+        run: flutter create --platforms=android .
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.app.directory }}
+        run: flutter pub get
+
+      - name: Analyze Flutter code
+        working-directory: ${{ matrix.app.directory }}
+        run: flutter analyze
+
+      - name: Build release APK
+        working-directory: ${{ matrix.app.directory }}
+        run: flutter build apk --release
+
+      - name: Save APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app.name }}-APK
+          path: ${{ matrix.app.directory }}/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
