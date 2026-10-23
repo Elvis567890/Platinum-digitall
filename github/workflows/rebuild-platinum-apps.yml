@@ -1,0 +1,17 @@
+
+      - name: Check required backend files
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Checking backend files..."
+          for f in firebase.json firestore.rules storage.rules functions/package.json functions/index.js; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Missing required file: $f"
+              echo "Repository root:"
+              ls -la
+              echo "Functions folder:"
+              ls -la functions 2>/dev/null || true
+              exit 1
+            fi
+            echo "Found: $f"
+          done
