@@ -13,7 +13,7 @@ jobs:
   # JOB 1: STUDENT APP
   # ==========================================
   build-student:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install ImageMagick
@@ -783,7 +783,7 @@ jobs:
   # JOB 2: ADMIN APP
   # ==========================================
   build-admin:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install ImageMagick
