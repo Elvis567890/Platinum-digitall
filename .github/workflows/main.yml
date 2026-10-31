@@ -1,4 +1,4 @@
-name: Build Platinum Ecosystem (Final Realistic Production)
+name: Build Platinum Ecosystem (Final Stable Build)
 
 on:
   push:
@@ -13,11 +13,10 @@ jobs:
   # JOB 1: STUDENT APP
   # ==========================================
   build-student:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install ImageMagick
-        run: sudo apt-get update && sudo apt-get install -y imagemagick
+          
       - uses: actions/setup-java@v4
         with: {distribution: 'zulu', java-version: '17'}
       - uses: subosito/flutter-action@v2
@@ -26,7 +25,9 @@ jobs:
       - name: Generate Student App
         run: |
           mkdir -p student_app/assets student_app/lib/screens student_app/android/app/src/main/res/xml
-          convert -size 1024x1024 xc:"#FFFFFF" student_app/assets/logo.png
+          
+          # Base64 image generation (NO CONVERT)
+          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           
           cat > student_app/android/app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.afrinode.platinum">
@@ -106,8 +107,9 @@ jobs:
             google_fonts: ^6.2.1
             shared_preferences: ^2.2.3
             timeago: ^3.7.0
-            share_plus: ^9.0.0
-            file_picker: 8.1.6
+            # STRICTLY LOCKED VERSIONS TO FIX CONFLICT
+            share_plus: 10.1.4
+            file_picker: 10.1.2
             audioplayers: ^6.0.0
             url_launcher: ^6.3.0
             http: ^1.2.1
@@ -117,6 +119,10 @@ jobs:
             open_filex: ^4.5.0
             permission_handler: ^11.3.1
             jitsi_meet_flutter_sdk: 10.3.0
+          
+          dependency_overrides:
+            web: 1.1.1
+
           flutter:
             uses-material-design: true
           EOF
@@ -252,7 +258,13 @@ jobs:
                       int years = DateTime.now().year - (data['enrollmentYear'] as int);
                       int baseClass = int.tryParse(currentClass.replaceAll('S', '')) ?? 1;
                       int newClassInt = baseClass + years;
-                      currentClass = newClassInt > 6 ? 'Omicron' : 'S$newClassInt';
+                      
+                      if (baseClass <= 4) {
+                        currentClass = newClassInt > 4 ? 'Omicron' : 'S$newClassInt';
+                      } else {
+                        currentClass = newClassInt > 6 ? 'Omicron' : 'S$newClassInt';
+                      }
+                      
                       if (currentClass != data['classLevel']) await FirebaseFirestore.instance.collection('students').doc(snap.docs.first.id).update({'classLevel': currentClass});
                     }
                     
@@ -324,7 +336,7 @@ jobs:
             @override
             Widget build(BuildContext context) {
               if (_code.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-              if (_cls == 'Omicron') return const AlumniHub();
+              if (_cls == 'Omicron') return AlumniHub(myCode: _code, myName: _name);
               final pages = [FeedScreen(name: _name), const StudyScreen(), HubScreen(name: _name, code: _code, cls: _cls), InboxScreen(myCode: _code, myName: _name), const AnonymousBoard(), ProfileScreen(code: _code, name: _name)];
               return Scaffold(
                 body: pages[_i],
@@ -339,6 +351,73 @@ jobs:
                     BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile')
                   ]
                 )
+              );
+            }
+          }
+          EOF
+
+          cat > lib/screens/alumni.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'chat.dart';
+
+          class AlumniHub extends StatelessWidget {
+            final String myCode; final String myName;
+            const AlumniHub({super.key, required this.myCode, required this.myName});
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: const Color(0xFF0B0F19),
+                appBar: AppBar(backgroundColor: const Color(0xFF0B0F19), title: const Text('Omicron Network', style: TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold))),
+                body: Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.5))),
+                      child: const Row(children: [
+                        Icon(Icons.workspace_premium, color: Color(0xFFD4AF37), size: 40),
+                        SizedBox(width: 16),
+                        Expanded(child: Text('Welcome to the OGs. This is an exclusive space for Omicron alumni only.', style: TextStyle(color: Colors.white))),
+                      ]),
+                    ),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('students').where('classLevel', isEqualTo: 'Omicron').snapshots(),
+                        builder: (c, s) {
+                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                          final others = s.data!.docs.where((doc) => doc['unitCode'] != myCode).toList();
+                          if (others.isEmpty) return const Center(child: Text('No other Omicron alumni yet.', style: TextStyle(color: Colors.grey)));
+                          
+                          return ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: others.length,
+                            itemBuilder: (c, i) {
+                              final d = others[i].data() as Map<String, dynamic>;
+                              final otherCode = d['unitCode'];
+                              final otherName = d['fullName'] ?? '${d['firstName']} ${d['lastName']}';
+                              return Card(
+                                color: const Color(0xFF131A26), margin: const EdgeInsets.only(bottom: 8),
+                                child: ListTile(
+                                  leading: CircleAvatar(backgroundColor: const Color(0xFFD4AF37), child: Text(d['firstName'][0], style: const TextStyle(color: Colors.white))),
+                                  title: Text(otherName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  subtitle: const Text('Omicron Alumni', style: TextStyle(color: Colors.grey)),
+                                  trailing: const Icon(Icons.chat, color: Color(0xFFD4AF37)),
+                                  onTap: () {
+                                    List<String> codes = [myCode, otherCode];
+                                    codes.sort();
+                                    String dmRoom = 'DM_${codes[0]}_${codes[1]}';
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: dmRoom, userCode: myCode, userName: myName)));
+                                  },
+                                ),
+                              );
+                            },
+                          );
+                        }
+                      ),
+                    )
+                  ],
+                ),
               );
             }
           }
@@ -389,17 +468,6 @@ jobs:
                 ),
               );
             }
-          }
-          EOF
-
-          cat > lib/screens/alumni.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          class AlumniHub extends StatefulWidget { const AlumniHub({super.key}); @override State<AlumniHub> createState() => _AlumniHubState(); }
-          class _AlumniHubState extends State<AlumniHub> {
-            final _c = TextEditingController();
-            void _post() async { if (_c.text.isEmpty) return; await FirebaseFirestore.instance.collection('alumni_feed').add({'text': _c.text.trim(), 'time': FieldValue.serverTimestamp()}); _c.clear(); }
-            @override Widget build(BuildContext context) => Scaffold(backgroundColor: const Color(0xFF0B0F19), appBar: AppBar(backgroundColor: const Color(0xFF0B0F19), title: const Text('Omicron Network', style: TextStyle(color: Color(0xFFD4AF37)))), body: Column(children: [Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('alumni_feed').orderBy('time', descending: true).snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(padding: const EdgeInsets.all(16), itemCount: s.data!.docs.length, itemBuilder: (c, i) => Card(color: const Color(0xFF131A26), child: ListTile(leading: const Icon(Icons.person, color: Color(0xFFD4AF37)), title: Text(s.data!.docs[i]['text'], style: const TextStyle(color: Colors.white))))); })), Padding(padding: const EdgeInsets.all(16), child: Row(children: [Expanded(child: TextField(controller: _c, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Share opportunity...', hintStyle: TextStyle(color: Colors.grey)))), IconButton(icon: const Icon(Icons.send, color: Color(0xFFD4AF37)), onPressed: _post)]))]));
           }
           EOF
 
@@ -706,7 +774,10 @@ jobs:
       - name: Build Student
         run: |
           cd student_app
+          flutter clean
+          rm -f pubspec.lock
           flutter pub get
+          flutter analyze --no-fatal-infos --no-fatal-warnings
           flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
 
       - name: Release Student
@@ -719,9 +790,10 @@ jobs:
   # JOB 2: ADMIN APP
   # ==========================================
   build-admin:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-java@v4
         with: {distribution: 'zulu', java-version: '17'}
       - uses: subosito/flutter-action@v2
@@ -730,7 +802,9 @@ jobs:
       - name: Generate Admin App
         run: |
           mkdir -p admin_app/assets admin_app/lib/screens
-          convert -size 1024x1024 xc:"#0B0F19" admin_app/assets/logo.png
+          
+          # Base64 image generation (NO CONVERT)
+          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
           
           cat > admin_app/android/build.gradle << 'EOF'
           allprojects {
@@ -977,7 +1051,10 @@ jobs:
       - name: Build Admin
         run: |
           cd admin_app
+          flutter clean
+          rm -f pubspec.lock
           flutter pub get
+          flutter analyze --no-fatal-infos --no-fatal-warnings
           flutter build apk --release
 
       - name: Release Admin
