@@ -26,7 +26,7 @@ jobs:
         run: |
           mkdir -p student_app/assets student_app/lib/screens student_app/android/app/src/main/res/xml
           
-          # 【修复1】使用纯 base64 生成 1x1 像素合法 PNG，YAML 中再无 convert 这个词
+          # 使用纯 base64 生成合法 PNG，无需任何系统工具
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           
           cat > student_app/android/app/src/main/AndroidManifest.xml << 'EOF'
@@ -107,7 +107,7 @@ jobs:
             google_fonts: ^6.2.1
             shared_preferences: ^2.2.3
             timeago: ^3.7.0
-            # 【修复2】直接写死绝对兼容的版本号，防止向下寻找引发冲突
+            # 锁定绝对兼容的版本组合
             share_plus: 10.1.4
             file_picker: 10.1.2
             audioplayers: ^6.0.0
@@ -120,7 +120,6 @@ jobs:
             permission_handler: ^11.3.1
             jitsi_meet_flutter_sdk: 10.3.0
           
-          # 强制覆盖 web 依赖
           dependency_overrides:
             web: 1.1.1
 
