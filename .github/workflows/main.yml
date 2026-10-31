@@ -27,6 +27,7 @@ jobs:
           mkdir -p student_app/assets student_app/lib/screens
           mkdir -p student_app/android/app/src/main/res/xml
           mkdir -p student_app/android/app/src/main/kotlin/com/afrinode/platinum
+          mkdir -p student_app/android/gradle/wrapper
           
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           
@@ -69,6 +70,16 @@ jobs:
           </paths>
           EOF
 
+          # 修复点：显式指定 Gradle Wrapper 版本为 8.7
+          cat > student_app/android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-all.zip
+          EOF
+
+          # 修复点：AGP 版本对齐为 8.5.0
           cat > student_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -87,7 +98,7 @@ jobs:
           }
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.7.0" apply false
+              id "com.android.application" version "8.5.0" apply false
               id "org.jetbrains.kotlin.android" version "1.9.24" apply false
           }
           include ":app"
@@ -928,6 +939,7 @@ jobs:
           mkdir -p admin_app/assets admin_app/lib/screens 
           mkdir -p admin_app/android/app/src/main 
           mkdir -p admin_app/android/app/src/main/kotlin/com/afrinode/platinumadmin
+          mkdir -p admin_app/android/gradle/wrapper
           
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
           
@@ -953,6 +965,14 @@ jobs:
           class MainActivity: FlutterActivity() { }
           EOF
 
+          cat > admin_app/android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-all.zip
+          EOF
+
           cat > admin_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -971,7 +991,7 @@ jobs:
           }
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.7.0" apply false
+              id "com.android.application" version "8.5.0" apply false
               id "org.jetbrains.kotlin.android" version "1.9.24" apply false
           }
           include ":app"
