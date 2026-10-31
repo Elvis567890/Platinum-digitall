@@ -29,6 +29,10 @@ jobs:
           mkdir -p student_app/android/app/src/main/kotlin/com/afrinode/platinum
           mkdir -p student_app/android/gradle/wrapper
           
+          # Generate launcher icon (FIX: Missing mipmap resource)
+          mkdir -p student_app/android/app/src/main/res/mipmap-xxxhdpi
+          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           
           cat > student_app/android/app/src/main/AndroidManifest.xml << 'EOF'
@@ -104,10 +108,11 @@ jobs:
           include ":app"
           EOF
 
+          # FIX: Disable Jetifier to avoid ExoPlayer metadata conflict
           cat > student_app/android/gradle.properties << 'EOF'
           org.gradle.jvmargs=-Xmx4G
           android.useAndroidX=true
-          android.enableJetifier=true
+          android.enableJetifier=false
           android.enableResourceShrinker=false
           EOF
 
@@ -125,10 +130,11 @@ jobs:
           tasks.register("clean", Delete) { delete rootProject.buildDir }
           EOF
 
+          # FIX: Update compileSdk to 35
           cat > student_app/android/app/build.gradle << 'EOF'
           plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin" }
           android {
-              namespace = "com.afrinode.platinum"; compileSdk = 34
+              namespace = "com.afrinode.platinum"; compileSdk = 35
               compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = "17" }
               defaultConfig { applicationId = "com.afrinode.platinum"; minSdk = 24; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }
@@ -948,6 +954,10 @@ jobs:
           mkdir -p admin_app/android/app/src/main/kotlin/com/afrinode/platinumadmin
           mkdir -p admin_app/android/gradle/wrapper
           
+          # Generate launcher icon (FIX: Missing mipmap resource)
+          mkdir -p admin_app/android/app/src/main/res/mipmap-xxxhdpi
+          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
           
           cat > admin_app/android/app/src/main/AndroidManifest.xml << 'EOF'
@@ -1006,10 +1016,11 @@ jobs:
           include ":app"
           EOF
 
+          # FIX: Disable Jetifier
           cat > admin_app/android/gradle.properties << 'EOF'
           org.gradle.jvmargs=-Xmx4G
           android.useAndroidX=true
-          android.enableJetifier=true
+          android.enableJetifier=false
           android.enableResourceShrinker=false
           EOF
 
@@ -1027,10 +1038,11 @@ jobs:
           tasks.register("clean", Delete) { delete rootProject.buildDir }
           EOF
 
+          # FIX: Update compileSdk to 35
           cat > admin_app/android/app/build.gradle << 'EOF'
           plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin" }
           android { 
-              namespace = "com.afrinode.platinumadmin"; compileSdk = 34; 
+              namespace = "com.afrinode.platinumadmin"; compileSdk = 35; 
               compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }; 
               kotlinOptions { jvmTarget = "17" }; 
               defaultConfig { applicationId = "com.afrinode.platinumadmin"; minSdk = 24; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }; 
