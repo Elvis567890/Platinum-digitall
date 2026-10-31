@@ -107,7 +107,6 @@ jobs:
             google_fonts: ^6.2.1
             shared_preferences: ^2.2.3
             timeago: ^3.7.0
-            # STRICTLY LOCKED VERSIONS TO FIX CONFLICT
             share_plus: 10.1.4
             file_picker: 10.1.2
             audioplayers: ^6.0.0
@@ -130,6 +129,7 @@ jobs:
           cd student_app
 
           cat > lib/main.dart << 'EOF'
+          import 'dart:io';
           import 'package:flutter/material.dart';
           import 'package:firebase_core/firebase_core.dart';
           import 'package:firebase_auth/firebase_auth.dart';
@@ -476,7 +476,11 @@ jobs:
           import 'package:cloud_firestore/cloud_firestore.dart';
           import 'package:timeago/timeago.dart' as timeago;
           import 'package:shared_preferences/shared_preferences.dart';
-          class AnonymousBoard extends StatefulWidget { const AnonymousBoard({super.key}); @override State<AnonymousBoard> createState() => _AnonymousBoardState(); }
+
+          class AnonymousBoard extends StatefulWidget { 
+            const AnonymousBoard({super.key}); 
+            @override State<AnonymousBoard> createState() => _AnonymousBoardState(); 
+          }
           class _AnonymousBoardState extends State<AnonymousBoard> {
             final _c = TextEditingController();
             void _post() async {
@@ -486,7 +490,57 @@ jobs:
               await FirebaseFirestore.instance.collection('anonymous_posts').add({'text': _c.text.trim(), 'time': FieldValue.serverTimestamp()}); await prefs.setInt('lastAnonPost', now);
               _c.clear(); if (mounted) Navigator.pop(context);
             }
-            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Anonymous Board'), actions: [IconButton(icon: const Icon(Icons.add_circle, color: Color(0xFFD4AF37), size: 30), onPressed: () => showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Confess Anonymously'), const SizedBox(height: 16), TextField(controller: _c, maxLines: 3, decoration: const InputDecoration(hintText: 'No names attached...')), const SizedBox(height: 16), ElevatedButton(onPressed: _post, child: const Text('Post'))])))]), body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('anonymous_posts').orderBy('time', descending: true).snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(padding: const EdgeInsets.all(16), itemCount: s.data!.docs.length, itemBuilder: (c, i) { final d = s.data!.docs[i].data() as Map<String, dynamic>; return Card(margin: const EdgeInsets.only(bottom: 12), child: ListTile(leading: const CircleAvatar(backgroundColor: Colors.black54, child: Icon(Icons.masks, color: Colors.white)), title: Text(d['text'] ?? ''), subtitle: Text(d['time'] != null ? timeago.format((d['time'] as Timestamp).toDate()) : ''))); }); }));
+            
+            @override 
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('Anonymous Board'), 
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.add_circle, color: Color(0xFFD4AF37), size: 30), 
+                      onPressed: () => showModalBottomSheet(
+                        context: context, isScrollControlled: true, 
+                        builder: (ctx) => Padding(
+                          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16), 
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min, 
+                            children: [
+                              const Text('Confess Anonymously'), 
+                              const SizedBox(height: 16), 
+                              TextField(controller: _c, maxLines: 3, decoration: const InputDecoration(hintText: 'No names attached...')), 
+                              const SizedBox(height: 16), 
+                              ElevatedButton(onPressed: _post, child: const Text('Post'))
+                            ]
+                          )
+                        )
+                      )
+                    )
+                  ]
+                ), 
+                body: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('anonymous_posts').orderBy('time', descending: true).snapshots(), 
+                  builder: (c, s) { 
+                    if (!s.hasData) return const Center(child: CircularProgressIndicator()); 
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16), 
+                      itemCount: s.data!.docs.length, 
+                      itemBuilder: (c, i) { 
+                        final d = s.data!.docs[i].data() as Map<String, dynamic>; 
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12), 
+                          child: ListTile(
+                            leading: const CircleAvatar(backgroundColor: Colors.black54, child: Icon(Icons.masks, color: Colors.white)), 
+                            title: Text(d['text'] ?? ''), 
+                            subtitle: Text(d['time'] != null ? timeago.format((d['time'] as Timestamp).toDate()) : '')
+                          )
+                        ); 
+                      }
+                    ); 
+                  }
+                )
+              );
+            }
           }
           EOF
 
@@ -505,7 +559,7 @@ jobs:
             @override State<FeedScreen> createState() => _FeedScreenState();
           }
           class _FeedScreenState extends State<FeedScreen> {
-            bool _posting = false; final _textCtrl = TextEditingController();
+            final _textCtrl = TextEditingController();
 
             Future<void> _createPost() async {
               final type = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(child: Wrap(children: [ListTile(leading: const Icon(Icons.image), title: const Text('Post Image'), onTap: () => Navigator.pop(ctx, 'image')), ListTile(leading: const Icon(Icons.videocam), title: const Text('Post Video'), onTap: () => Navigator.pop(ctx, 'video'))])));
@@ -514,12 +568,11 @@ jobs:
               if (x == null) return;
               if (mounted) {
                 showDialog(context: context, barrierDismissible: false, builder: (ctx) => const Center(child: CircularProgressIndicator()));
-                setState(() => _posting = true);
                 final ref = FirebaseStorage.instance.ref().child('feed/${DateTime.now().millisecondsSinceEpoch}');
                 await ref.putFile(File(x.path));
                 final url = await ref.getDownloadURL();
                 await FirebaseFirestore.instance.collection('feed_posts').add({'author': widget.name, 'authorType': 'student', 'text': _textCtrl.text.trim(), 'mediaUrl': url, 'mediaType': type, 'time': FieldValue.serverTimestamp(), 'likes': 0, 'likedBy': []});
-                _textCtrl.clear(); setState(() => _posting = false); if (mounted) Navigator.pop(context);
+                _textCtrl.clear(); if (mounted) Navigator.pop(context);
               }
             }
 
@@ -594,11 +647,45 @@ jobs:
 
           class PlatinumPlayScreen extends StatelessWidget {
             const PlatinumPlayScreen({super.key});
-            @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.transparent, title: const Text('Platinum PLAY', style: TextStyle(color: Colors.white)), iconTheme: const IconThemeData(color: Colors.white)), extendBodyBehindAppBar: true, body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('feed_posts').where('mediaUrl', isNotEqualTo: null).snapshots(), builder: (context, snapshot) { if (!snapshot.hasData) return const Center(child: CircularProgressIndicator()); final docs = snapshot.data!.docs; if (docs.isEmpty) return const Center(child: Text('No videos yet', style: TextStyle(color: Colors.white))); return PageView.builder(scrollDirection: Axis.vertical, itemCount: docs.length, itemBuilder: (context, i) { final d = docs[i].data() as Map<String, dynamic>; if (d['mediaType'] == 'video') return _VideoPlayer(url: d['mediaUrl']); return Center(child: Image.network(d['mediaUrl'], fit: BoxFit.cover)); }); })));
+            
+            @override 
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: Colors.black, 
+                appBar: AppBar(backgroundColor: Colors.transparent, title: const Text('Platinum PLAY', style: TextStyle(color: Colors.white)), iconTheme: const IconThemeData(color: Colors.white)), 
+                extendBodyBehindAppBar: true, 
+                body: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('feed_posts').where('mediaUrl', isNotEqualTo: null).snapshots(), 
+                  builder: (context, snapshot) { 
+                    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator()); 
+                    final docs = snapshot.data!.docs; 
+                    if (docs.isEmpty) return const Center(child: Text('No videos yet', style: TextStyle(color: Colors.white))); 
+                    return PageView.builder(
+                      scrollDirection: Axis.vertical, 
+                      itemCount: docs.length, 
+                      itemBuilder: (context, i) { 
+                        final d = docs[i].data() as Map<String, dynamic>; 
+                        if (d['mediaType'] == 'video') return _VideoPlayer(url: d['mediaUrl']); 
+                        return Center(child: Image.network(d['mediaUrl'], fit: BoxFit.cover)); 
+                      }
+                    ); 
+                  }
+                )
+              );
+            }
           }
 
-          class _VideoPlayer extends StatefulWidget { final String url; const _VideoPlayer({required this.url}); @override State<_VideoPlayer> createState() => _VideoPlayerState(); }
-          class _VideoPlayerState extends State<_VideoPlayer> { late VideoPlayerController _c; @override void initState() { super.initState(); _c = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _c.play(); }); } @override void dispose() { _c.dispose(); super.dispose(); } @override Widget build(BuildContext context) => GestureDetector(onTap: () => _c.value.isPlaying ? _c.pause() : _c.play(), child: Stack(fit: StackFit.expand, children: [FittedBox(fit: BoxFit.cover, child: SizedBox(width: _c.value.size.width, height: _c.value.size.height, child: VideoPlayer(_c))), if (!_c.value.isPlaying) const Center(child: Icon(Icons.play_arrow, color: Colors.white54, size: 80))])); }
+          class _VideoPlayer extends StatefulWidget { 
+            final String url; 
+            const _VideoPlayer({required this.url}); 
+            @override State<_VideoPlayer> createState() => _VideoPlayerState(); 
+          }
+          class _VideoPlayerState extends State<_VideoPlayer> { 
+            late VideoPlayerController _c; 
+            @override void initState() { super.initState(); _c = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _c.play(); }); } 
+            @override void dispose() { _c.dispose(); super.dispose(); } 
+            @override Widget build(BuildContext context) => GestureDetector(onTap: () => _c.value.isPlaying ? _c.pause() : _c.play(), child: Stack(fit: StackFit.expand, children: [FittedBox(fit: BoxFit.cover, child: SizedBox(width: _c.value.size.width, height: _c.value.size.height, child: VideoPlayer(_c))), if (!_c.value.isPlaying) const Center(child: Icon(Icons.play_arrow, color: Colors.white54, size: 80))])); 
+          }
           EOF
 
           cat > lib/screens/study.dart << 'EOF'
@@ -801,7 +888,8 @@ jobs:
 
       - name: Generate Admin App
         run: |
-          mkdir -p admin_app/assets admin_app/lib/screens
+          # ADDED admin_app/android/app to mkdir
+          mkdir -p admin_app/assets admin_app/lib/screens admin_app/android/app
           
           # Base64 image generation (NO CONVERT)
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
