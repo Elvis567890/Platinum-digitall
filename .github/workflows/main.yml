@@ -32,7 +32,9 @@ jobs:
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           
           cat > student_app/android/app/src/main/AndroidManifest.xml << 'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.afrinode.platinum">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" 
+              xmlns:tools="http://schemas.android.com/tools"
+              package="com.afrinode.platinum">
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.CAMERA"/>
               <uses-permission android:name="android.permission.RECORD_AUDIO"/>
@@ -41,7 +43,7 @@ jobs:
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
               <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-              <application android:label="Platinum Digital" android:name="${applicationName}" android:icon="@mipmap/ic_launcher">
+              <application android:label="Platinum Digital" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" tools:replace="android:label">
                   <meta-data android:name="flutterEmbedding" android:value="2" />
                   <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
                       <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>
@@ -949,9 +951,11 @@ jobs:
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
           
           cat > admin_app/android/app/src/main/AndroidManifest.xml << 'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.afrinode.platinumadmin">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" 
+              xmlns:tools="http://schemas.android.com/tools"
+              package="com.afrinode.platinumadmin">
               <uses-permission android:name="android.permission.INTERNET"/>
-              <application android:label="Platinum Admin" android:name="${applicationName}" android:icon="@mipmap/ic_launcher">
+              <application android:label="Platinum Admin" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" tools:replace="android:label">
                   <meta-data android:name="flutterEmbedding" android:value="2" />
                   <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
                       <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>
