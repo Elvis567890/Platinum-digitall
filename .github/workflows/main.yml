@@ -31,13 +31,11 @@ jobs:
           mkdir -p student_app/android/app/src/main/kotlin/com/afrinode/platinum
           mkdir -p student_app/android/gradle/wrapper
           
-          # Generate launcher icon
           mkdir -p student_app/android/app/src/main/res/mipmap-xxxhdpi
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           
-          # FIX: Add styles.xml and launch_background.xml
           cat > student_app/android/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -106,6 +104,7 @@ jobs:
           distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-all.zip
           EOF
 
+          # FIX: Upgraded Kotlin to 2.1.0
           cat > student_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -125,7 +124,7 @@ jobs:
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
               id "com.android.application" version "8.5.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.24" apply false
+              id "org.jetbrains.kotlin.android" version "2.1.0" apply false
           }
           include ":app"
           EOF
@@ -976,13 +975,11 @@ jobs:
           mkdir -p admin_app/android/app/src/main/kotlin/com/afrinode/platinumadmin
           mkdir -p admin_app/android/gradle/wrapper
           
-          # Generate launcher icon
           mkdir -p admin_app/android/app/src/main/res/mipmap-xxxhdpi
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
           
-          # FIX: Add styles.xml and launch_background.xml
           cat > admin_app/android/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -1034,6 +1031,7 @@ jobs:
           distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-all.zip
           EOF
 
+          # FIX: Upgraded Kotlin to 2.1.0
           cat > admin_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -1053,7 +1051,7 @@ jobs:
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
               id "com.android.application" version "8.5.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.24" apply false
+              id "org.jetbrains.kotlin.android" version "2.1.0" apply false
           }
           include ":app"
           EOF
