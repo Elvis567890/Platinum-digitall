@@ -26,7 +26,7 @@ jobs:
         run: |
           mkdir -p student_app/assets student_app/lib/screens student_app/android/app/src/main/res/xml
           
-          # [修复] 使用 base64 生成 1x1 像素的合法 PNG 图片，彻底摆脱对 ImageMagick 的依赖
+          # 使用纯 base64 生成图片，无任何外部依赖
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           
           cat > student_app/android/app/src/main/AndroidManifest.xml << 'EOF'
@@ -107,9 +107,9 @@ jobs:
             google_fonts: ^6.2.1
             shared_preferences: ^2.2.3
             timeago: ^3.7.0
-            # [修复] 强制锁定不会冲突的稳定版本，放弃原本不存在的 12.x 版本
-            share_plus: ^10.1.4
-            file_picker: ^10.1.2
+            # 强制降级到绝对兼容版本
+            share_plus: 8.0.1
+            file_picker: 8.0.7
             audioplayers: ^6.0.0
             url_launcher: ^6.3.0
             http: ^1.2.1
@@ -120,9 +120,9 @@ jobs:
             permission_handler: ^11.3.1
             jitsi_meet_flutter_sdk: 10.3.0
           
-          # 强制指定 web 兼容版本
+          # 强制指定 web 版本，彻底解决冲突
           dependency_overrides:
-            web: ^1.0.0
+            web: ^0.5.0
 
           flutter:
             uses-material-design: true
@@ -775,7 +775,6 @@ jobs:
       - name: Build Student
         run: |
           cd student_app
-          # [终极修复] 强力清除旧缓存，防止 9.0.0 的锁文件残留
           flutter clean
           rm -f pubspec.lock
           flutter pub get
@@ -805,7 +804,7 @@ jobs:
         run: |
           mkdir -p admin_app/assets admin_app/lib/screens
           
-          # [终极修复] 彻底删除 convert，改用 base64 生成合法图片，不再依赖任何系统工具！
+          # 使用纯 base64 生成图片，无任何外部依赖
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
           
           cat > admin_app/android/build.gradle << 'EOF'
@@ -1053,7 +1052,6 @@ jobs:
       - name: Build Admin
         run: |
           cd admin_app
-          # [终极修复] 清理 Admin 端缓存
           flutter clean
           rm -f pubspec.lock
           flutter pub get
