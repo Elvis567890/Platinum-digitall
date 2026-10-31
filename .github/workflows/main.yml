@@ -70,7 +70,6 @@ jobs:
           </paths>
           EOF
 
-          # 修复点：显式指定 Gradle Wrapper 版本为 8.7
           cat > student_app/android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
@@ -79,7 +78,6 @@ jobs:
           distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-all.zip
           EOF
 
-          # 修复点：AGP 版本对齐为 8.5.0
           cat > student_app/android/settings.gradle << 'EOF'
           pluginManagement {
               def flutterSdkPath = {
@@ -108,6 +106,7 @@ jobs:
           org.gradle.jvmargs=-Xmx4G
           android.useAndroidX=true
           android.enableJetifier=true
+          android.enableResourceShrinker=false
           EOF
 
           cat > student_app/android/build.gradle << 'EOF'
@@ -131,7 +130,13 @@ jobs:
               compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = "17" }
               defaultConfig { applicationId = "com.afrinode.platinum"; minSdk = 24; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }
-              buildTypes { release { signingConfig = signingConfigs.debug; minifyEnabled = false } }
+              buildTypes { 
+                  release { 
+                      signingConfig = signingConfigs.debug
+                      minifyEnabled = false
+                      shrinkResources = false
+                  } 
+              }
           }
           flutter { source = "../.." }
           dependencies { 
@@ -1001,6 +1006,7 @@ jobs:
           org.gradle.jvmargs=-Xmx4G
           android.useAndroidX=true
           android.enableJetifier=true
+          android.enableResourceShrinker=false
           EOF
 
           cat > admin_app/android/build.gradle << 'EOF'
@@ -1019,7 +1025,19 @@ jobs:
 
           cat > admin_app/android/app/build.gradle << 'EOF'
           plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin" }
-          android { namespace = "com.afrinode.platinumadmin"; compileSdk = 34; compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = "17" }; defaultConfig { applicationId = "com.afrinode.platinumadmin"; minSdk = 24; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }; buildTypes { release { signingConfig = signingConfigs.debug; minifyEnabled = false } } }
+          android { 
+              namespace = "com.afrinode.platinumadmin"; compileSdk = 34; 
+              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }; 
+              kotlinOptions { jvmTarget = "17" }; 
+              defaultConfig { applicationId = "com.afrinode.platinumadmin"; minSdk = 24; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }; 
+              buildTypes { 
+                  release { 
+                      signingConfig = signingConfigs.debug
+                      minifyEnabled = false
+                      shrinkResources = false
+                  } 
+              } 
+          }
           flutter { source = "../.." }
           dependencies { implementation platform("com.google.firebase:firebase-bom:35.0.2"); implementation "com.google.firebase:firebase-analytics" }
           EOF
