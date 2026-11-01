@@ -32,7 +32,7 @@ jobs:
           mkdir -p student_app/android/gradle/wrapper
           mkdir -p student_app/android/app/src/main/res/mipmap-xxxhdpi
           
-          # FIX: Use ffmpeg to properly convert the JPG to a real PNG
+          # Use ffmpeg to properly convert the JPG to a real PNG
           ffmpeg -y -i InShot_20261017_024714317.jpg student_app/assets/logo.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           ffmpeg -y -i InShot_20261017_024714317.jpg student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
@@ -901,7 +901,6 @@ jobs:
           }
           EOF
 
-          # FIX: Properly formatted play.dart
           cat > lib/screens/play.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -985,7 +984,6 @@ jobs:
           }
           EOF
 
-          # FIX: Properly formatted chat.dart
           cat > lib/screens/chat.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1106,6 +1104,7 @@ jobs:
           class _VideoScreenState extends State<_VideoScreen> { late VideoPlayerController _c; @override void initState() { super.initState(); _c = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _c.play(); }); } @override void dispose() { _c.dispose(); super.dispose(); } @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black), body: Center(child: _c.value.isInitialized ? AspectRatio(aspectRatio: _c.value.aspectRatio, child: VideoPlayer(_c)) : const CircularProgressIndicator())); }
           EOF
 
+          # FIXED PROFILE.DART (num to int casting)
           cat > lib/screens/profile.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:shared_preferences/shared_preferences.dart';
@@ -1155,7 +1154,8 @@ jobs:
                         int totalLikes = 0;
                         if (postSnapshot.hasData) {
                           for (var doc in postSnapshot.data!.docs) {
-                            totalLikes += (doc.data() as Map<String, dynamic>)['likes'] ?? 0;
+                            // FIX: Cast num to int
+                            totalLikes += ((doc.data() as Map<String, dynamic>)['likes'] ?? 0).toInt();
                           }
                         }
                         return Row(
@@ -1252,7 +1252,7 @@ jobs:
           mkdir -p admin_app/android/gradle/wrapper
           mkdir -p admin_app/android/app/src/main/res/mipmap-xxxhdpi
           
-          # FIX: Use ffmpeg to properly convert the JPG to a real PNG
+          # Use ffmpeg to properly convert the JPG to a real PNG
           ffmpeg -y -i InShot_20261017_024714317.jpg admin_app/assets/logo.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
           ffmpeg -y -i InShot_20261017_024714317.jpg admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
