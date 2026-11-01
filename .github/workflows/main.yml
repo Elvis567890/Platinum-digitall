@@ -32,9 +32,9 @@ jobs:
           mkdir -p student_app/android/gradle/wrapper
           mkdir -p student_app/android/app/src/main/res/mipmap-xxxhdpi
           
-          # Copy the real school logo you uploaded to the repo!
-          cp InShot_20261017_024714317.jpg student_app/assets/logo.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
-          cp InShot_20261017_024714317.jpg student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          # FIX: Use ffmpeg to properly convert the JPG to a real PNG
+          ffmpeg -y -i InShot_20261017_024714317.jpg student_app/assets/logo.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
+          ffmpeg -y -i InShot_20261017_024714317.jpg student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
           cat > student_app/android/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -204,9 +204,6 @@ jobs:
 
           cd student_app
 
-          # ==========================================
-          # START OF STUDENT DART CODE
-          # ==========================================
           cat > lib/main.dart << 'EOF'
           import 'dart:io';
           import 'package:flutter/material.dart';
@@ -433,9 +430,6 @@ jobs:
           }
           EOF
 
-          # ------------------------------------------
-          # NEW REDESIGNED FEED (WITH STORIES)
-          # ------------------------------------------
           cat > lib/screens/feed.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -485,7 +479,6 @@ jobs:
                 ),
                 body: ListView(
                   children: [
-                    // STORIES SECTION
                     SizedBox(
                       height: 100,
                       child: ListView(
@@ -501,8 +494,6 @@ jobs:
                         ],
                       ),
                     ),
-                    
-                    // FEED POSTS SECTION
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance.collection('feed_posts').orderBy('time', descending: true).snapshots(), 
                       builder: (c, s) { 
@@ -621,9 +612,6 @@ jobs:
           }
           EOF
 
-          # ------------------------------------------
-          # NEW REDESIGNED LIBRARY (GRID LAYOUT)
-          # ------------------------------------------
           cat > lib/screens/study.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -663,7 +651,6 @@ jobs:
                 body: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // Digital Library Grid
                     const Text('Subjects', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     const SizedBox(height: 12),
                     GridView.builder(
@@ -732,9 +719,6 @@ jobs:
           }
           EOF
 
-          # ------------------------------------------
-          # NEW REDESIGNED GROUPS
-          # ------------------------------------------
           cat > lib/screens/hub.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -749,7 +733,6 @@ jobs:
                 title: Column(children: const [Text('Groups', style: TextStyle(fontWeight: FontWeight.bold)), Text('School Clubs & Societies', style: TextStyle(fontSize: 12, color: Colors.grey))]),
               ), 
               body: ListView(padding: const EdgeInsets.all(16), children: [
-                // Whole school card
                 _clubCard(context, 'Whole School', 'Official Announcements', '1.2k members • Active today', Icons.public, Colors.blue, 'Whole School Chat'),
                 const SizedBox(height: 12),
                 _clubCard(context, '$cls - With Teachers', 'Class Group', '45 members • Active today', Icons.shield, Colors.orange, '$cls - With Teachers'),
@@ -807,9 +790,6 @@ jobs:
           }
           EOF
 
-          # ------------------------------------------
-          # NEW REDESIGNED INBOX (WITH ANONYMOUS ADMIN CARD)
-          # ------------------------------------------
           cat > lib/screens/inbox.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
@@ -826,7 +806,6 @@ jobs:
                 body: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // Anonymous Admin Message Card
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(color: const Color(0xFFFFF3CD), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFFFC107))),
@@ -856,7 +835,6 @@ jobs:
                     const Text('Chats', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     const SizedBox(height: 8),
                     
-                    // Regular Student Chats
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance.collection('students').where('unitCode', isNotEqualTo: myCode).snapshots(),
                       builder: (c, s) {
@@ -891,6 +869,241 @@ jobs:
               );
             }
           }
+          EOF
+
+          cat > lib/screens/anonymous.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:timeago/timeago.dart' as timeago;
+          import 'package:shared_preferences/shared_preferences.dart';
+          class AnonymousBoard extends StatefulWidget { const AnonymousBoard({super.key}); @override State<AnonymousBoard> createState() => _AnonymousBoardState(); }
+          class _AnonymousBoardState extends State<AnonymousBoard> {
+            final _c = TextEditingController();
+            void _post() async {
+              if (_c.text.isEmpty) return;
+              final prefs = await SharedPreferences.getInstance(); final lastPost = prefs.getInt('lastAnonPost') ?? 0; final now = DateTime.now().millisecondsSinceEpoch;
+              if (now - lastPost < 3600000) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You can only post once per hour.'))); return; }
+              await FirebaseFirestore.instance.collection('anonymous_posts').add({'text': _c.text.trim(), 'time': FieldValue.serverTimestamp()}); await prefs.setInt('lastAnonPost', now);
+              _c.clear(); if (mounted) Navigator.pop(context);
+            }
+            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Anonymous Board')), body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('anonymous_posts').orderBy('time', descending: true).snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(padding: const EdgeInsets.all(16), itemCount: s.data!.docs.length, itemBuilder: (c, i) { final d = s.data!.docs[i].data() as Map<String, dynamic>; return Card(margin: const EdgeInsets.only(bottom: 12), child: ListTile(leading: const CircleAvatar(backgroundColor: Colors.black54, child: Icon(Icons.masks, color: Colors.white)), title: Text(d['text'] ?? ''), subtitle: Text(d['time'] != null ? timeago.format((d['time'] as Timestamp).toDate()) : ''))); }); }), floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFC62828), onPressed: () => showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Confess Anonymously'), const SizedBox(height: 16), TextField(controller: _c, maxLines: 3, decoration: const InputDecoration(hintText: 'No names attached...')), const SizedBox(height: 16), ElevatedButton(onPressed: _post, child: const Text('Post'))]))), child: const Icon(Icons.add, color: Colors.white)));
+          }
+          EOF
+
+          cat > lib/screens/alumni.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'chat.dart';
+          class AlumniHub extends StatelessWidget {
+            final String myCode; final String myName;
+            const AlumniHub({super.key, required this.myCode, required this.myName});
+            @override Widget build(BuildContext context) => Scaffold(backgroundColor: const Color(0xFF0B0F19), appBar: AppBar(backgroundColor: const Color(0xFF0B0F19), title: const Text('Omicron Network', style: TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold))), body: Column(children: [Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.5))), child: const Row(children: [Icon(Icons.workspace_premium, color: Color(0xFFD4AF37), size: 40), SizedBox(width: 16), Expanded(child: Text('Welcome to the OGs. This is an exclusive space for Omicron alumni only.', style: TextStyle(color: Colors.white)))])), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('students').where('classLevel', isEqualTo: 'Omicron').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); final others = s.data!.docs.where((doc) => doc['unitCode'] != myCode).toList(); if (others.isEmpty) return const Center(child: Text('No other Omicron alumni yet.', style: TextStyle(color: Colors.grey))); return ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 16), itemCount: others.length, itemBuilder: (c, i) { final d = others[i].data() as Map<String, dynamic>; return Card(color: const Color(0xFF131A26), margin: const EdgeInsets.only(bottom: 8), child: ListTile(leading: CircleAvatar(backgroundColor: const Color(0xFFD4AF37), child: Text(d['firstName'][0], style: const TextStyle(color: Colors.white))), title: Text(d['fullName'] ?? '${d['firstName']} ${d['lastName']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), subtitle: const Text('Omicron Alumni', style: TextStyle(color: Colors.grey)), trailing: const Icon(Icons.chat, color: Color(0xFFD4AF37)), onTap: () { List<String> codes = [myCode, d['unitCode']]; codes.sort(); Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: 'DM_${codes[0]}_${codes[1]}', userCode: myCode, userName: myName))); }))); }))]));
+          }
+          EOF
+
+          # FIX: Properly formatted play.dart
+          cat > lib/screens/play.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:video_player/video_player.dart';
+
+          class PlatinumPlayScreen extends StatelessWidget {
+            const PlatinumPlayScreen({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: Colors.black,
+                appBar: AppBar(
+                  backgroundColor: Colors.transparent,
+                  title: const Text('Platinum PLAY', style: TextStyle(color: Colors.white)),
+                  iconTheme: const IconThemeData(color: Colors.white),
+                ),
+                extendBodyBehindAppBar: true,
+                body: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('feed_posts').where('mediaUrl', isNotEqualTo: null).snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                    final docs = snapshot.data!.docs;
+                    if (docs.isEmpty) return const Center(child: Text('No videos yet', style: TextStyle(color: Colors.white)));
+                    return PageView.builder(
+                      scrollDirection: Axis.vertical,
+                      itemCount: docs.length,
+                      itemBuilder: (context, i) {
+                        final d = docs[i].data() as Map<String, dynamic>;
+                        if (d['mediaType'] == 'video') return _VideoPlayer(url: d['mediaUrl']);
+                        return Center(child: Image.network(d['mediaUrl'], fit: BoxFit.cover));
+                      },
+                    );
+                  },
+                ),
+              );
+            }
+          }
+
+          class _VideoPlayer extends StatefulWidget {
+            final String url;
+            const _VideoPlayer({required this.url});
+            @override State<_VideoPlayer> createState() => _VideoPlayerState();
+          }
+
+          class _VideoPlayerState extends State<_VideoPlayer> {
+            late VideoPlayerController _c;
+            @override
+            void initState() {
+              super.initState();
+              _c = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) {
+                setState(() {});
+                _c.play();
+              });
+            }
+            @override
+            void dispose() {
+              _c.dispose();
+              super.dispose();
+            }
+            @override
+            Widget build(BuildContext context) {
+              return GestureDetector(
+                onTap: () => _c.value.isPlaying ? _c.pause() : _c.play(),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _c.value.size.width,
+                        height: _c.value.size.height,
+                        child: VideoPlayer(_c)
+                      )
+                    ),
+                    if (!_c.value.isPlaying) const Center(child: Icon(Icons.play_arrow, color: Colors.white54, size: 80))
+                  ]
+                )
+              );
+            }
+          }
+          EOF
+
+          # FIX: Properly formatted chat.dart
+          cat > lib/screens/chat.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:firebase_storage/firebase_storage.dart';
+          import 'package:file_picker/file_picker.dart';
+          import 'package:cached_network_image/cached_network_image.dart';
+          import 'package:video_player/video_player.dart';
+          import 'package:audioplayers/audioplayers.dart';
+          import 'package:url_launcher/url_launcher.dart';
+          import 'dart:io';
+
+          class ChatScreen extends StatefulWidget {
+            final String room; final String userCode; final String userName;
+            const ChatScreen({super.key, required this.room, required this.userCode, required this.userName});
+            @override State<ChatScreen> createState() => _ChatScreenState();
+          }
+          class _ChatScreenState extends State<ChatScreen> {
+            final _c = TextEditingController(); bool _uploading = false;
+
+            Future<void> _sendMedia(String kind) async {
+              FilePickerResult? r;
+              switch (kind) { case 'image': r = await FilePicker.platform.pickFiles(type: FileType.image); break; case 'video': r = await FilePicker.platform.pickFiles(type: FileType.video); break; case 'audio': r = await FilePicker.platform.pickFiles(type: FileType.audio); break; default: r = await FilePicker.platform.pickFiles(type: FileType.any); }
+              if (r == null) return;
+              setState(() => _uploading = true);
+              try {
+                final file = r.files.single;
+                final ref = FirebaseStorage.instance.ref().child('chat/${DateTime.now().millisecondsSinceEpoch}_${file.name}');
+                await ref.putFile(File(file.path!));
+                final url = await ref.getDownloadURL();
+                await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'senderCode': widget.userCode, 'senderName': widget.userName, 'text': '', 'type': kind, 'url': url, 'fileName': file.name, 'time': FieldValue.serverTimestamp()});
+              } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'))); } finally { if (mounted) setState(() => _uploading = false); }
+            }
+
+            void _showAttachMenu() {
+              showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))), builder: (ctx) => SafeArea(child: Wrap(children: [
+                ListTile(leading: const Icon(Icons.image, color: Colors.blueAccent), title: const Text('Image'), onTap: () { Navigator.pop(ctx); _sendMedia('image'); }),
+                ListTile(leading: const Icon(Icons.videocam, color: Colors.redAccent), title: const Text('Video'), onTap: () { Navigator.pop(ctx); _sendMedia('video'); }),
+                ListTile(leading: const Icon(Icons.audiotrack, color: Colors.orangeAccent), title: const Text('Audio'), onTap: () { Navigator.pop(ctx); _sendMedia('audio'); }),
+                ListTile(leading: const Icon(Icons.insert_drive_file, color: Colors.grey), title: const Text('File'), onTap: () { Navigator.pop(ctx); _sendMedia('file'); }),
+              ])));
+            }
+
+            Future<void> _sendText() async {
+              if (_c.text.trim().isEmpty) return;
+              await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'senderCode': widget.userCode, 'senderName': widget.userName, 'text': _c.text.trim(), 'type': 'text', 'time': FieldValue.serverTimestamp()});
+              _c.clear();
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: Text(widget.room.replaceAll('_', ' '))),
+                body: Column(
+                  children: [
+                    if (_uploading) const LinearProgressIndicator(color: Color(0xFFC62828)),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').orderBy('time').snapshots(),
+                        builder: (c, s) {
+                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                          return ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: s.data!.docs.length,
+                            itemBuilder: (c, i) {
+                              final d = s.data!.docs[i].data() as Map<String, dynamic>;
+                              final isMe = d['senderCode'] == widget.userCode;
+                              return Align(
+                                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isMe ? const Color(0xFFC62828) : Colors.white,
+                                    borderRadius: BorderRadius.circular(12)
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (!isMe) Text(d['senderName'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFC62828))),
+                                      if (d['type'] == 'text') Text(d['text'] ?? '', style: TextStyle(color: isMe ? Colors.white : Colors.black)),
+                                      if (d['type'] == 'image') ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: d['url'], width: 200, height: 200, fit: BoxFit.cover)),
+                                      if (d['type'] == 'video') GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _VideoScreen(url: d['url']))), child: Container(width: 200, height: 150, color: Colors.black54, child: const Icon(Icons.play_circle_fill, color: Colors.white, size: 50))),
+                                      if (d['type'] == 'audio') _AudioBubble(url: d['url']),
+                                      if (d['url'] != null && d['type'] != 'image' && d['type'] != 'video' && d['type'] != 'audio') InkWell(onTap: () => launchUrl(Uri.parse(d['url'])), child: Text(d['fileName'] ?? 'File', style: const TextStyle(color: Colors.blueAccent, decoration: TextDecoration.underline))),
+                                      Padding(padding: const EdgeInsets.only(top: 4), child: Text(_formatTime(d['time']), style: TextStyle(fontSize: 8, color: isMe ? Colors.white70 : Colors.grey))),
+                                    ]
+                                  )
+                                )
+                              );
+                            }
+                          );
+                        }
+                      )
+                    ),
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Row(
+                          children: [
+                            IconButton(icon: const Icon(Icons.add_circle, color: Color(0xFFC62828)), onPressed: _showAttachMenu),
+                            Expanded(child: TextField(controller: _c, decoration: InputDecoration(hintText: 'Message...', filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)))),
+                            IconButton(icon: const Icon(Icons.send, color: Color(0xFFC62828)), onPressed: _sendText)
+                          ]
+                        )
+                      )
+                    )
+                  ]
+                )
+              );
+            }
+            String _formatTime(dynamic t) { if (t is Timestamp) { final d = t.toDate(); return '${d.hour}:${d.minute}'; } return ''; }
+          }
+
+          class _AudioBubble extends StatefulWidget { final String url; const _AudioBubble({required this.url}); @override State<_AudioBubble> createState() => _AudioBubbleState(); }
+          class _AudioBubbleState extends State<_AudioBubble> { final _p = AudioPlayer(); bool _playing = false; @override void dispose() { _p.dispose(); super.dispose(); } @override Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: Icon(_playing ? Icons.pause : Icons.play_arrow, color: const Color(0xFFC62828)), onPressed: () { if (_playing) { _p.pause(); } else { _p.play(UrlSource(widget.url)); } setState(() => _playing = !_playing); }), const Text('Voice Note')]); }
+
+          class _VideoScreen extends StatefulWidget { final String url; const _VideoScreen({required this.url}); @override State<_VideoScreen> createState() => _VideoScreenState(); }
+          class _VideoScreenState extends State<_VideoScreen> { late VideoPlayerController _c; @override void initState() { super.initState(); _c = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _c.play(); }); } @override void dispose() { _c.dispose(); super.dispose(); } @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black), body: Center(child: _c.value.isInitialized ? AspectRatio(aspectRatio: _c.value.aspectRatio, child: VideoPlayer(_c)) : const CircularProgressIndicator())); }
           EOF
 
           cat > lib/screens/profile.dart << 'EOF'
@@ -999,85 +1212,6 @@ jobs:
           }
           EOF
 
-          # ------------------------------------------
-          # REST OF THE STUDENT APP (ANONYMOUS, ALUMNI, CHAT, PLAY)
-          # ------------------------------------------
-          cat > lib/screens/anonymous.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'package:timeago/timeago.dart' as timeago;
-          import 'package:shared_preferences/shared_preferences.dart';
-          class AnonymousBoard extends StatefulWidget { const AnonymousBoard({super.key}); @override State<AnonymousBoard> createState() => _AnonymousBoardState(); }
-          class _AnonymousBoardState extends State<AnonymousBoard> {
-            final _c = TextEditingController();
-            void _post() async {
-              if (_c.text.isEmpty) return;
-              final prefs = await SharedPreferences.getInstance(); final lastPost = prefs.getInt('lastAnonPost') ?? 0; final now = DateTime.now().millisecondsSinceEpoch;
-              if (now - lastPost < 3600000) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You can only post once per hour.'))); return; }
-              await FirebaseFirestore.instance.collection('anonymous_posts').add({'text': _c.text.trim(), 'time': FieldValue.serverTimestamp()}); await prefs.setInt('lastAnonPost', now);
-              _c.clear(); if (mounted) Navigator.pop(context);
-            }
-            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Anonymous Board')), body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('anonymous_posts').orderBy('time', descending: true).snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(padding: const EdgeInsets.all(16), itemCount: s.data!.docs.length, itemBuilder: (c, i) { final d = s.data!.docs[i].data() as Map<String, dynamic>; return Card(margin: const EdgeInsets.only(bottom: 12), child: ListTile(leading: const CircleAvatar(backgroundColor: Colors.black54, child: Icon(Icons.masks, color: Colors.white)), title: Text(d['text'] ?? ''), subtitle: Text(d['time'] != null ? timeago.format((d['time'] as Timestamp).toDate()) : ''))); }); }), floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFC62828), onPressed: () => showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Confess Anonymously'), const SizedBox(height: 16), TextField(controller: _c, maxLines: 3, decoration: const InputDecoration(hintText: 'No names attached...')), const SizedBox(height: 16), ElevatedButton(onPressed: _post, child: const Text('Post'))]))), child: const Icon(Icons.add, color: Colors.white)));
-          }
-          EOF
-
-          cat > lib/screens/alumni.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'chat.dart';
-          class AlumniHub extends StatelessWidget {
-            final String myCode; final String myName;
-            const AlumniHub({super.key, required this.myCode, required this.myName});
-            @override Widget build(BuildContext context) => Scaffold(backgroundColor: const Color(0xFF0B0F19), appBar: AppBar(backgroundColor: const Color(0xFF0B0F19), title: const Text('Omicron Network', style: TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold))), body: Column(children: [Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const Color(0xFF131A26), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.5))), child: const Row(children: [Icon(Icons.workspace_premium, color: Color(0xFFD4AF37), size: 40), SizedBox(width: 16), Expanded(child: Text('Welcome to the OGs. This is an exclusive space for Omicron alumni only.', style: TextStyle(color: Colors.white)))])), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('students').where('classLevel', isEqualTo: 'Omicron').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); final others = s.data!.docs.where((doc) => doc['unitCode'] != myCode).toList(); if (others.isEmpty) return const Center(child: Text('No other Omicron alumni yet.', style: TextStyle(color: Colors.grey))); return ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 16), itemCount: others.length, itemBuilder: (c, i) { final d = others[i].data() as Map<String, dynamic>; return Card(color: const Color(0xFF131A26), margin: const EdgeInsets.only(bottom: 8), child: ListTile(leading: CircleAvatar(backgroundColor: const Color(0xFFD4AF37), child: Text(d['firstName'][0], style: const TextStyle(color: Colors.white))), title: Text(d['fullName'] ?? '${d['firstName']} ${d['lastName']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), subtitle: const Text('Omicron Alumni', style: TextStyle(color: Colors.grey)), trailing: const Icon(Icons.chat, color: Color(0xFFD4AF37)), onTap: () { List<String> codes = [myCode, d['unitCode']]; codes.sort(); Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: 'DM_${codes[0]}_${codes[1]}', userCode: myCode, userName: myName))); }))); }))]));
-          }
-          EOF
-
-          cat > lib/screens/play.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'package:video_player/video_player.dart';
-          class PlatinumPlayScreen extends StatelessWidget {
-            const PlatinumPlayScreen({super.key});
-            @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.transparent, title: const Text('Platinum PLAY', style: TextStyle(color: Colors.white)), iconTheme: const IconThemeData(color: Colors.white)), extendBodyBehindAppBar: true, body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('feed_posts').where('mediaUrl', isNotEqualTo: null).snapshots(), builder: (context, snapshot) { if (!snapshot.hasData) return const Center(child: CircularProgressIndicator()); final docs = snapshot.data!.docs; if (docs.isEmpty) return const Center(child: Text('No videos yet', style: TextStyle(color: Colors.white))); return PageView.builder(scrollDirection: Axis.vertical, itemCount: docs.length, itemBuilder: (context, i) { final d = docs[i].data() as Map<String, dynamic>; if (d['mediaType'] == 'video') return _VideoPlayer(url: d['mediaUrl']); return Center(child: Image.network(d['mediaUrl'], fit: BoxFit.cover)); }); })));
-          }
-          class _VideoPlayer extends StatefulWidget { final String url; const _VideoPlayer({required this.url}); @override State<_VideoPlayer> createState() => _VideoPlayerState(); }
-          class _VideoPlayerState extends State<_VideoPlayer> { late VideoPlayerController _c; @override void initState() { super.initState(); _c = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _c.play(); }); } @override void dispose() { _c.dispose(); super.dispose(); } @override Widget build(BuildContext context) => GestureDetector(onTap: () => _c.value.isPlaying ? _c.pause() : _c.play(), child: Stack(fit: StackFit.expand, children: [FittedBox(fit: BoxFit.cover, child: SizedBox(width: _c.value.size.width, height: _c.value.size.height, child: VideoPlayer(_c))), if (!_c.value.isPlaying) const Center(child: Icon(Icons.play_arrow, color: Colors.white54, size: 80))])); }
-          EOF
-
-          cat > lib/screens/chat.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'package:firebase_storage/firebase_storage.dart';
-          import 'package:file_picker/file_picker.dart';
-          import 'package:cached_network_image/cached_network_image.dart';
-          import 'package:video_player/video_player.dart';
-          import 'package:audioplayers/audioplayers.dart';
-          import 'package:url_launcher/url_launcher.dart';
-          import 'dart:io';
-          class ChatScreen extends StatefulWidget {
-            final String room; final String userCode; final String userName;
-            const ChatScreen({super.key, required this.room, required this.userCode, required this.userName});
-            @override State<ChatScreen> createState() => _ChatScreenState();
-          }
-          class _ChatScreenState extends State<ChatScreen> {
-            final _c = TextEditingController(); bool _uploading = false;
-            Future<void> _sendMedia(String kind) async {
-              FilePickerResult? r;
-              switch (kind) { case 'image': r = await FilePicker.platform.pickFiles(type: FileType.image); break; case 'video': r = await FilePicker.platform.pickFiles(type: FileType.video); break; case 'audio': r = await FilePicker.platform.pickFiles(type: FileType.audio); break; default: r = await FilePicker.platform.pickFiles(type: FileType.any); }
-              if (r == null) return; setState(() => _uploading = true);
-              try { final file = r.files.single; final ref = FirebaseStorage.instance.ref().child('chat/${DateTime.now().millisecondsSinceEpoch}_${file.name}'); await ref.putFile(File(file.path!)); final url = await ref.getDownloadURL(); await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'senderCode': widget.userCode, 'senderName': widget.userName, 'text': '', 'type': kind, 'url': url, 'fileName': file.name, 'time': FieldValue.serverTimestamp()}); } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'))); } finally { if (mounted) setState(() => _uploading = false); }
-            }
-            void _showAttachMenu() => showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))), builder: (ctx) => SafeArea(child: Wrap(children: [ListTile(leading: const Icon(Icons.image, color: Colors.blueAccent), title: const Text('Image'), onTap: () { Navigator.pop(ctx); _sendMedia('image'); }), ListTile(leading: const Icon(Icons.videocam, color: Colors.redAccent), title: const Text('Video'), onTap: () { Navigator.pop(ctx); _sendMedia('video'); }), ListTile(leading: const Icon(Icons.audiotrack, color: Colors.orangeAccent), title: const Text('Audio'), onTap: () { Navigator.pop(ctx); _sendMedia('audio'); }), ListTile(leading: const Icon(Icons.insert_drive_file, color: Colors.grey), title: const Text('File'), onTap: () { Navigator.pop(ctx); _sendMedia('file'); })])));
-            Future<void> _sendText() async { if (_c.text.trim().isEmpty) return; await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'senderCode': widget.userCode, 'senderName': widget.userName, 'text': _c.text.trim(), 'type': 'text', 'time': FieldValue.serverTimestamp()}); _c.clear(); }
-            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(widget.room.replaceAll('_', ' '))), body: Column(children: [if (_uploading) const LinearProgressIndicator(color: Color(0xFFC62828)), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').orderBy('time').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(padding: const EdgeInsets.all(16), itemCount: s.data!.docs.length, itemBuilder: (c, i) { final d = s.data!.docs[i].data() as Map<String, dynamic>; final isMe = d['senderCode'] == widget.userCode; return Align(alignment: isMe ? Alignment.centerRight : Alignment.centerLeft, child: Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isMe ? const Color(0xFFC62828) : Colors.white, borderRadius: BorderRadius.circular(12)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (!isMe) Text(d['senderName'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFC62828))), if (d['type'] == 'text') Text(d['text'] ?? '', style: TextStyle(color: isMe ? Colors.white : Colors.black)), if (d['type'] == 'image') ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: d['url'], width: 200, height: 200, fit: BoxFit.cover)), if (d['type'] == 'video') GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _VideoScreen(url: d['url']))), child: Container(width: 200, height: 150, color: Colors.black54, child: const Icon(Icons.play_circle_fill, color: Colors.white, size: 50))), if (d['type'] == 'audio') _AudioBubble(url: d['url']), if (d['url'] != null && d['type'] != 'image' && d['type'] != 'video' && d['type'] != 'audio') InkWell(onTap: () => launchUrl(Uri.parse(d['url'])), child: Text(d['fileName'] ?? 'File', style: const TextStyle(color: Colors.blueAccent, decoration: TextDecoration.underline))), Padding(padding: const EdgeInsets.only(top: 4), child: Text(_formatTime(d['time']), style: TextStyle(fontSize: 8, color: isMe ? Colors.white70 : Colors.grey)))]))); }); })), SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: Row(children: [IconButton(icon: const Icon(Icons.add_circle, color: Color(0xFFC62828)), onPressed: _showAttachMenu), Expanded(child: TextField(controller: _c, decoration: InputDecoration(hintText: 'Message...', filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)))), IconButton(icon: const Icon(Icons.send, color: Color(0xFFC62828)), onPressed: _sendText)])))]));
-            String _formatTime(dynamic t) { if (t is Timestamp) { final d = t.toDate(); return '${d.hour}:${d.minute}'; } return ''; }
-          }
-          class _AudioBubble extends StatefulWidget { final String url; const _AudioBubble({required this.url}); @override State<_AudioBubble> createState() => _AudioBubbleState(); }
-          class _AudioBubbleState extends State<_AudioBubble> { final _p = AudioPlayer(); bool _playing = false; @override void dispose() { _p.dispose(); super.dispose(); } @override Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: Icon(_playing ? Icons.pause : Icons.play_arrow, color: const Color(0xFFC62828)), onPressed: () { if (_playing) { _p.pause(); } else { _p.play(UrlSource(widget.url)); } setState(() => _playing = !_playing); }), const Text('Voice Note')]); }
-          class _VideoScreen extends StatefulWidget { final String url; const _VideoScreen({required this.url}); @override State<_VideoScreen> createState() => _VideoScreenState(); }
-          class _VideoScreenState extends State<_VideoScreen> { late VideoPlayerController _c; @override void initState() { super.initState(); _c = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _c.play(); }); } @override void dispose() { _c.dispose(); super.dispose(); } @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black), body: Center(child: _c.value.isInitialized ? AspectRatio(aspectRatio: _c.value.aspectRatio, child: VideoPlayer(_c)) : const CircularProgressIndicator())); }
-          EOF
-
       - name: Decode Google Services (Student)
         run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | tr -d '[:space:]' | base64 -d > student_app/android/app/google-services.json
 
@@ -1118,8 +1252,9 @@ jobs:
           mkdir -p admin_app/android/gradle/wrapper
           mkdir -p admin_app/android/app/src/main/res/mipmap-xxxhdpi
           
-          cp InShot_20261017_024714317.jpg admin_app/assets/logo.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
-          cp InShot_20261017_024714317.jpg admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          # FIX: Use ffmpeg to properly convert the JPG to a real PNG
+          ffmpeg -y -i InShot_20261017_024714317.jpg admin_app/assets/logo.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
+          ffmpeg -y -i InShot_20261017_024714317.jpg admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
           cat > admin_app/android/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
