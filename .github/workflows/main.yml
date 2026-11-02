@@ -32,7 +32,6 @@ jobs:
           mkdir -p student_app/android/gradle/wrapper
           mkdir -p student_app/android/app/src/main/res/mipmap-xxxhdpi
           
-          # Use ffmpeg to properly convert the JPG to a real PNG
           ffmpeg -y -i InShot_20261017_024714317.jpg student_app/assets/logo.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/assets/logo.png
           ffmpeg -y -i InShot_20261017_024714317.jpg student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
@@ -192,6 +191,7 @@ jobs:
             open_filex: ^4.5.0
             permission_handler: ^11.3.1
             jitsi_meet_flutter_sdk: 10.3.0
+            device_info_plus: ^10.1.0
           
           dependency_overrides:
             web: 1.1.1
@@ -300,58 +300,137 @@ jobs:
           }
           EOF
 
+          cat > lib/screens/find_code.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+
+          class FindCodeScreen extends StatefulWidget {
+            const FindCodeScreen({super.key});
+            @override State<FindCodeScreen> createState() => _FindCodeScreenState();
+          }
+          class _FindCodeScreenState extends State<FindCodeScreen> {
+            final _fnCtrl = TextEditingController();
+            final _lnCtrl = TextEditingController();
+            String _result = '';
+            bool _loading = false;
+
+            void _search() async {
+              if (_fnCtrl.text.isEmpty || _lnCtrl.text.isEmpty) return;
+              setState(() { _loading = true; _result = ''; });
+              try {
+                final snap = await FirebaseFirestore.instance.collection('students')
+                  .where('firstName', isEqualTo: _fnCtrl.text.trim())
+                  .where('lastName', isEqualTo: _lnCtrl.text.trim())
+                  .get();
+
+                if (snap.docs.isNotEmpty) {
+                  setState(() { _result = 'Your Code is: ${snap.docs.first.data()['unitCode']}'; });
+                } else {
+                  setState(() { _result = 'Name not found. Please check your spelling or contact Admin.'; });
+                }
+              } catch (e) {
+                setState(() { _result = 'Error: $e'; });
+              }
+              setState(() => _loading = false);
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Find My Code')),
+                body: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      const Text('Enter your First Name and Last Name exactly as registered by the school.', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 24),
+                      TextField(controller: _fnCtrl, decoration: const InputDecoration(labelText: 'First Name', border: OutlineInputBorder())),
+                      const SizedBox(height: 16),
+                      TextField(controller: _lnCtrl, decoration: const InputDecoration(labelText: 'Last Name', border: OutlineInputBorder())),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity, height: 50,
+                        child: ElevatedButton(
+                          onPressed: _loading ? null : _search,
+                          child: _loading ? const CircularProgressIndicator(color: Colors.white) : const Text('SEARCH FOR CODE'),
+                        )
+                      ),
+                      const SizedBox(height: 32),
+                      if (_result.isNotEmpty)
+                        Text(_result, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+          EOF
+
           cat > lib/screens/login.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
           import 'package:shared_preferences/shared_preferences.dart';
-          import 'dart:math';
+          import 'package:device_info_plus/device_info_plus.dart';
+          import 'dart:io';
           import 'home.dart';
+          import 'find_code.dart';
 
           class LoginScreen extends StatefulWidget {
             const LoginScreen({super.key});
             @override State<LoginScreen> createState() => _LoginScreenState();
           }
           class _LoginScreenState extends State<LoginScreen> {
-            final _fn = TextEditingController(); final _ln = TextEditingController(); final _code = TextEditingController();
-            String _cls = 'S1'; bool _reg = false; bool _load = false;
+            final _code = TextEditingController();
+            bool _load = false;
 
-            Future<void> _auth() async {
-              if (_fn.text.isEmpty || _ln.text.isEmpty) return;
-              setState(() => _load = true);
-              try {
-                String fullName = '${_fn.text.trim()} ${_ln.text.trim()}';
-                if (_reg) {
-                  String genCode = "PDT-${Random().nextInt(8999) + 1000}";
-                  await FirebaseFirestore.instance.collection('students').add({'firstName': _fn.text.trim(), 'lastName': _ln.text.trim(), 'fullName': fullName, 'classLevel': _cls, 'unitCode': genCode, 'role': 'Student', 'time': FieldValue.serverTimestamp(), 'enrollmentYear': DateTime.now().year});
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('isLoggedIn', true); await prefs.setString('unitCode', genCode); await prefs.setString('fullName', fullName); await prefs.setString('classLevel', _cls);
-                  if (mounted) _showSuccess(genCode);
-                } else {
-                  final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: _code.text.trim().toUpperCase()).limit(1).get();
-                  if (snap.docs.isNotEmpty) {
-                    final data = snap.docs.first.data();
-                    String currentClass = data['classLevel'] ?? 'S1';
-                    String actualName = data['fullName'] ?? '${data['firstName']} ${data['lastName']}';
-                    
-                    if (data['enrollmentYear'] != null && currentClass.startsWith('S')) {
-                      int years = DateTime.now().year - (data['enrollmentYear'] as int);
-                      int baseClass = int.tryParse(currentClass.replaceAll('S', '')) ?? 1;
-                      int newClassInt = baseClass + years;
-                      if (baseClass <= 4) { currentClass = newClassInt > 4 ? 'Omicron' : 'S$newClassInt'; } 
-                      else { currentClass = newClassInt > 6 ? 'Omicron' : 'S$newClassInt'; }
-                      if (currentClass != data['classLevel']) await FirebaseFirestore.instance.collection('students').doc(snap.docs.first.id).update({'classLevel': currentClass});
-                    }
-                    
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setBool('isLoggedIn', true); await prefs.setString('unitCode', data['unitCode']); await prefs.setString('fullName', actualName); await prefs.setString('classLevel', currentClass);
-                    if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-                  } else if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid Code.')));
-                }
-              } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); } finally { if (mounted) setState(() => _load = false); }
+            Future<String> _getDeviceId() async {
+              final deviceInfo = DeviceInfoPlugin();
+              if (Platform.isAndroid) {
+                final androidInfo = await deviceInfo.androidInfo;
+                return androidInfo.id;
+              }
+              return 'unknown_device';
             }
 
-            void _showSuccess(String code) {
-              showDialog(context: context, barrierDismissible: false, builder: (ctx) => AlertDialog(title: const Text('Success!'), content: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Your Code:'), const SizedBox(height: 16), Text(code, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold))]), actions: [TextButton(onPressed: () { Navigator.pop(ctx); Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())); }, child: const Text('Saved'))]));
+            Future<void> _auth() async {
+              if (_code.text.isEmpty) return;
+              setState(() => _load = true);
+              try {
+                String deviceId = await _getDeviceId();
+                final deviceBanCheck = await FirebaseFirestore.instance.collection('banned_devices').doc(deviceId).get();
+                if (deviceBanCheck.exists) throw 'This device has been banned.';
+
+                final codeBanCheck = await FirebaseFirestore.instance.collection('banned_codes').doc(_code.text.trim().toUpperCase()).get();
+                if (codeBanCheck.exists) throw 'This Access Code has been revoked.';
+
+                final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: _code.text.trim().toUpperCase()).limit(1).get();
+                if (snap.docs.isNotEmpty) {
+                  final data = snap.docs.first.data();
+                  String currentClass = data['classLevel'] ?? 'S1';
+                  String actualName = data['fullName'] ?? '${data['firstName']} ${data['lastName']}';
+                  
+                  await FirebaseFirestore.instance.collection('students').doc(snap.docs.first.id).update({'device_id': deviceId, 'last_login': FieldValue.serverTimestamp()});
+
+                  if (data['enrollmentYear'] != null && currentClass.startsWith('S')) {
+                    int years = DateTime.now().year - (data['enrollmentYear'] as int);
+                    int baseClass = int.tryParse(currentClass.replaceAll('S', '')) ?? 1;
+                    int newClassInt = baseClass + years;
+                    if (baseClass <= 4) { currentClass = newClassInt > 4 ? 'Omicron' : 'S$newClassInt'; } 
+                    else { currentClass = newClassInt > 6 ? 'Omicron' : 'S$newClassInt'; }
+                    if (currentClass != data['classLevel']) await FirebaseFirestore.instance.collection('students').doc(snap.docs.first.id).update({'classLevel': currentClass});
+                  }
+                  
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('isLoggedIn', true); await prefs.setString('unitCode', data['unitCode']); await prefs.setString('fullName', actualName); await prefs.setString('classLevel', currentClass);
+                  if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+                } else {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid Code.')));
+                }
+              } catch (e) { 
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); 
+              } finally { 
+                if (mounted) setState(() => _load = false); 
+              }
             }
 
             @override
@@ -364,16 +443,13 @@ jobs:
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
                       Image.asset('assets/logo.png', height: 100, errorBuilder: (c, e, s) => const Icon(Icons.school, size: 80, color: Color(0xFFC62828))), 
                       const SizedBox(height: 16),
-                      Text(_reg ? 'Student Registration' : 'Student Login', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                      const Text('Student Login', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 16),
-                      if (_reg) ...[
-                        TextField(controller: _fn, decoration: const InputDecoration(labelText: 'First Name')),
-                        const SizedBox(height: 16), TextField(controller: _ln, decoration: const InputDecoration(labelText: 'Last Name')),
-                        const SizedBox(height: 16), DropdownButtonFormField<String>(value: _cls, decoration: const InputDecoration(labelText: 'Class'), items: ['S1','S2','S3','S4','S5','S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _cls = v!)),
-                      ] else TextField(controller: _code, textAlign: TextAlign.center, style: const TextStyle(letterSpacing: 4, fontWeight: FontWeight.bold), decoration: const InputDecoration(labelText: 'Access Code')),
+                      TextField(controller: _code, textAlign: TextAlign.center, style: const TextStyle(letterSpacing: 4, fontWeight: FontWeight.bold), decoration: const InputDecoration(labelText: 'Access Code')),
                       const SizedBox(height: 24),
-                      SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _load ? null : _auth, child: _load ? const CircularProgressIndicator(color: Colors.white) : Text(_reg ? 'Register' : 'Login'))),
-                      TextButton(onPressed: () => setState(() => _reg = !_reg), child: Text(_reg ? 'Login instead' : 'Register here')),
+                      SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _load ? null : _auth, child: _load ? const CircularProgressIndicator(color: Colors.white) : const Text('Login'))),
+                      const SizedBox(height: 16),
+                      TextButton(onPressed: () { Navigator.push(context, MaterialPageRoute(builder: (_) => const FindCodeScreen())); }, child: const Text('Don\'t know your code? Find it here.', style: TextStyle(color: Colors.blue))),
                     ]),
                   ),
                 )),
@@ -433,36 +509,14 @@ jobs:
           cat > lib/screens/feed.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'package:firebase_storage/firebase_storage.dart';
-          import 'package:image_picker/image_picker.dart';
-          import 'dart:io';
           import 'package:timeago/timeago.dart' as timeago;
-          import 'play.dart';
 
-          class FeedScreen extends StatefulWidget {
+          class FeedScreen extends StatelessWidget {
             final String name;
             const FeedScreen({super.key, required this.name});
-            @override State<FeedScreen> createState() => _FeedScreenState();
-          }
-          class _FeedScreenState extends State<FeedScreen> {
-            final _textCtrl = TextEditingController();
 
-            Future<void> _createPost() async {
-              final type = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(child: Wrap(children: [ListTile(leading: const Icon(Icons.image), title: const Text('Post Image'), onTap: () => Navigator.pop(ctx, 'image')), ListTile(leading: const Icon(Icons.videocam), title: const Text('Post Video'), onTap: () => Navigator.pop(ctx, 'video'))])));
-              if (type == null) return;
-              final x = type == 'image' ? await ImagePicker().pickImage(source: ImageSource.gallery) : await ImagePicker().pickVideo(source: ImageSource.gallery);
-              if (x == null) return;
-              if (mounted) {
-                showDialog(context: context, barrierDismissible: false, builder: (ctx) => const Center(child: CircularProgressIndicator()));
-                final ref = FirebaseStorage.instance.ref().child('feed/${DateTime.now().millisecondsSinceEpoch}');
-                await ref.putFile(File(x.path));
-                final url = await ref.getDownloadURL();
-                await FirebaseFirestore.instance.collection('feed_posts').add({'author': widget.name, 'authorType': 'student', 'text': _textCtrl.text.trim(), 'mediaUrl': url, 'mediaType': type, 'time': FieldValue.serverTimestamp(), 'likes': 0, 'likedBy': []});
-                _textCtrl.clear(); if (mounted) Navigator.pop(context);
-              }
-            }
-
-            @override Widget build(BuildContext context) {
+            @override
+            Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(
                   title: Row(
@@ -472,10 +526,6 @@ jobs:
                       const Text('Platinum Pulse', style: TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),
-                  actions: [
-                    IconButton(icon: const Icon(Icons.favorite_border), onPressed: () {}),
-                    IconButton(icon: const Icon(Icons.send), onPressed: () {}),
-                  ],
                 ),
                 body: ListView(
                   children: [
@@ -485,12 +535,11 @@ jobs:
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         children: [
-                          _buildStory('Your Story', Icons.school),
-                          _buildStory('Science Club', Icons.science),
-                          _buildStory('Sports', Icons.sports_soccer),
-                          _buildStory('Music', Icons.music_note),
-                          _buildStory('Debate', Icons.record_voice_over),
-                          _buildStory('Art', Icons.palette),
+                          _buildStory(context, 'Your Story', Icons.add),
+                          _buildStory(context, 'Science Club', Icons.science),
+                          _buildStory(context, 'Sports', Icons.sports_soccer),
+                          _buildStory(context, 'Music', Icons.music_note),
+                          _buildStory(context, 'Debate', Icons.record_voice_over),
                         ],
                       ),
                     ),
@@ -501,37 +550,39 @@ jobs:
                         return Column(
                           children: s.data!.docs.map((doc) { 
                             final d = doc.data() as Map<String, dynamic>; 
-                            return _FeedCard(id: doc.id, data: d, myName: widget.name); 
+                            return _FeedCard(id: doc.id, data: d, myName: name); 
                           }).toList()
                         ); 
                       }
                     ),
                   ],
                 ),
-                floatingActionButton: FloatingActionButton(
-                  backgroundColor: const Color(0xFFC62828),
-                  onPressed: _createPost,
-                  child: const Icon(Icons.add, color: Colors.white),
-                ),
               );
             }
 
-            Widget _buildStory(String title, IconData icon) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 64, height: 64,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFFC62828), width: 2),
+            Widget _buildStory(BuildContext context, String title, IconData icon) {
+              return GestureDetector(
+                onTap: () {
+                  if (title == 'Your Story') {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Story upload feature coming soon!')));
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 64, height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFC62828), width: 2),
+                        ),
+                        child: Center(child: Icon(icon, size: 30, color: const Color(0xFFC62828))),
                       ),
-                      child: Center(child: Icon(icon, size: 30, color: const Color(0xFFC62828))),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
               );
             }
@@ -578,16 +629,21 @@ jobs:
               )));
             }
 
-            @override Widget build(BuildContext context) {
+            @override
+            Widget build(BuildContext context) {
               final likedBy = widget.data['likedBy'] as List? ?? [];
               final hasLiked = likedBy.contains(widget.myName);
+              final isClub = widget.data['authorType'] == 'club';
               return Card(
                 margin: const EdgeInsets.only(bottom: 24, left: 16, right: 16), elevation: 0, color: Colors.transparent,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(backgroundColor: const Color(0xFFC62828), child: const Icon(Icons.person, color: Colors.white)), 
-                    title: Text(widget.data['author'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold)), 
+                    leading: CircleAvatar(backgroundColor: isClub ? Colors.blue : const Color(0xFFC62828), child: Icon(isClub ? Icons.groups : Icons.person, color: Colors.white)), 
+                    title: Row(children: [
+                      Text(widget.data['author'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      if (isClub) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: const Text('CLUB', style: TextStyle(fontSize: 8, color: Colors.blue, fontWeight: FontWeight.bold)))
+                    ]), 
                     subtitle: Text(widget.data['time'] != null ? timeago.format((widget.data['time'] as Timestamp).toDate()) : '', style: const TextStyle(fontSize: 10)),
                     trailing: const Icon(Icons.more_horiz),
                   ),
@@ -1104,16 +1160,50 @@ jobs:
           class _VideoScreenState extends State<_VideoScreen> { late VideoPlayerController _c; @override void initState() { super.initState(); _c = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _c.play(); }); } @override void dispose() { _c.dispose(); super.dispose(); } @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black), body: Center(child: _c.value.isInitialized ? AspectRatio(aspectRatio: _c.value.aspectRatio, child: VideoPlayer(_c)) : const CircularProgressIndicator())); }
           EOF
 
-          # FIXED PROFILE.DART (num to int casting)
           cat > lib/screens/profile.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:shared_preferences/shared_preferences.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:image_picker/image_picker.dart';
+          import 'package:firebase_storage/firebase_storage.dart';
+          import 'dart:io';
           import 'login.dart';
 
-          class ProfileScreen extends StatelessWidget {
+          class ProfileScreen extends StatefulWidget {
             final String code; final String name; final String cls;
             const ProfileScreen({super.key, required this.code, required this.name, required this.cls});
+            @override State<ProfileScreen> createState() => _ProfileScreenState();
+          }
+          class _ProfileScreenState extends State<ProfileScreen> {
+            Future<void> _createPersonalPost() async {
+              final type = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(child: Wrap(children: [ListTile(leading: const Icon(Icons.image), title: const Text('Post Image'), onTap: () => Navigator.pop(ctx, 'image')), ListTile(leading: const Icon(Icons.videocam), title: const Text('Post Video'), onTap: () => Navigator.pop(ctx, 'video'))])));
+              if (type == null) return;
+              final x = type == 'image' ? await ImagePicker().pickImage(source: ImageSource.gallery) : await ImagePicker().pickVideo(source: ImageSource.gallery);
+              if (x == null) return;
+              if (mounted) {
+                showDialog(context: context, barrierDismissible: false, builder: (ctx) => const Center(child: CircularProgressIndicator()));
+                final ref = FirebaseStorage.instance.ref().child('personal/${DateTime.now().millisecondsSinceEpoch}');
+                await ref.putFile(File(x.path));
+                final url = await ref.getDownloadURL();
+                await FirebaseFirestore.instance.collection('personal_posts').add({'author': widget.name, 'authorCode': widget.code, 'text': '', 'mediaUrl': url, 'mediaType': type, 'time': FieldValue.serverTimestamp(), 'likes': 0, 'likedBy': []});
+                if (mounted) Navigator.pop(context);
+              }
+            }
+
+            Future<void> _postAsClub(String clubName) async {
+              final type = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(child: Wrap(children: [ListTile(leading: const Icon(Icons.image), title: const Text('Post Image'), onTap: () => Navigator.pop(ctx, 'image')), ListTile(leading: const Icon(Icons.videocam), title: const Text('Post Video'), onTap: () => Navigator.pop(ctx, 'video'))])));
+              if (type == null) return;
+              final x = type == 'image' ? await ImagePicker().pickImage(source: ImageSource.gallery) : await ImagePicker().pickVideo(source: ImageSource.gallery);
+              if (x == null) return;
+              if (mounted) {
+                showDialog(context: context, barrierDismissible: false, builder: (ctx) => const Center(child: CircularProgressIndicator()));
+                final ref = FirebaseStorage.instance.ref().child('feed/${DateTime.now().millisecondsSinceEpoch}');
+                await ref.putFile(File(x.path));
+                final url = await ref.getDownloadURL();
+                await FirebaseFirestore.instance.collection('feed_posts').add({'author': clubName, 'authorType': 'club', 'text': '', 'mediaUrl': url, 'mediaType': type, 'time': FieldValue.serverTimestamp(), 'likes': 0, 'likedBy': []});
+                if (mounted) Navigator.pop(context);
+              }
+            }
 
             @override
             Widget build(BuildContext context) {
@@ -1144,18 +1234,21 @@ jobs:
                     const SizedBox(height: 24),
                     Center(child: CircleAvatar(radius: 50, backgroundColor: Colors.grey[300], child: const Icon(Icons.person, size: 60, color: Colors.white))),
                     const SizedBox(height: 16),
-                    Center(child: Column(children: [Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), Text('Admission No: $code • Class: $cls', style: const TextStyle(color: Colors.grey, fontSize: 12))])),
+                    Center(child: Column(children: [Text(widget.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), Text('Admission No: ${widget.code} • Class: ${widget.cls}', style: const TextStyle(color: Colors.grey, fontSize: 12))])),
                     const SizedBox(height: 24),
                     
                     FutureBuilder<QuerySnapshot>(
-                      future: FirebaseFirestore.instance.collection('feed_posts').where('author', isEqualTo: name).get(),
+                      future: FirebaseFirestore.instance.collection('personal_posts').where('authorCode', isEqualTo: widget.code).get(),
                       builder: (context, postSnapshot) {
                         int postCount = postSnapshot.hasData ? postSnapshot.data!.docs.length : 0;
                         int totalLikes = 0;
                         if (postSnapshot.hasData) {
                           for (var doc in postSnapshot.data!.docs) {
-                            // FIX: Cast num to int
-                            totalLikes += ((doc.data() as Map<String, dynamic>)['likes'] ?? 0).toInt();
+                            final data = doc.data() as Map<String, dynamic>? ?? {};
+                            final likes = data['likes'];
+                            if (likes is num) {
+                              totalLikes += likes.toInt();
+                            }
                           }
                         }
                         return Row(
@@ -1186,6 +1279,45 @@ jobs:
                         ],
                       ),
                     ),
+
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('clubs').where('head_code', isEqualTo: widget.code).snapshots(),
+                      builder: (context, clubSnapshot) {
+                        if (!clubSnapshot.hasData) return const SizedBox();
+                        if (clubSnapshot.data!.docs.isEmpty) return const SizedBox();
+
+                        final club = clubSnapshot.data!.docs.first;
+                        final clubName = club['name'];
+
+                        return Column(
+                          children: [
+                            const SizedBox(height: 24),
+                            Card(
+                              color: Colors.blue.withOpacity(0.1), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.blue)),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  children: [
+                                    Text('Club Head of $clubName', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue, fontSize: 16)),
+                                    const SizedBox(height: 16),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                                        onPressed: () => _postAsClub(clubName),
+                                        icon: const Icon(Icons.post_add),
+                                        label: Text('Post as $clubName'),
+                                      ),
+                                    )
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    ),
+
                     const SizedBox(height: 24),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC62828), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))),
@@ -1198,6 +1330,11 @@ jobs:
                     ),
                     const SizedBox(height: 20),
                   ],
+                ),
+                floatingActionButton: FloatingActionButton(
+                  backgroundColor: const Color(0xFFC62828),
+                  onPressed: _createPersonalPost,
+                  child: const Icon(Icons.add, color: Colors.white),
                 ),
               );
             }
@@ -1252,7 +1389,6 @@ jobs:
           mkdir -p admin_app/android/gradle/wrapper
           mkdir -p admin_app/android/app/src/main/res/mipmap-xxxhdpi
           
-          # Use ffmpeg to properly convert the JPG to a real PNG
           ffmpeg -y -i InShot_20261017_024714317.jpg admin_app/assets/logo.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/assets/logo.png
           ffmpeg -y -i InShot_20261017_024714317.jpg admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
@@ -1280,6 +1416,9 @@ jobs:
               xmlns:tools="http://schemas.android.com/tools"
               package="com.afrinode.platinumadmin">
               <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
               <application android:label="Platinum Staff Hub" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" tools:replace="android:label">
                   <meta-data android:name="flutterEmbedding" android:value="2" />
                   <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
@@ -1433,23 +1572,509 @@ jobs:
 
           cat > lib/screens/dashboard.dart << 'EOF'
           import 'package:flutter/material.dart';
-          import 'manage_students.dart'; import 'manage_staff.dart'; import 'moderation.dart'; import 'ocr_marks.dart'; import 'enter_marks.dart'; import 'broadcast.dart';
+          import 'manage_students.dart'; import 'manage_staff.dart'; import 'moderation.dart'; import 'ocr_marks.dart'; import 'enter_marks.dart'; import 'broadcast.dart'; import 'ban_manager.dart'; import 'post_announcement.dart'; import 'manage_clubs.dart'; import 'ocr_register.dart';
           class Dashboard extends StatelessWidget {
             const Dashboard({super.key});
             @override Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(title: const Text('Staff Dashboard', style: TextStyle(color: Color(0xFFD4AF37)))),
                 body: ListView(padding: const EdgeInsets.all(16), children: [
+                  _card(context, 'Scan Register (OCR)', Icons.camera, Colors.greenAccent, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OcrRegisterScreen()))),
+                  _card(context, 'Post Announcement to Feed', Icons.post_add, const Color(0xFFD4AF37), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PostAnnouncementScreen()))),
+                  _card(context, 'Manage Clubs & Assign Heads', Icons.groups, Colors.blueAccent, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageClubsScreen()))),
                   _card(context, 'Go Live Now (Jitsi)', Icons.videocam, Colors.redAccent, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BroadcastScreen()))),
                   _card(context, 'Enter Marks', Icons.edit_document, const Color(0xFFD4AF37), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EnterMarksScreen()))),
                   _card(context, 'Manage Students', Icons.school, const Color(0xFFD4AF37), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageStudents()))),
                   _card(context, 'Manage Staff', Icons.people, const Color(0xFFD4AF37), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageStaff()))),
+                  _card(context, 'Security & Device Bans', Icons.shield, Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BanManagerScreen()))),
                   _card(context, 'Moderate Feed & Anon', Icons.security, const Color(0xFFD4AF37), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ModerationScreen()))),
                   _card(context, 'Scan Marks OCR', Icons.document_scanner, const Color(0xFFD4AF37), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OcrMarksScreen()))),
                 ]),
               );
             }
             Widget _card(BuildContext ctx, String title, IconData icon, Color iconColor, VoidCallback onTap) => Card(child: InkWell(onTap: onTap, child: Padding(padding: const EdgeInsets.all(20), child: Row(children: [Icon(icon, color: iconColor, size: 30), const SizedBox(width: 16), Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]))));
+          }
+          EOF
+
+          # NEW OCR REGISTER SCANNER
+          cat > lib/screens/ocr_register.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'package:image_picker/image_picker.dart';
+          import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+          import 'dart:io';
+          import 'dart:math';
+
+          class OcrRegisterScreen extends StatefulWidget {
+            const OcrRegisterScreen({super.key});
+            @override State<OcrRegisterScreen> createState() => _OcrRegisterScreenState();
+          }
+          class _OcrRegisterScreenState extends State<OcrRegisterScreen> {
+            List<String> _extractedNames = [];
+            String _selectedClass = 'S1';
+            bool _loading = false;
+            bool _saving = false;
+
+            void _scan() async {
+              final img = await ImagePicker().pickImage(source: ImageSource.camera);
+              if (img == null) return;
+              
+              setState(() { _loading = true; _extractedNames.clear(); });
+              final rec = TextRecognizer();
+              final res = await rec.processImage(InputImage.fromFile(File(img.path)));
+              await rec.close();
+
+              // Clean up the raw text into a list of names
+              List<String> rawLines = res.text.split('\n');
+              List<String> cleanedNames = [];
+              
+              for (String line in rawLines) {
+                String clean = line.trim();
+                // Remove leading numbers like "1. " or "1) "
+                clean = clean.replaceFirst(RegExp(r'^\d+[\.\)]?\s*'), '');
+                // If it looks like a name (more than 2 chars, contains a space), add it
+                if (clean.length > 2 && clean.contains(' ')) {
+                  cleanedNames.add(clean);
+                }
+              }
+
+              setState(() { _extractedNames = cleanedNames; _loading = false; });
+            }
+
+            void _saveToDatabase() async {
+              if (_extractedNames.isEmpty) return;
+              setState(() => _saving = true);
+              
+              int addedCount = 0;
+              for (String fullName in _extractedNames) {
+                // Split into first and last name
+                List<String> parts = fullName.split(' ');
+                String firstName = parts[0];
+                String lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+                String genCode = "PDT-${Random().nextInt(8999) + 1000}";
+
+                await FirebaseFirestore.instance.collection('students').add({
+                  'firstName': firstName,
+                  'lastName': lastName,
+                  'fullName': fullName,
+                  'classLevel': _selectedClass,
+                  'unitCode': genCode,
+                  'role': 'Student',
+                  'time': FieldValue.serverTimestamp(),
+                  'enrollmentYear': DateTime.now().year
+                });
+                addedCount++;
+              }
+
+              setState(() { _saving = false; _extractedNames.clear(); });
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully registered $addedCount students in $_selectedClass!')));
+              }
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Scan Physical Register')),
+                body: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          DropdownButtonFormField<String>(
+                            value: _selectedClass,
+                            decoration: const InputDecoration(labelText: 'Select Class'),
+                            items: ['S1','S2','S3','S4','S5','S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                            onChanged: (v) => setState(() => _selectedClass = v!),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity, height: 50,
+                            child: ElevatedButton.icon(
+                              onPressed: _loading ? null : _scan,
+                              icon: const Icon(Icons.camera_alt),
+                              label: Text(_loading ? 'Scanning...' : 'Take Photo of Register'),
+                            )
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(),
+                    const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Text('Review Extracted Names Below:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                    Expanded(
+                      child: _extractedNames.isEmpty 
+                        ? Center(child: Text(_loading ? 'Reading names...' : 'No names scanned yet.', style: const TextStyle(color: Colors.grey)))
+                        : ListView.builder(
+                            itemCount: _extractedNames.length,
+                            itemBuilder: (c, i) => ListTile(
+                              leading: const Icon(Icons.person, color: Colors.greenAccent),
+                              title: Text(_extractedNames[i]),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.remove_circle, color: Colors.red),
+                                onPressed: () => setState(() => _extractedNames.removeAt(i)),
+                              ),
+                            ),
+                          ),
+                    ),
+                    if (_extractedNames.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: SizedBox(
+                          width: double.infinity, height: 50,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                            onPressed: _saving ? null : _saveToDatabase,
+                            icon: const Icon(Icons.save),
+                            label: Text(_saving ? 'Saving...' : 'Save & Generate Codes for ${_extractedNames.length} Students'),
+                          )
+                        ),
+                      )
+                  ],
+                ),
+              );
+            }
+          }
+          EOF
+
+          cat > lib/screens/manage_students.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+          import 'dart:math';
+
+          class ManageStudents extends StatelessWidget { 
+            const ManageStudents({super.key}); 
+            
+            void _issueCode(BuildContext context, String docId) async { 
+              String newCode = "PDT-${Random().nextInt(8999) + 1000}"; 
+              await FirebaseFirestore.instance.collection('students').doc(docId).update({'unitCode': newCode}); 
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('New code issued: $newCode'))); 
+            }
+
+            @override Widget build(BuildContext context) => Scaffold(
+              appBar: AppBar(title: const Text('Manage Students')), 
+              body: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('students').snapshots(), 
+                builder: (c, s) { 
+                  if (!s.hasData) return const Center(child: CircularProgressIndicator()); 
+                  return ListView.builder(
+                    itemCount: s.data!.docs.length, 
+                    itemBuilder: (c, i) { 
+                      final d = s.data!.docs[i].data() as Map<String, dynamic>; 
+                      final name = d['fullName'] ?? '${d['firstName']} ${d['lastName']}'; 
+                      return ListTile(
+                        leading: const Icon(Icons.person, color: Color(0xFFD4AF37)), 
+                        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)), 
+                        subtitle: Text('Class: ${d['classLevel']} | Secret Code: ${d['unitCode']}'), 
+                        trailing: IconButton(icon: const Icon(Icons.vpn_key, color: Colors.orange), onPressed: () => _issueCode(context, s.data!.docs[i].id))
+                      ); 
+                    }
+                  ); 
+                }
+              )
+            ); 
+          }
+          EOF
+
+          # REST OF ADMIN FILES
+          cat > lib/screens/post_announcement.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+
+          class PostAnnouncementScreen extends StatefulWidget {
+            const PostAnnouncementScreen({super.key});
+            @override State<PostAnnouncementScreen> createState() => _PostAnnouncementScreenState();
+          }
+          class _PostAnnouncementScreenState extends State<PostAnnouncementScreen> {
+            final _textCtrl = TextEditingController();
+            bool _loading = false;
+
+            Future<void> _post() async {
+              if (_textCtrl.text.isEmpty) return;
+              setState(() => _loading = true);
+              await FirebaseFirestore.instance.collection('feed_posts').add({
+                'author': 'School Admin',
+                'authorType': 'admin',
+                'text': _textCtrl.text.trim(),
+                'time': FieldValue.serverTimestamp(),
+                'likes': 0,
+                'likedBy': []
+              });
+              _textCtrl.clear();
+              setState(() => _loading = false);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Announcement Posted!')));
+                Navigator.pop(context);
+              }
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Post Announcement')),
+                body: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _textCtrl,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          hintText: 'Type your official announcement here...',
+                          filled: true,
+                          fillColor: Color(0xFF131A26),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)))
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _loading ? null : _post,
+                          child: _loading ? const CircularProgressIndicator(color: Colors.black) : const Text('POST TO FEED', style: TextStyle(fontWeight: FontWeight.bold))
+                        )
+                      )
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+          EOF
+
+          cat > lib/screens/manage_clubs.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+
+          class ManageClubsScreen extends StatefulWidget {
+            const ManageClubsScreen({super.key});
+            @override State<ManageClubsScreen> createState() => _ManageClubsScreenState();
+          }
+          class _ManageClubsScreenState extends State<ManageClubsScreen> {
+            final _clubNameCtrl = TextEditingController();
+            final _headCodeCtrl = TextEditingController();
+            bool _loading = false;
+
+            void _assignClub() async {
+              if (_clubNameCtrl.text.isEmpty || _headCodeCtrl.text.isEmpty) return;
+              setState(() => _loading = true);
+              String clubName = _clubNameCtrl.text.trim();
+              String headCode = _headCodeCtrl.text.trim().toUpperCase();
+
+              final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: headCode).limit(1).get();
+              if (snap.docs.isNotEmpty) {
+                final studentName = snap.docs.first.data()['fullName'];
+                
+                await FirebaseFirestore.instance.collection('clubs').doc(clubName).set({
+                  'name': clubName,
+                  'head_code': headCode,
+                  'head_name': studentName,
+                  'time': FieldValue.serverTimestamp(),
+                });
+
+                _clubNameCtrl.clear();
+                _headCodeCtrl.clear();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$clubName assigned to $studentName')));
+              } else {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Student Code not found!')));
+              }
+              setState(() => _loading = false);
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Manage Clubs')),
+                body: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          TextField(controller: _clubNameCtrl, decoration: const InputDecoration(labelText: 'Club Name (e.g. Science Club)')),
+                          const SizedBox(height: 16),
+                          TextField(controller: _headCodeCtrl, decoration: const InputDecoration(labelText: 'Student Code (e.g. PDT-1234)')),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity, height: 50,
+                            child: ElevatedButton(onPressed: _loading ? null : _assignClub, child: _loading ? const CircularProgressIndicator() : const Text('ASSIGN CLUB HEAD'))
+                          )
+                        ],
+                      ),
+                    ),
+                    const Divider(),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('clubs').snapshots(),
+                        builder: (c, s) {
+                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                          return ListView.builder(
+                            itemCount: s.data!.docs.length,
+                            itemBuilder: (c, i) {
+                              final doc = s.data!.docs[i];
+                              return ListTile(
+                                leading: const Icon(Icons.groups, color: Colors.blue),
+                                title: Text(doc['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text('Head: ${doc['head_name']} (${doc['head_code']})'),
+                                trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await doc.reference.delete(); }),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+          EOF
+
+          cat > lib/screens/ban_manager.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:cloud_firestore/cloud_firestore.dart';
+
+          class BanManagerScreen extends StatefulWidget {
+            const BanManagerScreen({super.key});
+            @override State<BanManagerScreen> createState() => _BanManagerScreenState();
+          }
+          class _BanManagerScreenState extends State<BanManagerScreen> {
+            final _codeCtrl = TextEditingController();
+            final _deviceCtrl = TextEditingController();
+
+            void _banCodeAndDevice() async {
+              if (_codeCtrl.text.isEmpty) return;
+              String code = _codeCtrl.text.trim().toUpperCase();
+              
+              final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: code).limit(1).get();
+              if (snap.docs.isNotEmpty) {
+                final deviceId = snap.docs.first.data()['device_id'];
+                
+                await FirebaseFirestore.instance.collection('banned_codes').doc(code).set({'time': FieldValue.serverTimestamp()});
+                
+                if (deviceId != null) {
+                  await FirebaseFirestore.instance.collection('banned_devices').doc(deviceId).set({'time': FieldValue.serverTimestamp()});
+                }
+                _codeCtrl.clear();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code and Device Banned Successfully')));
+              } else {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Student with this code not found')));
+              }
+            }
+
+            void _unbanCode() async {
+              if (_codeCtrl.text.isEmpty) return;
+              String code = _codeCtrl.text.trim().toUpperCase();
+
+              final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: code).limit(1).get();
+              
+              await FirebaseFirestore.instance.collection('banned_codes').doc(code).delete();
+              
+              if (snap.docs.isNotEmpty) {
+                final deviceId = snap.docs.first.data()['device_id'];
+                if (deviceId != null) {
+                  await FirebaseFirestore.instance.collection('banned_devices').doc(deviceId).delete();
+                }
+              }
+
+              _codeCtrl.clear();
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code and Device Unbanned Successfully')));
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return DefaultTabController(
+                length: 2,
+                child: Scaffold(
+                  appBar: AppBar(title: const Text('Security & Bans'), bottom: const TabBar(tabs: [Tab(text: 'Banned Codes'), Tab(text: 'Banned Devices')])),
+                  body: TabBarView(
+                    children: [
+                      Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Expanded(child: TextField(controller: _codeCtrl, decoration: const InputDecoration(labelText: 'Enter Code (e.g. PDT-1234)', filled: true, fillColor: Color(0xFF131A26)))),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: _banCodeAndDevice, child: const Text('BAN CODE & DEVICE')),
+                              ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _unbanCode, child: const Text('UNBAN CODE & DEVICE')),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance.collection('banned_codes').snapshots(),
+                              builder: (c, s) {
+                                if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                                return ListView.builder(
+                                  itemCount: s.data!.docs.length,
+                                  itemBuilder: (c, i) {
+                                    final doc = s.data!.docs[i];
+                                    return ListTile(
+                                      leading: const Icon(Icons.block, color: Colors.red),
+                                      title: Text(doc.id, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.green), onPressed: () async { await doc.reference.delete(); }),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Expanded(child: TextField(controller: _deviceCtrl, decoration: const InputDecoration(labelText: 'Enter Device ID', filled: true, fillColor: Color(0xFF131A26)))),
+                                const SizedBox(width: 16),
+                                ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: () async {
+                                  if (_deviceCtrl.text.isNotEmpty) {
+                                    await FirebaseFirestore.instance.collection('banned_devices').doc(_deviceCtrl.text.trim()).set({'time': FieldValue.serverTimestamp()});
+                                    _deviceCtrl.clear();
+                                  }
+                                }, child: const Text('BAN')),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance.collection('banned_devices').snapshots(),
+                              builder: (c, s) {
+                                if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                                return ListView.builder(
+                                  itemCount: s.data!.docs.length,
+                                  itemBuilder: (c, i) {
+                                    final doc = s.data!.docs[i];
+                                    return ListTile(
+                                      leading: const Icon(Icons.phone_android, color: Colors.red),
+                                      title: Text(doc.id, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.green), onPressed: () async { await doc.reference.delete(); }),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      )
+                    ]
+                  )
+                )
+              );
+            }
           }
           EOF
 
@@ -1511,17 +2136,6 @@ jobs:
             String _text = 'No image scanned.'; bool _loading = false;
             void _scan() async { final img = await ImagePicker().pickImage(source: ImageSource.camera); if (img == null) return; setState(() => _loading = true); final rec = TextRecognizer(); final res = await rec.processImage(InputImage.fromFile(File(img.path))); await rec.close(); setState(() { _text = res.text; _loading = false; }); }
             @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Scan Marksheet')), body: Padding(padding: const EdgeInsets.all(16), child: Column(children: [Expanded(child: Container(width: double.infinity, padding: const EdgeInsets.all(10), color: Colors.black, child: SingleChildScrollView(child: Text(_text, style: const TextStyle(color: Colors.greenAccent))))), const SizedBox(height: 20), if (_loading) const CircularProgressIndicator(), ElevatedButton.icon(onPressed: _loading ? null : _scan, icon: const Icon(Icons.camera_alt), label: const Text('Scan Photo'))])));
-          }
-          EOF
-
-          cat > lib/screens/manage_students.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-          import 'dart:math';
-          class ManageStudents extends StatelessWidget { 
-            const ManageStudents({super.key}); 
-            void _issueCode(BuildContext context, String docId) async { String newCode = "PDT-${Random().nextInt(8999) + 1000}"; await FirebaseFirestore.instance.collection('students').doc(docId).update({'unitCode': newCode}); if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('New code issued: $newCode'))); }
-            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Manage Students')), body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('students').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final d = s.data!.docs[i].data() as Map<String, dynamic>; final name = d['fullName'] ?? '${d['firstName']} ${d['lastName']}'; return ListTile(leading: const Icon(Icons.person, color: Color(0xFFD4AF37)), title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('Class: ${d['classLevel']} | Code: ${d['unitCode']}'), trailing: IconButton(icon: const Icon(Icons.vpn_key, color: Colors.orange), onPressed: () => _issueCode(context, s.data!.docs[i].id))); }); })); 
           }
           EOF
 
