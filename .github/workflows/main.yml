@@ -37,13 +37,10 @@ jobs:
           
           # Create directories
           mkdir -p student_app/assets student_app/android/app/src/main/res/mipmap-xxxhdpi
-          mkdir -p admin_app/assets admin_app/android/app/src/main/res/mipmap-xxxhdpi
           
-          # Convert the found image to valid PNGs for both apps
+          # Convert the found image to valid PNGs for student app
           convert "$IMG_PATH" student_app/assets/logo.png
           convert "$IMG_PATH" student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          convert "$IMG_PATH" admin_app/assets/logo.png
-          convert "$IMG_PATH" admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
       - name: Generate Student App
         run: |
@@ -1514,6 +1511,27 @@ jobs:
         with: {distribution: 'zulu', java-version: '17'}
       - uses: subosito/flutter-action@v2
         with: {flutter-version: '3.24.5', channel: stable, cache: true}
+
+      # 👇 THIS IS THE NEW STEP THAT FIXES THE ISSUE 👇
+      - name: Find and Convert Logo (Admin)
+        run: |
+          # Search for any image in the root folder (jpg, jpeg, or png)
+          IMG_PATH=$(find . -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) ! -name "logo.png" | head -n 1)
+          if [ -z "$IMG_PATH" ]; then
+            echo "Error: No logo image found in the root directory! Please upload your logo."
+            exit 1
+          fi
+          echo "Found logo at: $IMG_PATH"
+          
+          # Install ImageMagick 6 explicitly to ensure 'convert' works
+          sudo apt-get update && sudo apt-get install -y imagemagick-6.q16
+          
+          # Create directories for Admin App
+          mkdir -p admin_app/assets admin_app/android/app/src/main/res/mipmap-xxxhdpi
+          
+          # Convert the found image to valid PNGs for admin app
+          convert "$IMG_PATH" admin_app/assets/logo.png
+          convert "$IMG_PATH" admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
       - name: Generate Admin App
         run: |
