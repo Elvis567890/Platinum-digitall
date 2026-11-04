@@ -1,0 +1,24 @@
+name: Generate Release Keystore
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Keystore and Print Base64
+        run: |
+          keytool -genkey -v -keystore my-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload -storepass platinum123 -keypass platinum123 -dname "CN=Platinum, OU=School, O=Platinum, L=Kampala, S=Kampala, C=UG"
+          
+          echo ""
+          echo "=========================================================="
+          echo "COPY THE LONG TEXT BELOW AND SAVE IT IN GITHUB SECRETS"
+          echo "=========================================================="
+          echo ""
+          
+          base64 -w 0 my-release-key.jks
+          
+          echo ""
+          echo ""
+          echo "=========================================================="
