@@ -83,7 +83,7 @@ jobs:
           distributionPath=wrapper/dists
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-all.zip
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.11.1-all.zip
           EOF
 
           cat > student_app/android/settings.gradle << 'EOF'
@@ -434,7 +434,7 @@ jobs:
           distributionPath=wrapper/dists
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-all.zip
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.11.1-all.zip
           EOF
 
           cat > admin_app/android/settings.gradle << 'EOF'
@@ -460,7 +460,7 @@ jobs:
 
           cat > admin_app/android/app/build.gradle << 'EOF'
           plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin" }
-          android { namespace = "com.afrinode.platinumadmin"; compileSdk = 35; compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = "17" }; defaultConfig { applicationId = "com.afrinode.platinumadmin"; minSdk = 24; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }; buildTypes { release { signingConfig = signingConfigs.debug; minifyEnabled = false; shrinkResources = false } } }
+          android { namespace = "com.afrinode.platinumadmin"; compileSdk = 36; compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = "17" }; defaultConfig { applicationId = "com.afrinode.platinumadmin"; minSdk = 24; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }; buildTypes { release { signingConfig = signingConfigs.debug; minifyEnabled = false; shrinkResources = false } } }
           flutter { source = "../.." }
           dependencies { implementation platform("com.google.firebase:firebase-bom:35.0.2"); implementation "com.google.firebase:firebase-analytics"; implementation "androidx.core:core:1.12.0" }
           EOF
