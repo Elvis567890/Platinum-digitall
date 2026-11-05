@@ -111,7 +111,7 @@ jobs:
           plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin" }
           android { 
               namespace = "com.afrinode.platinum"; 
-              compileSdk = 35; 
+              compileSdk = 36; 
               compileOptions { 
                   sourceCompatibility = JavaVersion.VERSION_17; 
                   targetCompatibility = JavaVersion.VERSION_17; 
