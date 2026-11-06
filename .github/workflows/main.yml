@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   # ==========================================
-  # JOB 1: STUDENT APP (Platinum Digital Hub)
+  # JOB 1: STUDENT APP (Platinum Digital App)
   # ==========================================
   build-student:
     runs-on: ubuntu-22.04
@@ -28,8 +28,15 @@ jobs:
           if [ -z "$IMG_PATH" ]; then echo "Error: No logo found!"; exit 1; fi
           sudo apt-get update && sudo apt-get install -y imagemagick-6.q16
           mkdir -p student_app/assets student_app/android/app/src/main/res/mipmap-xxxhdpi
-          convert "$IMG_PATH" student_app/assets/logo.png
-          convert "$IMG_PATH" student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          mkdir -p admin_app/assets admin_app/android/app/src/main/res/mipmap-xxxhdpi
+          
+          # 1. Student App gets the normal logo
+          convert "$IMG_PATH" -resize 512x512 student_app/assets/logo.png
+          convert "$IMG_PATH" -resize 512x512 student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          
+          # 2. Admin App gets a distinct icon: Dark background + Gold border
+          convert "$IMG_PATH" -resize 512x512 admin_app/assets/logo.png
+          convert "$IMG_PATH" -resize 380x380 -background "#0B0F19" -gravity center -extent 512x512 -bordercolor "#D4AF37" -border 25 admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
       - name: Generate Student App
         run: |
@@ -62,7 +69,7 @@ jobs:
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
               <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-              <application android:label="Platinum Digital Hub" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" tools:replace="android:label">
+              <application android:label="Platinum Digital App" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" tools:replace="android:label">
                   <meta-data android:name="flutterEmbedding" android:value="2" />
                   <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
                       <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>
@@ -381,8 +388,10 @@ jobs:
           if [ -z "$IMG_PATH" ]; then echo "Error: No logo found!"; exit 1; fi
           sudo apt-get update && sudo apt-get install -y imagemagick-6.q16
           mkdir -p admin_app/assets admin_app/android/app/src/main/res/mipmap-xxxhdpi
-          convert "$IMG_PATH" admin_app/assets/logo.png
-          convert "$IMG_PATH" admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          
+          # Admin App gets a distinct icon: Dark background + Gold border
+          convert "$IMG_PATH" -resize 512x512 admin_app/assets/logo.png
+          convert "$IMG_PATH" -resize 380x380 -background "#0B0F19" -gravity center -extent 512x512 -bordercolor "#D4AF37" -border 25 admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
       - name: Generate Admin App
         run: |
