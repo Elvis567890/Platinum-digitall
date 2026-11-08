@@ -30,9 +30,11 @@ jobs:
           mkdir -p student_app/assets student_app/android/app/src/main/res/mipmap-xxxhdpi
           mkdir -p admin_app/assets admin_app/android/app/src/main/res/mipmap-xxxhdpi
           
+          # Student App Logo (Clean)
           convert "$IMG_PATH" -resize 512x512 student_app/assets/logo.png
           convert "$IMG_PATH" -resize 512x512 student_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
+          # Admin App Logo (Dark background + Red border for distinction)
           convert "$IMG_PATH" -resize 400x400 admin_app/assets/logo.png
           convert "$IMG_PATH" -resize 400x400 -background "#0B0F19" -gravity center -extent 512x512 -bordercolor "#C62828" -border 15 admin_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
@@ -116,7 +118,7 @@ jobs:
           plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin" }
           android { 
               namespace = "com.afrinode.platinum"; 
-              compileSdk = 36; 
+              compileSdk = 35; 
               compileOptions { 
                   sourceCompatibility = JavaVersion.VERSION_17; 
                   targetCompatibility = JavaVersion.VERSION_17; 
@@ -607,7 +609,7 @@ jobs:
 
           cat > admin_app/android/app/build.gradle << 'EOF'
           plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin" }
-          android { namespace = "com.afrinode.platinumadmin"; compileSdk = 36; compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = "17" }; defaultConfig { applicationId = "com.afrinode.platinumadmin"; minSdk = 24; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }; buildTypes { release { signingConfig = signingConfigs.debug; minifyEnabled = false; shrinkResources = false } } }
+          android { namespace = "com.afrinode.platinumadmin"; compileSdk = 35; compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = "17" }; defaultConfig { applicationId = "com.afrinode.platinumadmin"; minSdk = 24; targetSdk = 34; versionCode = flutter.versionCode; versionName = flutter.versionName; multiDexEnabled = true }; buildTypes { release { signingConfig = signingConfigs.debug; minifyEnabled = false; shrinkResources = false } } }
           flutter { source = "../.." }
           dependencies { implementation platform("com.google.firebase:firebase-bom:35.0.2"); implementation "com.google.firebase:firebase-analytics"; implementation "androidx.core:core:1.12.0" }
           EOF
@@ -737,45 +739,159 @@ jobs:
           }
           EOF
 
-          cat > lib/screens/reset_system.dart << 'EOF'
+          cat > lib/screens/manage_timetable.dart << 'EOF'
           import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
-          class ResetSystemScreen extends StatefulWidget { const ResetSystemScreen({super.key}); @override State<ResetSystemScreen> createState() => _ResetSystemScreenState(); }
-          class _ResetSystemScreenState extends State<ResetSystemScreen> {
+          
+          class ManageTimetableScreen extends StatefulWidget { const ManageTimetableScreen({super.key}); @override State<ManageTimetableScreen> createState() => _ManageTimetableScreenState(); }
+          class _ManageTimetableScreenState extends State<ManageTimetableScreen> {
+            String _selectedClass = 'S1';
+            String _selectedDay = 'Monday';
+            final _timeCtrl = TextEditingController();
+            final _subjectCtrl = TextEditingController();
             bool _loading = false;
-            Future<void> _wipeCollection(String collectionName) async {
-              final snap = await FirebaseFirestore.instance.collection(collectionName).get();
-              for (var doc in snap.docs) { await doc.reference.delete(); }
-            }
-            Future<void> _resetAll() async {
+
+            void _addPeriod() async {
+              if (_timeCtrl.text.isEmpty || _subjectCtrl.text.isEmpty) return;
               setState(() => _loading = true);
+              
               try {
-                await _wipeCollection('feed_posts');
-                await _wipeCollection('anonymous_posts');
-                await _wipeCollection('notifications');
-                await _wipeCollection('live_classes');
-                final chatSnap = await FirebaseFirestore.instance.collection('chats').get();
-                for (var chatDoc in chatSnap.docs) {
-                  final msgs = await chatDoc.reference.collection('msgs').get();
-                  for (var msg in msgs.docs) { await msg.reference.delete(); }
+                final existing = await FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods')
+                    .where('day', isEqualTo: _selectedDay)
+                    .where('time', isEqualTo: _timeCtrl.text.trim())
+                    .get();
+                
+                if (existing.docs.isNotEmpty) {
+                  throw "A period already exists at $_selectedDay ${_timeCtrl.text.trim()}!";
                 }
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All Posts, Chats, and Notifications Deleted!'), backgroundColor: Colors.green));
+
+                await FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').add({
+                  'day': _selectedDay,
+                  'time': _timeCtrl.text.trim(),
+                  'subject': _subjectCtrl.text.trim(),
+                  'order': DateTime.now().millisecondsSinceEpoch,
+                });
+                
+                _timeCtrl.clear();
+                _subjectCtrl.clear();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Period Added!'), backgroundColor: Colors.green));
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString(), style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red));
               } finally {
                 setState(() => _loading = false);
               }
             }
-            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Reset App Data')), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(Icons.warning_amber_rounded, size: 80, color: Colors.red),
-              const SizedBox(height: 16),
-              const Text('Warning!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red)),
-              const SizedBox(height: 8),
-              const Text('This will delete ALL feed posts, anonymous confessions, and chat messages. This action cannot be undone.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 32),
-              if (_loading) const CircularProgressIndicator(),
-              if (!_loading) SizedBox(width: double.infinity, height: 50, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: _resetAll, child: const Text('DELETE ALL POSTS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)))),
-            ]))));
+
+            void _deletePeriod(String docId) async {
+              await FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').doc(docId).delete();
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Digital Timetable Editor')),
+                body: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          DropdownButtonFormField<String>(value: _selectedClass, decoration: const InputDecoration(labelText: 'Select Class'), items: ['S1','S2','S3','S4','S5','S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedClass = v!)), const SizedBox(height: 16),
+                          Row(children: [
+                            Expanded(flex: 2, child: DropdownButtonFormField<String>(value: _selectedDay, decoration: const InputDecoration(labelText: 'Day'), items: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedDay = v!))),
+                            const SizedBox(width: 10),
+                            Expanded(flex: 2, child: TextField(controller: _timeCtrl, decoration: const InputDecoration(labelText: 'Time (e.g. 8:00 - 9:00)'))),
+                          ]), const SizedBox(height: 16),
+                          TextField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: 'Subject & Teacher (e.g. Math - Mr. Okello)')), const SizedBox(height: 16),
+                          SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.green), onPressed: _loading ? null : _addPeriod, icon: const Icon(Icons.add), label: const Text('ADD PERIOD TO TIMETABLE'))),
+                        ],
+                      ),
+                    ),
+                    const Divider(color: Colors.grey),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').orderBy('order').snapshots(),
+                        builder: (c, s) {
+                          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                          if (s.data!.docs.isEmpty) return const Center(child: Text('No periods added yet.', style: TextStyle(color: Colors.grey)));
+                          
+                          return ListView.builder(
+                            itemCount: s.data!.docs.length,
+                            itemBuilder: (c, i) {
+                              final doc = s.data!.docs[i];
+                              final d = doc.data() as Map<String, dynamic>;
+                              return ListTile(
+                                leading: const Icon(Icons.schedule, color: Color(0xFFD4AF37)),
+                                title: Text('${d['subject']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text('${d['day']} | ${d['time']}'),
+                                trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deletePeriod(doc.id)),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
           }
+          EOF
+
+          cat > lib/screens/manage_clubs.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class ManageClubsScreen extends StatefulWidget { const ManageClubsScreen({super.key}); @override State<ManageClubsScreen> createState() => _ManageClubsScreenState(); }
+          class _ManageClubsScreenState extends State<ManageClubsScreen> { final _clubNameCtrl = TextEditingController(); final _headCodeCtrl = TextEditingController(); bool _loading = false; void _assignClub() async { if (_clubNameCtrl.text.isEmpty || _headCodeCtrl.text.isEmpty) return; setState(() => _loading = true); String clubName = _clubNameCtrl.text.trim(); String headCode = _headCodeCtrl.text.trim().toUpperCase(); final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: headCode).limit(1).get(); if (snap.docs.isNotEmpty) { final studentName = snap.docs.first.data()['fullName']; await FirebaseFirestore.instance.collection('clubs').doc(clubName).set({'name': clubName, 'head_code': headCode, 'head_name': studentName, 'time': FieldValue.serverTimestamp()}); _clubNameCtrl.clear(); _headCodeCtrl.clear(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$clubName assigned to $studentName'))); } else { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Student Code not found!'))); } setState(() => _loading = false); } @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Manage Clubs')), body: Column(children: [Padding(padding: const EdgeInsets.all(16), child: Column(children: [TextField(controller: _clubNameCtrl, decoration: const InputDecoration(labelText: 'Club Name')), const SizedBox(height: 16), TextField(controller: _headCodeCtrl, decoration: const InputDecoration(labelText: 'Student Code (e.g. PDT-1234)')), const SizedBox(height: 24), SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _loading ? null : _assignClub, child: _loading ? const CircularProgressIndicator() : const Text('ASSIGN CLUB HEAD')))])), const Divider(), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('clubs').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final doc = s.data!.docs[i]; return ListTile(leading: const Icon(Icons.groups, color: Colors.blue), title: Text(doc['name'], style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('Head: ${doc['head_name']} (${doc['head_code']})'), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await doc.reference.delete(); })); }); }))])); }
+          EOF
+
+          cat > lib/screens/manage_staff.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class ManageStaff extends StatefulWidget { const ManageStaff({super.key}); @override State<ManageStaff> createState() => _ManageStaffState(); }
+          class _ManageStaffState extends State<ManageStaff> { 
+            final _fn = TextEditingController(); final _ln = TextEditingController(); String _role = 'Teacher'; 
+            
+            void _add() async { if (_fn.text.isEmpty) return; await FirebaseFirestore.instance.collection('staff').add({'firstName': _fn.text.trim(), 'lastName': _ln.text.trim(), 'fullName': '${_fn.text.trim()} ${_ln.text.trim()}', 'role': _role, 'isBanned': false, 'unitCode': 'STF-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'}); _fn.clear(); _ln.clear(); if (mounted) Navigator.pop(context); } 
+            
+            void _toggleBan(String docId, bool currentStatus) async {
+              await FirebaseFirestore.instance.collection('staff').doc(docId).update({'isBanned': !currentStatus});
+            }
+            
+            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Manage Staff & Roles')), floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFD4AF37), onPressed: () => showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Add Staff Account'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: _fn, decoration: const InputDecoration(labelText: 'First Name')), TextField(controller: _ln, decoration: const InputDecoration(labelText: 'Last Name')), DropdownButtonFormField<String>(value: _role, items: ['Super Admin', 'Admin', 'Teacher'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _role = v!))]), actions: [ElevatedButton(onPressed: _add, child: const Text('Create Account'))])), child: const Icon(Icons.add, color: Colors.black)), body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('staff').snapshots(), builder: (c, s) { 
+              if (!s.hasData) return const Center(child: CircularProgressIndicator()); 
+              return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { 
+                final doc = s.data!.docs[i]; final d = doc.data() as Map<String, dynamic>; 
+                final name = d['fullName'] ?? '${d['firstName']} ${d['lastName']}';
+                bool isBanned = d['isBanned'] ?? false;
+                
+                return ListTile(
+                  leading: Icon(Icons.shield, color: isBanned ? Colors.red : Color(0xFFD4AF37)), 
+                  title: Row(children: [Text(name, style: const TextStyle(fontWeight: FontWeight.bold)), if (isBanned) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.red.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: const Text('BANNED', style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)))]), 
+                  subtitle: Text('Code: ${d['unitCode']} | Role: ${d['role']}'), 
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(icon: Icon(isBanned ? Icons.lock : Icons.lock_open, color: isBanned ? Colors.red : Colors.green), tooltip: isBanned ? 'Unban Staff' : 'Ban Staff', onPressed: () => _toggleBan(doc.id, isBanned)),
+                    IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await doc.reference.delete(); })
+                  ])
+                ); 
+              }); 
+            })); 
+          }
+          EOF
+
+          cat > lib/screens/ocr_register.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart'; import 'package:image_picker/image_picker.dart'; import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'; import 'dart:io';
+          class OcrRegisterScreen extends StatefulWidget { const OcrRegisterScreen({super.key}); @override State<OcrRegisterScreen> createState() => _OcrRegisterScreenState(); }
+          class _OcrRegisterScreenState extends State<OcrRegisterScreen> { List<String> _extractedNames = []; String _selectedClass = 'S1'; String _selectedTitle = 'Mr.'; bool _loading = false; bool _saving = false; void _scan() async { final img = await ImagePicker().pickImage(source: ImageSource.camera); if (img == null) return; setState(() { _loading = true; _extractedNames.clear(); }); final rec = TextRecognizer(); final res = await rec.processImage(InputImage.fromFile(File(img.path))); await rec.close(); List<String> rawLines = res.text.split('\n'); List<String> cleanedNames = []; for (String line in rawLines) { String clean = line.trim(); clean = clean.replaceFirst(RegExp(r'^\d+[\.\)]?\s*'), ''); if (clean.length > 2 && clean.contains(' ')) { cleanedNames.add(clean); } } setState(() { _extractedNames = cleanedNames; _loading = false; }); } void _saveToDatabase() async { if (_extractedNames.isEmpty) return; setState(() => _saving = true); int addedCount = 0; int rejectedCount = 0; for (String rawName in _extractedNames) { String fullName = "$_selectedTitle $rawName".trim(); final existing = await FirebaseFirestore.instance.collection('students').where('fullName', isEqualTo: fullName).limit(1).get(); if (existing.docs.isNotEmpty) { rejectedCount++; continue; } List<String> parts = rawName.split(' '); String firstName = parts[0]; String lastName = parts.length > 1 ? parts.sublist(1).join(' ') : ''; String genCode = "PDT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}${addedCount}"; await FirebaseFirestore.instance.collection('students').add({'firstName': firstName, 'lastName': lastName, 'fullName': fullName, 'classLevel': _selectedClass, 'unitCode': genCode, 'role': 'Student', 'time': FieldValue.serverTimestamp(), 'enrollmentYear': DateTime.now().year}); addedCount++; } setState(() { _saving = false; _extractedNames.clear(); }); if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registered: $addedCount | Rejected: $rejectedCount'), backgroundColor: rejectedCount > 0 ? Colors.orange : Colors.green)); } @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('Register Students')), body: Column(children: [Padding(padding: const EdgeInsets.all(16), child: Column(children: [Row(children: [Expanded(child: DropdownButtonFormField<String>(value: _selectedTitle, decoration: const InputDecoration(labelText: 'Title'), items: ['Mr.', 'Mrs.', 'Ms.'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedTitle = v!))), const SizedBox(width: 16), Expanded(child: DropdownButtonFormField<String>(value: _selectedClass, decoration: const InputDecoration(labelText: 'Class'), items: ['S1','S2','S3','S4','S5','S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedClass = v!)))]), const SizedBox(height: 16), SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(onPressed: _loading ? null : _scan, icon: const Icon(Icons.camera_alt), label: Text(_loading ? 'Scanning...' : 'Take Photo of Register')))]), ), const Divider(), const Padding(padding: EdgeInsets.all(8.0), child: Text('Review Extracted Names (Duplicates blocked):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))), Expanded(child: _extractedNames.isEmpty ? Center(child: Text(_loading ? 'Reading names...' : 'No names scanned yet.', style: const TextStyle(color: Colors.grey))) : ListView.builder(itemCount: _extractedNames.length, itemBuilder: (c, i) => ListTile(leading: const Icon(Icons.person, color: Colors.greenAccent), title: Text("$_selectedTitle ${_extractedNames[i]}"), trailing: IconButton(icon: const Icon(Icons.remove_circle, color: Colors.red), onPressed: () => setState(() => _extractedNames.removeAt(i)))))), if (_extractedNames.isNotEmpty) Padding(padding: const EdgeInsets.all(16), child: SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _saving ? null : _saveToDatabase, icon: const Icon(Icons.save), label: Text(_saving ? 'Saving...' : 'Save & Generate Codes for ${_extractedNames.length} Students'))))])); } }
+          EOF
+
+          cat > lib/screens/post_announcement.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart'; import 'package:image_picker/image_picker.dart'; import 'dart:io'; import '../services/telegram_service.dart';
+          class PostAnnouncementScreen extends StatefulWidget { const PostAnnouncementScreen({super.key}); @override State<PostAnnouncementScreen> createState() => _PostAnnouncementScreenState(); }
+          class _PostAnnouncementScreenState extends State<PostAnnouncementScreen> { final _textCtrl = TextEditingController(); bool _loading = false; File? _image; Future<void> _pickImage() async { final x = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 50, maxWidth: 800); if (x != null) setState(() => _image = File(x.path)); } Future<void> _post() async { if (_textCtrl.text.isEmpty && _image == null) return; setState(() => _loading = true); try { String? fileId; if (_image != null) { fileId = await TelegramService.uploadFile(_image!, 'image'); } await FirebaseFirestore.instance.collection('feed_posts').add({'author': 'School Admin', 'authorType': 'admin', 'text': _textCtrl.text.trim(), 'telegram_file_id': fileId, 'mediaType': fileId != null ? 'image' : null, 'time': FieldValue.serverTimestamp(), 'likes': 0, 'likedBy': []}); _textCtrl.clear(); setState(() { _image = null; _loading = false; }); if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Announcement Posted!'))); Navigator.pop(context); } } catch (e) { setState(() => _loading = false); if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); } } @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Post Announcement')), body: ListView(padding: const EdgeInsets.all(16), children: [TextField(controller: _textCtrl, maxLines: 5, decoration: const InputDecoration(hintText: 'Type your announcement...', filled: true, fillColor: Color(0xFF131A26))), const SizedBox(height: 16), if (_image != null) Image.file(_image!, height: 200), const SizedBox(height: 16), ElevatedButton.icon(icon: const Icon(Icons.image), label: const Text('Attach Image (Optional)'), onPressed: _pickImage), const SizedBox(height: 16), SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _loading ? null : _post, child: _loading ? const CircularProgressIndicator() : const Text('POST TO FEED')))])); }
+          EOF
+
+          cat > lib/screens/ban_manager.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class BanManagerScreen extends StatefulWidget { const BanManagerScreen({super.key}); @override State<BanManagerScreen> createState() => _BanManagerScreenState(); }
+          class _BanManagerScreenState extends State<BanManagerScreen> { final _codeCtrl = TextEditingController(); final _deviceCtrl = TextEditingController(); void _banCodeAndDevice() async { if (_codeCtrl.text.isEmpty) return; String code = _codeCtrl.text.trim().toUpperCase(); final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: code).limit(1).get(); if (snap.docs.isNotEmpty) { final deviceId = snap.docs.first.data()['device_id']; await FirebaseFirestore.instance.collection('banned_codes').doc(code).set({'time': FieldValue.serverTimestamp()}); if (deviceId != null) { await FirebaseFirestore.instance.collection('banned_devices').doc(deviceId).set({'time': FieldValue.serverTimestamp()}); } _codeCtrl.clear(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Banned Successfully'))); } else { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found'))); } } void _unbanCode() async { if (_codeCtrl.text.isEmpty) return; String code = _codeCtrl.text.trim().toUpperCase(); final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: code).limit(1).get(); await FirebaseFirestore.instance.collection('banned_codes').doc(code).delete(); if (snap.docs.isNotEmpty) { final deviceId = snap.docs.first.data()['device_id']; if (deviceId != null) { await FirebaseFirestore.instance.collection('banned_devices').doc(deviceId).delete(); } } _codeCtrl.clear(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unbanned Successfully'))); } @override Widget build(BuildContext context) => DefaultTabController(length: 2, child: Scaffold(appBar: AppBar(title: const Text('Security & Bans'), bottom: const TabBar(tabs: [Tab(text: 'Banned Codes'), Tab(text: 'Banned Devices')])), body: TabBarView(children: [Column(children: [Padding(padding: const EdgeInsets.all(16), child: Row(children: [Expanded(child: TextField(controller: _codeCtrl, decoration: const InputDecoration(labelText: 'Enter Code', filled: true, fillColor: Color(0xFF131A26))))])), Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: _banCodeAndDevice, child: const Text('BAN')), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _unbanCode, child: const Text('UNBAN'))]), const SizedBox(height: 16), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('banned_codes').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final doc = s.data!.docs[i]; return ListTile(leading: const Icon(Icons.block, color: Colors.red), title: Text(doc.id, style: const TextStyle(fontWeight: FontWeight.bold)), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.green), onPressed: () async { await doc.reference.delete(); })); }); }))]), Column(children: [Padding(padding: const EdgeInsets.all(16), child: Row(children: [Expanded(child: TextField(controller: _deviceCtrl, decoration: const InputDecoration(labelText: 'Enter Device ID', filled: true, fillColor: Color(0xFF131A26)))), const SizedBox(width: 16), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: () async { if (_deviceCtrl.text.isNotEmpty) { await FirebaseFirestore.instance.collection('banned_devices').doc(_deviceCtrl.text.trim()).set({'time': FieldValue.serverTimestamp()}); _deviceCtrl.clear(); } }, child: const Text('BAN'))])), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('banned_devices').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final doc = s.data!.docs[i]; return ListTile(leading: const Icon(Icons.phone_android, color: Colors.red), title: Text(doc.id, style: const TextStyle(fontWeight: FontWeight.bold)), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.green), onPressed: () async { await doc.reference.delete(); })); }); }))])]))); }
           EOF
 
           cat > lib/screens/manage_students.dart << 'EOF'
@@ -891,63 +1007,6 @@ jobs:
               ])
             );
           }
-          EOF
-
-          cat > lib/screens/manage_staff.dart << 'EOF'
-          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
-          class ManageStaff extends StatefulWidget { const ManageStaff({super.key}); @override State<ManageStaff> createState() => _ManageStaffState(); }
-          class _ManageStaffState extends State<ManageStaff> { 
-            final _fn = TextEditingController(); final _ln = TextEditingController(); String _role = 'Teacher'; 
-            
-            void _add() async { if (_fn.text.isEmpty) return; await FirebaseFirestore.instance.collection('staff').add({'firstName': _fn.text.trim(), 'lastName': _ln.text.trim(), 'fullName': '${_fn.text.trim()} ${_ln.text.trim()}', 'role': _role, 'isBanned': false, 'unitCode': 'STF-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'}); _fn.clear(); _ln.clear(); if (mounted) Navigator.pop(context); } 
-            
-            void _toggleBan(String docId, bool currentStatus) async {
-              await FirebaseFirestore.instance.collection('staff').doc(docId).update({'isBanned': !currentStatus});
-            }
-            
-            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Manage Staff & Roles')), floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFD4AF37), onPressed: () => showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Add Staff Account'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: _fn, decoration: const InputDecoration(labelText: 'First Name')), TextField(controller: _ln, decoration: const InputDecoration(labelText: 'Last Name')), DropdownButtonFormField<String>(value: _role, items: ['Super Admin', 'Admin', 'Teacher'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _role = v!))]), actions: [ElevatedButton(onPressed: _add, child: const Text('Create Account'))])), child: const Icon(Icons.add, color: Colors.black)), body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('staff').snapshots(), builder: (c, s) { 
-              if (!s.hasData) return const Center(child: CircularProgressIndicator()); 
-              return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { 
-                final doc = s.data!.docs[i]; final d = doc.data() as Map<String, dynamic>; 
-                final name = d['fullName'] ?? '${d['firstName']} ${d['lastName']}';
-                bool isBanned = d['isBanned'] ?? false;
-                
-                return ListTile(
-                  leading: Icon(Icons.shield, color: isBanned ? Colors.red : Color(0xFFD4AF37)), 
-                  title: Row(children: [Text(name, style: const TextStyle(fontWeight: FontWeight.bold)), if (isBanned) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.red.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: const Text('BANNED', style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)))]), 
-                  subtitle: Text('Code: ${d['unitCode']} | Role: ${d['role']}'), 
-                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                    IconButton(icon: Icon(isBanned ? Icons.lock : Icons.lock_open, color: isBanned ? Colors.red : Colors.green), tooltip: isBanned ? 'Unban Staff' : 'Ban Staff', onPressed: () => _toggleBan(doc.id, isBanned)),
-                    IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await doc.reference.delete(); })
-                  ])
-                ); 
-              }); 
-            })); 
-          }
-          EOF
-
-          cat > lib/screens/manage_clubs.dart << 'EOF'
-          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
-          class ManageClubsScreen extends StatefulWidget { const ManageClubsScreen({super.key}); @override State<ManageClubsScreen> createState() => _ManageClubsScreenState(); }
-          class _ManageClubsScreenState extends State<ManageClubsScreen> { final _clubNameCtrl = TextEditingController(); final _headCodeCtrl = TextEditingController(); bool _loading = false; void _assignClub() async { if (_clubNameCtrl.text.isEmpty || _headCodeCtrl.text.isEmpty) return; setState(() => _loading = true); String clubName = _clubNameCtrl.text.trim(); String headCode = _headCodeCtrl.text.trim().toUpperCase(); final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: headCode).limit(1).get(); if (snap.docs.isNotEmpty) { final studentName = snap.docs.first.data()['fullName']; await FirebaseFirestore.instance.collection('clubs').doc(clubName).set({'name': clubName, 'head_code': headCode, 'head_name': studentName, 'time': FieldValue.serverTimestamp()}); _clubNameCtrl.clear(); _headCodeCtrl.clear(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$clubName assigned to $studentName'))); } else { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Student Code not found!'))); } setState(() => _loading = false); } @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Manage Clubs')), body: Column(children: [Padding(padding: const EdgeInsets.all(16), child: Column(children: [TextField(controller: _clubNameCtrl, decoration: const InputDecoration(labelText: 'Club Name')), const SizedBox(height: 16), TextField(controller: _headCodeCtrl, decoration: const InputDecoration(labelText: 'Student Code (e.g. PDT-1234)')), const SizedBox(height: 24), SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _loading ? null : _assignClub, child: _loading ? const CircularProgressIndicator() : const Text('ASSIGN CLUB HEAD')))])), const Divider(), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('clubs').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final doc = s.data!.docs[i]; return ListTile(leading: const Icon(Icons.groups, color: Colors.blue), title: Text(doc['name'], style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('Head: ${doc['head_name']} (${doc['head_code']})'), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await doc.reference.delete(); })); }); }))])); }
-          EOF
-
-          cat > lib/screens/ocr_register.dart << 'EOF'
-          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart'; import 'package:image_picker/image_picker.dart'; import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'; import 'dart:io';
-          class OcrRegisterScreen extends StatefulWidget { const OcrRegisterScreen({super.key}); @override State<OcrRegisterScreen> createState() => _OcrRegisterScreenState(); }
-          class _OcrRegisterScreenState extends State<OcrRegisterScreen> { List<String> _extractedNames = []; String _selectedClass = 'S1'; String _selectedTitle = 'Mr.'; bool _loading = false; bool _saving = false; void _scan() async { final img = await ImagePicker().pickImage(source: ImageSource.camera); if (img == null) return; setState(() { _loading = true; _extractedNames.clear(); }); final rec = TextRecognizer(); final res = await rec.processImage(InputImage.fromFile(File(img.path))); await rec.close(); List<String> rawLines = res.text.split('\n'); List<String> cleanedNames = []; for (String line in rawLines) { String clean = line.trim(); clean = clean.replaceFirst(RegExp(r'^\d+[\.\)]?\s*'), ''); if (clean.length > 2 && clean.contains(' ')) { cleanedNames.add(clean); } } setState(() { _extractedNames = cleanedNames; _loading = false; }); } void _saveToDatabase() async { if (_extractedNames.isEmpty) return; setState(() => _saving = true); int addedCount = 0; int rejectedCount = 0; for (String rawName in _extractedNames) { String fullName = "$_selectedTitle $rawName".trim(); final existing = await FirebaseFirestore.instance.collection('students').where('fullName', isEqualTo: fullName).limit(1).get(); if (existing.docs.isNotEmpty) { rejectedCount++; continue; } List<String> parts = rawName.split(' '); String firstName = parts[0]; String lastName = parts.length > 1 ? parts.sublist(1).join(' ') : ''; String genCode = "PDT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}${addedCount}"; await FirebaseFirestore.instance.collection('students').add({'firstName': firstName, 'lastName': lastName, 'fullName': fullName, 'classLevel': _selectedClass, 'unitCode': genCode, 'role': 'Student', 'time': FieldValue.serverTimestamp(), 'enrollmentYear': DateTime.now().year}); addedCount++; } setState(() { _saving = false; _extractedNames.clear(); }); if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registered: $addedCount | Rejected: $rejectedCount'), backgroundColor: rejectedCount > 0 ? Colors.orange : Colors.green)); } @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text('Register Students')), body: Column(children: [Padding(padding: const EdgeInsets.all(16), child: Column(children: [Row(children: [Expanded(child: DropdownButtonFormField<String>(value: _selectedTitle, decoration: const InputDecoration(labelText: 'Title'), items: ['Mr.', 'Mrs.', 'Ms.'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedTitle = v!))), const SizedBox(width: 16), Expanded(child: DropdownButtonFormField<String>(value: _selectedClass, decoration: const InputDecoration(labelText: 'Class'), items: ['S1','S2','S3','S4','S5','S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedClass = v!)))]), const SizedBox(height: 16), SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(onPressed: _loading ? null : _scan, icon: const Icon(Icons.camera_alt), label: Text(_loading ? 'Scanning...' : 'Take Photo of Register')))]), ), const Divider(), const Padding(padding: EdgeInsets.all(8.0), child: Text('Review Extracted Names (Duplicates blocked):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))), Expanded(child: _extractedNames.isEmpty ? Center(child: Text(_loading ? 'Reading names...' : 'No names scanned yet.', style: const TextStyle(color: Colors.grey))) : ListView.builder(itemCount: _extractedNames.length, itemBuilder: (c, i) => ListTile(leading: const Icon(Icons.person, color: Colors.greenAccent), title: Text("$_selectedTitle ${_extractedNames[i]}"), trailing: IconButton(icon: const Icon(Icons.remove_circle, color: Colors.red), onPressed: () => setState(() => _extractedNames.removeAt(i)))))), if (_extractedNames.isNotEmpty) Padding(padding: const EdgeInsets.all(16), child: SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _saving ? null : _saveToDatabase, icon: const Icon(Icons.save), label: Text(_saving ? 'Saving...' : 'Save & Generate Codes for ${_extractedNames.length} Students'))))])); } }
-          EOF
-
-          cat > lib/screens/post_announcement.dart << 'EOF'
-          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart'; import 'package:image_picker/image_picker.dart'; import 'dart:io'; import '../services/telegram_service.dart';
-          class PostAnnouncementScreen extends StatefulWidget { const PostAnnouncementScreen({super.key}); @override State<PostAnnouncementScreen> createState() => _PostAnnouncementScreenState(); }
-          class _PostAnnouncementScreenState extends State<PostAnnouncementScreen> { final _textCtrl = TextEditingController(); bool _loading = false; File? _image; Future<void> _pickImage() async { final x = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 50, maxWidth: 800); if (x != null) setState(() => _image = File(x.path)); } Future<void> _post() async { if (_textCtrl.text.isEmpty && _image == null) return; setState(() => _loading = true); try { String? fileId; if (_image != null) { fileId = await TelegramService.uploadFile(_image!, 'image'); } await FirebaseFirestore.instance.collection('feed_posts').add({'author': 'School Admin', 'authorType': 'admin', 'text': _textCtrl.text.trim(), 'telegram_file_id': fileId, 'mediaType': fileId != null ? 'image' : null, 'time': FieldValue.serverTimestamp(), 'likes': 0, 'likedBy': []}); _textCtrl.clear(); setState(() { _image = null; _loading = false; }); if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Announcement Posted!'))); Navigator.pop(context); } } catch (e) { setState(() => _loading = false); if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); } } @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Post Announcement')), body: ListView(padding: const EdgeInsets.all(16), children: [TextField(controller: _textCtrl, maxLines: 5, decoration: const InputDecoration(hintText: 'Type your announcement...', filled: true, fillColor: Color(0xFF131A26))), const SizedBox(height: 16), if (_image != null) Image.file(_image!, height: 200), const SizedBox(height: 16), ElevatedButton.icon(icon: const Icon(Icons.image), label: const Text('Attach Image (Optional)'), onPressed: _pickImage), const SizedBox(height: 16), SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _loading ? null : _post, child: _loading ? const CircularProgressIndicator() : const Text('POST TO FEED')))])); }
-          EOF
-
-          cat > lib/screens/ban_manager.dart << 'EOF'
-          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
-          class BanManagerScreen extends StatefulWidget { const BanManagerScreen({super.key}); @override State<BanManagerScreen> createState() => _BanManagerScreenState(); }
-          class _BanManagerScreenState extends State<BanManagerScreen> { final _codeCtrl = TextEditingController(); final _deviceCtrl = TextEditingController(); void _banCodeAndDevice() async { if (_codeCtrl.text.isEmpty) return; String code = _codeCtrl.text.trim().toUpperCase(); final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: code).limit(1).get(); if (snap.docs.isNotEmpty) { final deviceId = snap.docs.first.data()['device_id']; await FirebaseFirestore.instance.collection('banned_codes').doc(code).set({'time': FieldValue.serverTimestamp()}); if (deviceId != null) { await FirebaseFirestore.instance.collection('banned_devices').doc(deviceId).set({'time': FieldValue.serverTimestamp()}); } _codeCtrl.clear(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Banned Successfully'))); } else { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found'))); } } void _unbanCode() async { if (_codeCtrl.text.isEmpty) return; String code = _codeCtrl.text.trim().toUpperCase(); final snap = await FirebaseFirestore.instance.collection('students').where('unitCode', isEqualTo: code).limit(1).get(); await FirebaseFirestore.instance.collection('banned_codes').doc(code).delete(); if (snap.docs.isNotEmpty) { final deviceId = snap.docs.first.data()['device_id']; if (deviceId != null) { await FirebaseFirestore.instance.collection('banned_devices').doc(deviceId).delete(); } } _codeCtrl.clear(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unbanned Successfully'))); } @override Widget build(BuildContext context) => DefaultTabController(length: 2, child: Scaffold(appBar: AppBar(title: const Text('Security & Bans'), bottom: const TabBar(tabs: [Tab(text: 'Banned Codes'), Tab(text: 'Banned Devices')])), body: TabBarView(children: [Column(children: [Padding(padding: const EdgeInsets.all(16), child: Row(children: [Expanded(child: TextField(controller: _codeCtrl, decoration: const InputDecoration(labelText: 'Enter Code', filled: true, fillColor: Color(0xFF131A26))))])), Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: _banCodeAndDevice, child: const Text('BAN')), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _unbanCode, child: const Text('UNBAN'))]), const SizedBox(height: 16), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('banned_codes').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final doc = s.data!.docs[i]; return ListTile(leading: const Icon(Icons.block, color: Colors.red), title: Text(doc.id, style: const TextStyle(fontWeight: FontWeight.bold)), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.green), onPressed: () async { await doc.reference.delete(); })); }); }))]), Column(children: [Padding(padding: const EdgeInsets.all(16), child: Row(children: [Expanded(child: TextField(controller: _deviceCtrl, decoration: const InputDecoration(labelText: 'Enter Device ID', filled: true, fillColor: Color(0xFF131A26)))), const SizedBox(width: 16), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: () async { if (_deviceCtrl.text.isNotEmpty) { await FirebaseFirestore.instance.collection('banned_devices').doc(_deviceCtrl.text.trim()).set({'time': FieldValue.serverTimestamp()}); _deviceCtrl.clear(); } }, child: const Text('BAN'))])), Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('banned_devices').snapshots(), builder: (c, s) { if (!s.hasData) return const Center(child: CircularProgressIndicator()); return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final doc = s.data!.docs[i]; return ListTile(leading: const Icon(Icons.phone_android, color: Colors.red), title: Text(doc.id, style: const TextStyle(fontWeight: FontWeight.bold)), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.green), onPressed: () async { await doc.reference.delete(); })); }); }))])]))); }
           EOF
           
           cat > lib/screens/send_notification.dart << 'EOF'
