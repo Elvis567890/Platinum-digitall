@@ -1008,6 +1008,47 @@ jobs:
             );
           }
           EOF
+
+          cat > lib/screens/reset_system.dart << 'EOF'
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class ResetSystemScreen extends StatefulWidget { const ResetSystemScreen({super.key}); @override State<ResetSystemScreen> createState() => _ResetSystemScreenState(); }
+          class _ResetSystemScreenState extends State<ResetSystemScreen> {
+            bool _loading = false;
+            Future<void> _wipeCollection(String collectionName) async {
+              final snap = await FirebaseFirestore.instance.collection(collectionName).get();
+              for (var doc in snap.docs) { await doc.reference.delete(); }
+            }
+            Future<void> _resetAll() async {
+              setState(() => _loading = true);
+              try {
+                await _wipeCollection('feed_posts');
+                await _wipeCollection('anonymous_posts');
+                await _wipeCollection('notifications');
+                await _wipeCollection('live_classes');
+                final chatSnap = await FirebaseFirestore.instance.collection('chats').get();
+                for (var chatDoc in chatSnap.docs) {
+                  final msgs = await chatDoc.reference.collection('msgs').get();
+                  for (var msg in msgs.docs) { await msg.reference.delete(); }
+                }
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All Posts, Chats, and Notifications Deleted!'), backgroundColor: Colors.green));
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              } finally {
+                setState(() => _loading = false);
+              }
+            }
+            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Reset App Data')), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(Icons.warning_amber_rounded, size: 80, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text('Warning!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red)),
+              const SizedBox(height: 8),
+              const Text('This will delete ALL feed posts, anonymous confessions, and chat messages. This action cannot be undone.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 32),
+              if (_loading) const CircularProgressIndicator(),
+              if (!_loading) SizedBox(width: double.infinity, height: 50, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: _resetAll, child: const Text('DELETE ALL POSTS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)))),
+            ]))));
+          }
+          EOF
           
           cat > lib/screens/send_notification.dart << 'EOF'
           import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart'; import 'package:http/http.dart' as http; import 'dart:convert';
