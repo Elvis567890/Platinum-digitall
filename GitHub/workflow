@@ -190,6 +190,9 @@ jobs:
           }
           EOF
 
+          # =========================================================
+          # main.dart — FIXED in-app updater (awaits check before nav)
+          # =========================================================
           cat > lib/main.dart << 'EOF'
           import 'dart:io';
           import 'package:flutter/material.dart';
@@ -243,49 +246,102 @@ jobs:
           }
           class _StartScreenState extends State<StartScreen> {
             @override void initState() { super.initState(); _init(); }
+
             Future<void> _init() async {
-              _checkForUpdates();
+              await _checkForUpdates();   // WAIT for update flow before navigating
               final prefs = await SharedPreferences.getInstance();
               final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => isLoggedIn ? const HomeScreen() : const LoginScreen()));
+              if (!mounted) return;
+              Navigator.pushReplacement(context, MaterialPageRoute(
+                  builder: (_) => isLoggedIn ? const HomeScreen() : const LoginScreen()));
             }
-            void _checkForUpdates() async {
+
+            Future<void> _checkForUpdates() async {
               try {
                 PackageInfo pInfo = await PackageInfo.fromPlatform();
-                final res = await http.get(Uri.parse('https://api.github.com/repos/Elvis567890/Platinum-digitall/releases'));
-                if (res.statusCode == 200) {
-                  final data = jsonDecode(res.body);
-                  for (var release in data) {
-                    if (release['tag_name'].startsWith('v')) {
-                      final latest = release['tag_name'].toString().replaceFirst(RegExp(r'^v'), '');
-                      final assets = (release['assets'] as List?) ?? const [];
-                      Map? apkAsset;
-                      for (final asset in assets) { if (asset is Map && asset['name'].toString().endsWith('.apk')) { apkAsset = asset; break; } }
-                      final apkUrl = apkAsset?['browser_download_url']?.toString();
-                      if (apkUrl != null && latest != pInfo.version && mounted) {
-                        showDialog(context: context, barrierDismissible: false, builder: (ctx) => AlertDialog(title: const Text('Update Available'), content: Text('Version $latest is available. Please update to continue using the app.'), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Remind Me Later')), ElevatedButton(onPressed: () async { Navigator.pop(ctx); await _download(apkUrl); }, child: const Text('Update Now'))]));
-                      }
+                final res = await http.get(Uri.parse(
+                    'https://api.github.com/repos/Elvis567890/Platinum-digitall/releases'));
+                if (res.statusCode != 200) return;
+                final data = jsonDecode(res.body);
+                for (var release in data) {
+                  // Only consider student releases that start with "v" (not "staff-v...")
+                  if (!release['tag_name'].toString().startsWith('v')) continue;
+                  final latest = release['tag_name'].toString().replaceFirst(RegExp(r'^v'), '');
+                  final assets = (release['assets'] as List?) ?? const [];
+                  String? apkUrl;
+                  for (final asset in assets) {
+                    if (asset is Map && asset['name'].toString().endsWith('.apk')) {
+                      apkUrl = asset['browser_download_url']?.toString();
                       break;
                     }
                   }
+                  if (apkUrl == null) break;
+
+                  if (latest != pInfo.version && mounted) {
+                    await showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Update Available'),
+                        content: Text('Version $latest is available (you have ${pInfo.version}).\n\nUpdate now to get the latest features.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Remind Me Later'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () async {
+                              Navigator.pop(ctx);
+                              await _download(apkUrl!);
+                            },
+                            child: const Text('Update Now'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  break;
                 }
-              } catch (e) {}
+              } catch (_) {}
             }
+
             Future<void> _download(String url) async {
-              if (await Permission.requestInstallPackages.status != PermissionStatus.granted) { await Permission.requestInstallPackages.request(); }
-              showDialog(context: context, barrierDismissible: false, builder: (ctx) => const AlertDialog(content: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 20), Text("Downloading Update...")])));
+              if (await Permission.requestInstallPackages.status != PermissionStatus.granted) {
+                await Permission.requestInstallPackages.request();
+              }
+              if (!mounted) return;
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (ctx) => const AlertDialog(
+                  content: Column(mainAxisSize: MainAxisSize.min, children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 20),
+                    Text("Downloading update..."),
+                  ]),
+                ),
+              );
               try {
-                Directory? dir = await getExternalStorageDirectory(); dir ??= await getApplicationDocumentsDirectory();
-                final path = '${dir.path}/update.apk';
+                Directory? dir = await getExternalStorageDirectory();
+                dir ??= await getApplicationDocumentsDirectory();
+                final path = '${dir.path}/platinum_update.apk';
                 await Dio().download(url, path);
                 if (mounted) Navigator.pop(context);
                 await OpenFilex.open(path, type: "application/vnd.android.package-archive");
               } catch (e) {
                 if (mounted) Navigator.pop(context);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Update failed: $e')));
               }
             }
-            @override Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+            @override Widget build(BuildContext context) => const Scaffold(
+              body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Checking for updates...', style: TextStyle(color: Colors.grey)),
+              ])),
+            );
           }
           EOF
 
@@ -359,7 +415,6 @@ jobs:
             @override Widget build(BuildContext context) {
               if (_code.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator()));
               if (_cls == 'Omicron') return AlumniHub(myCode: _code, myName: _name);
-
               final pages = [
                 NoticeBoardScreen(name: _name, role: _role, code: _code),
                 PulseScreen(name: _name, role: _role, code: _code),
@@ -368,7 +423,6 @@ jobs:
                 InboxScreen(myCode: _code, myName: _name),
                 ProfileScreen(code: _code, name: _name, cls: _cls),
               ];
-
               return Scaffold(
                 body: pages[_i],
                 bottomNavigationBar: BottomNavigationBar(
@@ -452,27 +506,24 @@ jobs:
                       return ListView.builder(padding: const EdgeInsets.only(top: 8, bottom: 80), itemCount: s.data!.docs.length, itemBuilder: (c, i) {
                         final d = s.data!.docs[i].data() as Map<String, dynamic>;
                         final fileId = d['telegram_file_id'] as String?;
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
-                          child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Row(children: [
-                              CircleAvatar(backgroundColor: d['authorType'] == 'admin' ? const Color(0xFF0B0F19) : Colors.orange, child: Icon(d['authorType'] == 'admin' ? Icons.shield : Icons.campaign, color: Colors.white, size: 20)),
-                              const SizedBox(width: 10),
-                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(d['author'] ?? 'Admin', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                Text(d['time'] != null ? timeago.format((d['time'] as Timestamp).toDate()) : '', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                              ])),
-                              if (d['authorType'] == 'prefect') Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: const Text('PREFECT', style: TextStyle(fontSize: 8, color: Colors.orange, fontWeight: FontWeight.bold))),
-                            ]),
-                            const SizedBox(height: 12),
-                            if (d['text'] != null && d['text'].toString().isNotEmpty) Text(d['text'], style: const TextStyle(fontSize: 15, height: 1.4)),
-                            if (fileId != null) Padding(padding: const EdgeInsets.only(top: 12), child: FutureBuilder<String?>(future: TelegramService.getFileUrl(fileId), builder: (ctx2, snap) {
-                              if (!snap.hasData) return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
-                              if (snap.data == null) return const Text('Media expired', style: TextStyle(color: Colors.red));
-                              return ClipRRect(borderRadius: BorderRadius.circular(12), child: CachedNetworkImage(imageUrl: snap.data!, width: double.infinity, height: 220, fit: BoxFit.cover));
-                            })),
-                          ]))
-                        );
+                        return Card(margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            CircleAvatar(backgroundColor: d['authorType'] == 'admin' ? const Color(0xFF0B0F19) : Colors.orange, child: Icon(d['authorType'] == 'admin' ? Icons.shield : Icons.campaign, color: Colors.white, size: 20)),
+                            const SizedBox(width: 10),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(d['author'] ?? 'Admin', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(d['time'] != null ? timeago.format((d['time'] as Timestamp).toDate()) : '', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            ])),
+                            if (d['authorType'] == 'prefect') Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: const Text('PREFECT', style: TextStyle(fontSize: 8, color: Colors.orange, fontWeight: FontWeight.bold))),
+                          ]),
+                          const SizedBox(height: 12),
+                          if (d['text'] != null && d['text'].toString().isNotEmpty) Text(d['text'], style: const TextStyle(fontSize: 15, height: 1.4)),
+                          if (fileId != null) Padding(padding: const EdgeInsets.only(top: 12), child: FutureBuilder<String?>(future: TelegramService.getFileUrl(fileId), builder: (ctx2, snap) {
+                            if (!snap.hasData) return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
+                            if (snap.data == null) return const Text('Media expired', style: TextStyle(color: Colors.red));
+                            return ClipRRect(borderRadius: BorderRadius.circular(12), child: CachedNetworkImage(imageUrl: snap.data!, width: double.infinity, height: 220, fit: BoxFit.cover));
+                          })),
+                        ])));
                       });
                     }
                   ))
@@ -499,9 +550,7 @@ jobs:
           class _PulseScreenState extends State<PulseScreen> {
             bool _uploading = false;
             bool get _canModerate => widget.role == 'Admin' || widget.role == 'Teacher' || widget.role == 'Super Admin' || widget.role == 'Prefect';
-
             @override void initState() { super.initState(); _purgeOldStories(); }
-
             Future<void> _purgeOldStories() async {
               try {
                 final cutoff = DateTime.now().subtract(const Duration(hours: 24));
@@ -509,7 +558,6 @@ jobs:
                 for (var doc in old.docs) { await doc.reference.delete(); }
               } catch (_) {}
             }
-
             Future<void> _createPost() async {
               final textCtrl = TextEditingController(); File? image;
               await showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => StatefulBuilder(builder: (context, setModalState) {
@@ -540,7 +588,6 @@ jobs:
                 ]));
               }));
             }
-
             Future<void> _createStory() async {
               final x = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 40);
               if (x == null) return;
@@ -555,25 +602,19 @@ jobs:
               } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); }
               setState(() => _uploading = false);
             }
-
             void _viewStory(Map<String, dynamic> story) {
-              showDialog(context: context, builder: (ctx) => Dialog(
-                backgroundColor: Colors.black, insetPadding: const EdgeInsets.all(8),
+              showDialog(context: context, builder: (ctx) => Dialog(backgroundColor: Colors.black, insetPadding: const EdgeInsets.all(8),
                 child: Stack(children: [
-                  SizedBox(width: double.infinity, height: 500, child: FutureBuilder<String?>(
-                    future: TelegramService.getFileUrl(story['telegram_file_id']),
-                    builder: (c, snap) {
-                      if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: Colors.white));
-                      if (snap.data == null) return const Center(child: Text('Story unavailable', style: TextStyle(color: Colors.white)));
-                      return CachedNetworkImage(imageUrl: snap.data!, fit: BoxFit.contain);
-                    }
-                  )),
+                  SizedBox(width: double.infinity, height: 500, child: FutureBuilder<String?>(future: TelegramService.getFileUrl(story['telegram_file_id']), builder: (c, snap) {
+                    if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: Colors.white));
+                    if (snap.data == null) return const Center(child: Text('Story unavailable', style: TextStyle(color: Colors.white)));
+                    return CachedNetworkImage(imageUrl: snap.data!, fit: BoxFit.contain);
+                  })),
                   Positioned(top: 8, left: 12, child: Text(story['authorName'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                   Positioned(top: 8, right: 8, child: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(ctx))),
                 ])
               ));
             }
-
             @override Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(title: const Text('Platinum Pulse'), actions: [
@@ -594,21 +635,14 @@ jobs:
                         return now.difference(t.toDate()).inHours < 24;
                       }).toList();
                       if (fresh.isEmpty) return const SizedBox();
-                      return ListView.builder(
-                        scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8),
-                        itemCount: fresh.length,
-                        itemBuilder: (c, i) {
-                          final story = fresh[i].data() as Map<String, dynamic>;
-                          return GestureDetector(onTap: () => _viewStory(story), child: Container(
-                            margin: const EdgeInsets.only(right: 8), width: 72,
-                            child: Column(children: [
-                              Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFC62828), width: 2)), child: const CircleAvatar(radius: 28, backgroundColor: Colors.grey, child: Icon(Icons.person, color: Colors.white))),
-                              const SizedBox(height: 4),
-                              Text(story['authorName'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)
-                            ])
-                          ));
-                        }
-                      );
+                      return ListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), itemCount: fresh.length, itemBuilder: (c, i) {
+                        final story = fresh[i].data() as Map<String, dynamic>;
+                        return GestureDetector(onTap: () => _viewStory(story), child: Container(margin: const EdgeInsets.only(right: 8), width: 72, child: Column(children: [
+                          Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFC62828), width: 2)), child: const CircleAvatar(radius: 28, backgroundColor: Colors.grey, child: Icon(Icons.person, color: Colors.white))),
+                          const SizedBox(height: 4),
+                          Text(story['authorName'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)
+                        ])));
+                      });
                     }
                   )),
                   Expanded(child: StreamBuilder<QuerySnapshot>(
@@ -627,7 +661,6 @@ jobs:
               );
             }
           }
-
           class PulseCard extends StatefulWidget {
             final String docId; final Map<String, dynamic> data; final String myName; final String myCode; final bool canModerate;
             const PulseCard({required this.docId, required this.data, required this.myName, required this.myCode, required this.canModerate});
@@ -636,7 +669,6 @@ jobs:
           class _PulseCardState extends State<PulseCard> {
             final _commentCtrl = TextEditingController();
             @override void dispose() { _commentCtrl.dispose(); super.dispose(); }
-
             void _toggleLike() async {
               final doc = FirebaseFirestore.instance.collection('feed_posts').doc(widget.docId);
               await FirebaseFirestore.instance.runTransaction((transaction) async {
@@ -646,7 +678,6 @@ jobs:
                 else { likedBy.add(widget.myName); transaction.update(doc, {'likes': FieldValue.increment(1), 'likedBy': likedBy}); }
               });
             }
-
             void _showComments() {
               showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.white, builder: (ctx) => Padding(
                 padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
@@ -673,7 +704,6 @@ jobs:
                 ]))
               ));
             }
-
             void _deletePost() async {
               final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
                 title: const Text('Delete Post'), content: const Text('Are you sure you want to delete this post?'),
@@ -684,7 +714,6 @@ jobs:
               ));
               if (confirm == true) await FirebaseFirestore.instance.collection('feed_posts').doc(widget.docId).delete();
             }
-
             void _followAuthor() async {
               final authorCode = widget.data['authorCode'];
               if (authorCode == null) return;
@@ -693,7 +722,6 @@ jobs:
               if (existing.exists) { await followDoc.delete(); }
               else { await followDoc.set({'follower': widget.myCode, 'following': authorCode, 'time': FieldValue.serverTimestamp()}); }
             }
-
             Widget _buildMedia() {
               final fileId = widget.data['telegram_file_id'];
               if (fileId == null) return const SizedBox();
@@ -703,16 +731,13 @@ jobs:
                 return ClipRRect(borderRadius: BorderRadius.circular(12), child: CachedNetworkImage(imageUrl: snapshot.data!, width: double.infinity, height: 250, fit: BoxFit.cover));
               });
             }
-
             @override Widget build(BuildContext context) {
               final likedBy = widget.data['likedBy'] as List? ?? [];
               final hasLiked = likedBy.contains(widget.myName);
               final authorType = widget.data['authorType'] ?? 'student';
               final canDelete = widget.canModerate || widget.data['authorCode'] == widget.myCode;
-
               return Card(margin: const EdgeInsets.only(bottom: 24, left: 16, right: 16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   leading: CircleAvatar(backgroundColor: authorType == 'admin' ? const Color(0xFF0B0F19) : (authorType == 'teacher' || authorType == 'prefect' ? Colors.orange : const Color(0xFFC62828)), child: Icon(authorType == 'admin' ? Icons.shield : (authorType == 'teacher' || authorType == 'prefect' ? Icons.school : Icons.person), color: Colors.white)),
                   title: Row(children: [
                     Text(widget.data['author'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -728,8 +753,7 @@ jobs:
                       }
                     ),
                     if (canDelete) IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20), onPressed: _deletePost)
-                  ])
-                ),
+                  ])),
                 if (widget.data['text'] != null && widget.data['text'].toString().isNotEmpty) Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Text(widget.data['text'], style: const TextStyle(fontSize: 15, height: 1.35))),
                 if (widget.data['telegram_file_id'] != null) Padding(padding: const EdgeInsets.only(top: 8), child: _buildMedia()),
                 Row(children: [
@@ -763,14 +787,10 @@ jobs:
           class _LibraryScreenState extends State<LibraryScreen> {
             bool _uploading = false;
             bool get _isTeacher => widget.role == 'Admin' || widget.role == 'Teacher' || widget.role == 'Super Admin';
-
             Future<void> _uploadResource() async {
               final titleCtrl = TextEditingController();
               final descCtrl = TextEditingController();
-              File? image;
-              File? file;
-              String kind = 'image';
-
+              File? image; File? file; String kind = 'image';
               await showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => StatefulBuilder(builder: (context, setModalState) {
                 return Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16), child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
                   const Text('Upload to Library', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -806,7 +826,6 @@ jobs:
                 ])));
               }));
             }
-
             @override Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(title: const Text('Library')),
@@ -825,11 +844,8 @@ jobs:
                           onTap: fileId == null ? null : () async {
                             final url = await TelegramService.getFileUrl(fileId);
                             if (url == null) return;
-                            if (d['mediaType'] == 'image') {
-                              if (context.mounted) showDialog(context: context, builder: (ctx) => Dialog(child: InteractiveViewer(child: CachedNetworkImage(imageUrl: url))));
-                            } else {
-                              if (context.mounted) await launchUrl(Uri.parse(url));
-                            }
+                            if (d['mediaType'] == 'image') { if (context.mounted) showDialog(context: context, builder: (ctx) => Dialog(child: InteractiveViewer(child: CachedNetworkImage(imageUrl: url)))); }
+                            else { if (context.mounted) await launchUrl(Uri.parse(url)); }
                           },
                           child: Padding(padding: const EdgeInsets.all(14), child: Row(children: [
                             CircleAvatar(backgroundColor: Colors.blue.withOpacity(0.15), child: Icon(d['mediaType'] == 'image' ? Icons.image : Icons.description, color: Colors.blue)),
@@ -859,26 +875,11 @@ jobs:
             @override Widget build(BuildContext context) => Scaffold(
               appBar: AppBar(title: const Text('Groups')),
               body: ListView(padding: const EdgeInsets.all(16), children: [
-                ListTile(
-                  leading: const Icon(Icons.public, color: Color(0xFFC62828)),
-                  title: const Text('Whole School', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Everyone in the school'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: 'Whole_School', userCode: code, userName: name)))),
+                ListTile(leading: const Icon(Icons.public, color: Color(0xFFC62828)), title: const Text('Whole School', style: TextStyle(fontWeight: FontWeight.bold)), subtitle: const Text('Everyone in the school'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: 'Whole_School', userCode: code, userName: name)))),
                 const SizedBox(height: 8),
-                ListTile(
-                  leading: const Icon(Icons.shield, color: Colors.orange),
-                  title: Text('$cls – With Teachers', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Class group where teachers can see messages'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: '${cls}_Teachers', userCode: code, userName: name)))),
+                ListTile(leading: const Icon(Icons.shield, color: Colors.orange), title: Text('$cls – With Teachers', style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: const Text('Class group where teachers can see messages'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: '${cls}_Teachers', userCode: code, userName: name)))),
                 const SizedBox(height: 8),
-                ListTile(
-                  leading: const Icon(Icons.groups, color: Color(0xFFC62828)),
-                  title: Text('$cls – Students Only', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('No teachers in this group'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: '${cls}_Students', userCode: code, userName: name)))),
+                ListTile(leading: const Icon(Icons.groups, color: Color(0xFFC62828)), title: Text('$cls – Students Only', style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: const Text('No teachers in this group'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: '${cls}_Students', userCode: code, userName: name)))),
                 const Divider(height: 32),
                 const Text('Official Clubs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.blue)),
                 const SizedBox(height: 8),
@@ -930,31 +931,20 @@ jobs:
             final _recorder = AudioRecorder();
             bool _uploading = false;
             bool _isRecording = false;
-
             @override void dispose() { _c.dispose(); _recorder.dispose(); super.dispose(); }
-
             Future<void> _sendMedia(String kind) async {
               FilePickerResult? r;
-              switch (kind) {
-                case 'image': r = await FilePicker.platform.pickFiles(type: FileType.image); break;
-                case 'video': r = await FilePicker.platform.pickFiles(type: FileType.video); break;
-                case 'audio': r = await FilePicker.platform.pickFiles(type: FileType.audio); break;
-                default: r = await FilePicker.platform.pickFiles(type: FileType.any);
-              }
+              switch (kind) { case 'image': r = await FilePicker.platform.pickFiles(type: FileType.image); break; case 'video': r = await FilePicker.platform.pickFiles(type: FileType.video); break; case 'audio': r = await FilePicker.platform.pickFiles(type: FileType.audio); break; default: r = await FilePicker.platform.pickFiles(type: FileType.any); }
               if (r == null) return;
               setState(() => _uploading = true);
               try {
                 final file = r.files.single;
                 final fileId = await TelegramService.uploadFile(File(file.path!), kind);
                 if (fileId == null) throw 'Upload failed';
-                await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({
-                  'senderCode': widget.userCode, 'senderName': widget.userName, 'text': '', 'type': kind,
-                  'telegram_file_id': fileId, 'fileName': file.name, 'time': FieldValue.serverTimestamp()
-                });
+                await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'senderCode': widget.userCode, 'senderName': widget.userName, 'text': '', 'type': kind, 'telegram_file_id': fileId, 'fileName': file.name, 'time': FieldValue.serverTimestamp()});
               } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'))); }
               finally { if (mounted) setState(() => _uploading = false); }
             }
-
             Future<void> _toggleRecording() async {
               if (_isRecording) {
                 final path = await _recorder.stop();
@@ -963,10 +953,7 @@ jobs:
                 setState(() => _uploading = true);
                 try {
                   final fileId = await TelegramService.uploadFile(File(path), 'audio');
-                  await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({
-                    'senderCode': widget.userCode, 'senderName': widget.userName, 'text': '', 'type': 'audio',
-                    'telegram_file_id': fileId, 'fileName': 'voice_note.m4a', 'time': FieldValue.serverTimestamp()
-                  });
+                  await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'senderCode': widget.userCode, 'senderName': widget.userName, 'text': '', 'type': 'audio', 'telegram_file_id': fileId, 'fileName': 'voice_note.m4a', 'time': FieldValue.serverTimestamp()});
                 } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Voice upload failed: $e'))); }
                 finally { if (mounted) setState(() => _uploading = false); }
               } else {
@@ -980,7 +967,6 @@ jobs:
                 }
               }
             }
-
             void _showAttachMenu() {
               showModalBottomSheet(context: context, builder: (ctx) => SafeArea(child: Wrap(children: [
                 ListTile(leading: const Icon(Icons.image), title: const Text('Image'), onTap: () { Navigator.pop(ctx); _sendMedia('image'); }),
@@ -988,15 +974,11 @@ jobs:
                 ListTile(leading: const Icon(Icons.audiotrack), title: const Text('Audio File'), onTap: () { Navigator.pop(ctx); _sendMedia('audio'); }),
               ])));
             }
-
             Future<void> _sendText() async {
               if (_c.text.trim().isEmpty) return;
-              await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({
-                'senderCode': widget.userCode, 'senderName': widget.userName, 'text': _c.text.trim(), 'type': 'text', 'time': FieldValue.serverTimestamp()
-              });
+              await FirebaseFirestore.instance.collection('chats').doc(widget.room).collection('msgs').add({'senderCode': widget.userCode, 'senderName': widget.userName, 'text': _c.text.trim(), 'type': 'text', 'time': FieldValue.serverTimestamp()});
               _c.clear();
             }
-
             @override Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(title: Text(widget.room.replaceAll('_', ' '))),
@@ -1039,7 +1021,6 @@ jobs:
             }
             String _formatTime(dynamic t) { if (t is Timestamp) { final d = t.toDate(); return '${d.hour}:${d.minute.toString().padLeft(2, '0')}'; } return ''; }
           }
-
           class _TelegramMediaBubble extends StatelessWidget {
             final String fileId; final String type;
             const _TelegramMediaBubble({required this.fileId, required this.type});
@@ -1055,13 +1036,11 @@ jobs:
               });
             }
           }
-
           class _AudioBubble extends StatefulWidget { final String url; const _AudioBubble({required this.url}); @override State<_AudioBubble> createState() => _AudioBubbleState(); }
           class _AudioBubbleState extends State<_AudioBubble> { final _p = AudioPlayer(); bool _playing = false; @override void dispose() { _p.dispose(); super.dispose(); } @override Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
             IconButton(icon: Icon(_playing ? Icons.pause_circle_filled : Icons.play_circle_filled, color: const Color(0xFFC62828), size: 32), onPressed: () { if (_playing) { _p.pause(); } else { _p.play(UrlSource(widget.url)); } setState(() => _playing = !_playing); }),
             const Text('Voice Note', style: TextStyle(fontWeight: FontWeight.w500))
           ]); }
-
           class _VideoScreen extends StatefulWidget { final String url; const _VideoScreen({required this.url}); @override State<_VideoScreen> createState() => _VideoScreenState(); }
           class _VideoScreenState extends State<_VideoScreen> { late VideoPlayerController _c; @override void initState() { super.initState(); _c = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { setState(() {}); _c.play(); }); } @override void dispose() { _c.dispose(); super.dispose(); } @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black), body: Center(child: _c.value.isInitialized ? AspectRatio(aspectRatio: _c.value.aspectRatio, child: VideoPlayer(_c)) : const CircularProgressIndicator())); }
           EOF
@@ -1104,36 +1083,17 @@ jobs:
           cat > lib/screens/games.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:cloud_firestore/cloud_firestore.dart';
-
           class GamesScreen extends StatefulWidget {
-            final String playerCode;
-            final String playerName;
+            final String playerCode; final String playerName;
             const GamesScreen({super.key, required this.playerCode, required this.playerName});
             @override State<GamesScreen> createState() => _GamesScreenState();
           }
-
           class _GamesScreenState extends State<GamesScreen> {
-            bool _loading = true;
-            String? _error;
-            Map<String, dynamic>? _game;
-            String? _gameId;
-            int? _selected;
-            bool _answered = false;
-            int _streak = 0;
-            int _best = 0;
-
-            String get _today {
-              final n = DateTime.now();
-              return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
-            }
-
-            String get _yesterday {
-              final y = DateTime.now().subtract(const Duration(days: 1));
-              return '${y.year}-${y.month.toString().padLeft(2, '0')}-${y.day.toString().padLeft(2, '0')}';
-            }
-
+            bool _loading = true; String? _error; Map<String, dynamic>? _game; String? _gameId;
+            int? _selected; bool _answered = false; int _streak = 0; int _best = 0;
+            String get _today { final n = DateTime.now(); return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}'; }
+            String get _yesterday { final y = DateTime.now().subtract(const Duration(days: 1)); return '${y.year}-${y.month.toString().padLeft(2, '0')}-${y.day.toString().padLeft(2, '0')}'; }
             @override void initState() { super.initState(); _load(); }
-
             Future<void> _load() async {
               setState(() { _loading = true; _error = null; });
               try {
@@ -1142,18 +1102,10 @@ jobs:
                 _gameId = gameSnap.docs.first.id;
                 _game = gameSnap.docs.first.data();
                 final progressDoc = await FirebaseFirestore.instance.collection('game_progress').doc(widget.playerCode).get();
-                if (progressDoc.exists) {
-                  final p = progressDoc.data()!;
-                  _streak = p['streak'] ?? 0;
-                  _best = p['best'] ?? 0;
-                  if (p['lastPlayedDate'] == _today) { _answered = true; _selected = p['lastChoice'] ?? -1; }
-                }
+                if (progressDoc.exists) { final p = progressDoc.data()!; _streak = p['streak'] ?? 0; _best = p['best'] ?? 0; if (p['lastPlayedDate'] == _today) { _answered = true; _selected = p['lastChoice'] ?? -1; } }
                 setState(() => _loading = false);
-              } catch (e) {
-                setState(() { _loading = false; _error = e.toString(); });
-              }
+              } catch (e) { setState(() { _loading = false; _error = e.toString(); }); }
             }
-
             Future<void> _pick(int idx) async {
               if (_answered || _game == null) return;
               final correct = _game!['correctIndex'] as int;
@@ -1166,52 +1118,27 @@ jobs:
                 final p = pDoc.data()!;
                 totalPlayed = (p['totalPlayed'] ?? 0) + 1;
                 totalCorrect = (p['totalCorrect'] ?? 0) + (wasCorrect ? 1 : 0);
-                if (wasCorrect) {
-                  newStreak = (p['lastPlayedDate'] == _yesterday && p['lastAnswerCorrect'] == true) ? (p['streak'] ?? 0) + 1 : 1;
-                } else { newStreak = 0; }
+                if (wasCorrect) { newStreak = (p['lastPlayedDate'] == _yesterday && p['lastAnswerCorrect'] == true) ? (p['streak'] ?? 0) + 1 : 1; } else { newStreak = 0; }
                 newBest = (p['best'] ?? 0) > newStreak ? (p['best'] ?? 0) : newStreak;
-              } else {
-                newStreak = wasCorrect ? 1 : 0;
-                newBest = newStreak;
-              }
-              await ref.set({
-                'studentCode': widget.playerCode, 'studentName': widget.playerName,
-                'streak': newStreak, 'best': newBest,
-                'lastPlayedDate': _today, 'lastAnswerCorrect': wasCorrect, 'lastChoice': idx,
-                'totalPlayed': totalPlayed, 'totalCorrect': totalCorrect,
-                'time': FieldValue.serverTimestamp(),
-              });
-              await FirebaseFirestore.instance.collection('game_answers').doc('${widget.playerCode}_$_today').set({
-                'studentCode': widget.playerCode, 'studentName': widget.playerName,
-                'date': _today, 'gameId': _gameId, 'choice': idx, 'correct': wasCorrect,
-                'time': FieldValue.serverTimestamp(),
-              });
+              } else { newStreak = wasCorrect ? 1 : 0; newBest = newStreak; }
+              await ref.set({'studentCode': widget.playerCode, 'studentName': widget.playerName, 'streak': newStreak, 'best': newBest, 'lastPlayedDate': _today, 'lastAnswerCorrect': wasCorrect, 'lastChoice': idx, 'totalPlayed': totalPlayed, 'totalCorrect': totalCorrect, 'time': FieldValue.serverTimestamp()});
+              await FirebaseFirestore.instance.collection('game_answers').doc('${widget.playerCode}_$_today').set({'studentCode': widget.playerCode, 'studentName': widget.playerName, 'date': _today, 'gameId': _gameId, 'choice': idx, 'correct': wasCorrect, 'time': FieldValue.serverTimestamp()});
               setState(() { _streak = newStreak; _best = newBest; });
             }
-
             @override Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Game a Day')),
-                body: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _error != null
-                        ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('Error: $_error', textAlign: TextAlign.center)))
-                        : _game == null ? _noGame() : _gameView(),
-              );
+              return Scaffold(appBar: AppBar(title: const Text('Game a Day')), body: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('Error: $_error', textAlign: TextAlign.center)))
+                : _game == null ? _noGame() : _gameView());
             }
-
-            Widget _noGame() => Center(
-              child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Icon(Icons.videogame_asset_off, size: 80, color: Colors.grey),
-                const SizedBox(height: 16),
-                const Text('No game posted yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('Your teachers will post today\'s game soon.', style: TextStyle(color: Colors.grey[600]), textAlign: TextAlign.center),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Refresh')),
-              ])),
-            );
-
+            Widget _noGame() => Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(Icons.videogame_asset_off, size: 80, color: Colors.grey), const SizedBox(height: 16),
+              const Text('No game posted yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Your teachers will post today\'s game soon.', style: TextStyle(color: Colors.grey[600]), textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Refresh')),
+            ])));
             Widget _gameView() {
               final opts = (_game!['options'] as List).cast<String>();
               final correct = _game!['correctIndex'] as int;
@@ -1273,7 +1200,6 @@ jobs:
           }
           class _ProfileScreenState extends State<ProfileScreen> {
             bool _uploading = false;
-
             Future<void> _createPersonalPost() async {
               final type = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(child: Wrap(children: [
                 ListTile(leading: const Icon(Icons.image), title: const Text('Post Image'), onTap: () => Navigator.pop(ctx, 'image')),
@@ -1286,87 +1212,43 @@ jobs:
               try {
                 final fileId = await TelegramService.uploadFile(File(x.path), type);
                 if (fileId == null) throw 'Upload failed';
-                await FirebaseFirestore.instance.collection('feed_posts').add({
-                  'author': widget.name, 'authorCode': widget.code, 'authorType': 'student', 'text': '',
-                  'telegram_file_id': fileId, 'mediaType': type, 'time': FieldValue.serverTimestamp(), 'likes': 0, 'likedBy': []
-                });
+                await FirebaseFirestore.instance.collection('feed_posts').add({'author': widget.name, 'authorCode': widget.code, 'authorType': 'student', 'text': '', 'telegram_file_id': fileId, 'mediaType': type, 'time': FieldValue.serverTimestamp(), 'likes': 0, 'likedBy': []});
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posted to Pulse!')));
               } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); }
               finally { setState(() => _uploading = false); }
             }
-
             @override Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('My Profile')),
-                body: ListView(padding: const EdgeInsets.all(16), children: [
-                  Center(child: CircleAvatar(radius: 50, backgroundColor: const Color(0xFFC62828), child: const Icon(Icons.person, size: 60, color: Colors.white))),
-                  const SizedBox(height: 16),
-                  Center(child: Column(children: [
-                    Text(widget.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    Text('Code: ${widget.code} • Class: ${widget.cls}', style: const TextStyle(color: Colors.grey))
-                  ])),
-                  const SizedBox(height: 24),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('follows').where('following', isEqualTo: widget.code).snapshots(),
-                    builder: (c, s1) => StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance.collection('follows').where('follower', isEqualTo: widget.code).snapshots(),
-                      builder: (c, s2) {
-                        final followers = s1.hasData ? s1.data!.docs.length : 0;
-                        final following = s2.hasData ? s2.data!.docs.length : 0;
-                        return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                          _stat('$followers', 'Followers'),
-                          Container(width: 1, height: 40, color: Colors.grey.shade300),
-                          _stat('$following', 'Following'),
-                        ]);
-                      }
-                    )
-                  ),
-                  const SizedBox(height: 24),
-                  if (_uploading) const Center(child: CircularProgressIndicator()),
-                  Card(child: ListTile(
-                    leading: const Icon(Icons.add_a_photo, color: Color(0xFFC62828)),
-                    title: const Text('Post to Pulse', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Share a photo or video with the school'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: _uploading ? null : _createPersonalPost,
-                  )),
-                  const SizedBox(height: 8),
-                  Card(child: ListTile(
-                    leading: const Icon(Icons.videogame_asset, color: Colors.orange),
-                    title: const Text('Game a Day', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Daily quiz + streak counter'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GamesScreen(playerCode: widget.code, playerName: widget.name))),
-                  )),
-                  const SizedBox(height: 8),
-                  Card(child: ListTile(
-                    leading: const Icon(Icons.calendar_today, color: Colors.blue),
-                    title: const Text('My Timetable', style: TextStyle(fontWeight: FontWeight.bold)),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TimetableScreen(cls: widget.cls))),
-                  )),
-                  const SizedBox(height: 8),
-                  Card(child: ListTile(
-                    leading: const Icon(Icons.masks, color: Colors.purple),
-                    title: const Text('Anonymous Board', style: TextStyle(fontWeight: FontWeight.bold)),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AnonymousBoard())),
-                  )),
-                  const SizedBox(height: 8),
-                  Card(child: ListTile(
-                    leading: const Icon(Icons.mail, color: Colors.green),
-                    title: const Text('Inbox', style: TextStyle(fontWeight: FontWeight.bold)),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InboxScreen(myCode: widget.code, myName: widget.name))),
-                  )),
-                  const SizedBox(height: 24),
-                  ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC62828), foregroundColor: Colors.white), onPressed: () async {
-                    final p = await SharedPreferences.getInstance();
-                    await p.clear();
-                    if (context.mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (r) => false);
-                  }, child: const Text('Logout')),
-                ])
-              );
+              return Scaffold(appBar: AppBar(title: const Text('My Profile')), body: ListView(padding: const EdgeInsets.all(16), children: [
+                Center(child: CircleAvatar(radius: 50, backgroundColor: const Color(0xFFC62828), child: const Icon(Icons.person, size: 60, color: Colors.white))),
+                const SizedBox(height: 16),
+                Center(child: Column(children: [
+                  Text(widget.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text('Code: ${widget.code} • Class: ${widget.cls}', style: const TextStyle(color: Colors.grey))
+                ])),
+                const SizedBox(height: 24),
+                StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('follows').where('following', isEqualTo: widget.code).snapshots(), builder: (c, s1) => StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('follows').where('follower', isEqualTo: widget.code).snapshots(), builder: (c, s2) {
+                  final followers = s1.hasData ? s1.data!.docs.length : 0;
+                  final following = s2.hasData ? s2.data!.docs.length : 0;
+                  return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+                    _stat('$followers', 'Followers'),
+                    Container(width: 1, height: 40, color: Colors.grey.shade300),
+                    _stat('$following', 'Following'),
+                  ]);
+                })),
+                const SizedBox(height: 24),
+                if (_uploading) const Center(child: CircularProgressIndicator()),
+                Card(child: ListTile(leading: const Icon(Icons.add_a_photo, color: Color(0xFFC62828)), title: const Text('Post to Pulse', style: TextStyle(fontWeight: FontWeight.bold)), subtitle: const Text('Share a photo or video with the school'), trailing: const Icon(Icons.chevron_right), onTap: _uploading ? null : _createPersonalPost)),
+                const SizedBox(height: 8),
+                Card(child: ListTile(leading: const Icon(Icons.videogame_asset, color: Colors.orange), title: const Text('Game a Day', style: TextStyle(fontWeight: FontWeight.bold)), subtitle: const Text('Daily quiz + streak counter'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GamesScreen(playerCode: widget.code, playerName: widget.name))))),
+                const SizedBox(height: 8),
+                Card(child: ListTile(leading: const Icon(Icons.calendar_today, color: Colors.blue), title: const Text('My Timetable', style: TextStyle(fontWeight: FontWeight.bold)), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TimetableScreen(cls: widget.cls))))),
+                const SizedBox(height: 8),
+                Card(child: ListTile(leading: const Icon(Icons.masks, color: Colors.purple), title: const Text('Anonymous Board', style: TextStyle(fontWeight: FontWeight.bold)), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AnonymousBoard())))),
+                const SizedBox(height: 8),
+                Card(child: ListTile(leading: const Icon(Icons.mail, color: Colors.green), title: const Text('Inbox', style: TextStyle(fontWeight: FontWeight.bold)), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InboxScreen(myCode: widget.code, myName: widget.name))))),
+                const SizedBox(height: 24),
+                ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC62828), foregroundColor: Colors.white), onPressed: () async { final p = await SharedPreferences.getInstance(); await p.clear(); if (context.mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (r) => false); }, child: const Text('Logout')),
+              ]));
             }
             Widget _stat(String number, String label) => Column(children: [Text(number, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12))]);
           }
@@ -1415,7 +1297,6 @@ jobs:
       - name: Generate Admin App
         run: |
           mkdir -p admin_app/lib/screens admin_app/lib/services
-          mkdir -p admin_app/android/app/src/main
           mkdir -p admin_app/android/app/src/main/res/values
           mkdir -p admin_app/android/app/src/main/res/drawable
           mkdir -p admin_app/android/app/src/main/kotlin/com/afrinode/platinumadmin
@@ -1555,14 +1436,11 @@ jobs:
           cat > lib/screens/dashboard.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'manage_students.dart'; import 'manage_staff.dart'; import 'moderation.dart'; import 'broadcast.dart'; import 'ban_manager.dart'; import 'post_announcement.dart'; import 'ocr_register.dart'; import 'send_notification.dart'; import 'manage_timetable.dart'; import 'manage_clubs.dart'; import 'reset_system.dart'; import 'change_pin.dart'; import 'manage_games.dart';
-
           class Dashboard extends StatelessWidget {
             final String role; final String staffName;
             const Dashboard({super.key, required this.role, required this.staffName});
-
             @override Widget build(BuildContext context) {
               bool isSuperAdmin = role == 'Super Admin'; bool isAdmin = role == 'Admin' || isSuperAdmin;
-
               return Scaffold(appBar: AppBar(title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Staff Dashboard', style: TextStyle(color: Color(0xFFD4AF37), fontSize: 18)), Text('$role: $staffName', style: const TextStyle(fontSize: 12, color: Colors.grey))])), body: ListView(padding: const EdgeInsets.all(16), children: [
                 _card(context, 'Post Announcement', Icons.post_add, const Color(0xFFD4AF37), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PostAnnouncementScreen()))),
                 _card(context, 'Go Live Now (Jitsi)', Icons.videocam, Colors.redAccent, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BroadcastScreen()))),
@@ -1590,27 +1468,13 @@ jobs:
           EOF
 
           cat > lib/screens/manage_games.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:cloud_firestore/cloud_firestore.dart';
-
-          class ManageGamesScreen extends StatefulWidget {
-            const ManageGamesScreen({super.key});
-            @override State<ManageGamesScreen> createState() => _ManageGamesScreenState();
-          }
+          import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
+          class ManageGamesScreen extends StatefulWidget { const ManageGamesScreen({super.key}); @override State<ManageGamesScreen> createState() => _ManageGamesScreenState(); }
           class _ManageGamesScreenState extends State<ManageGamesScreen> {
-            final _q = TextEditingController();
-            final List<TextEditingController> _opts = List.generate(4, (_) => TextEditingController());
-            int _correct = 0;
-            DateTime _date = DateTime.now();
-            bool _saving = false;
-
+            final _q = TextEditingController(); final List<TextEditingController> _opts = List.generate(4, (_) => TextEditingController());
+            int _correct = 0; DateTime _date = DateTime.now(); bool _saving = false;
             String _fmt(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-            Future<void> _pickDate() async {
-              final p = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
-              if (p != null) setState(() => _date = p);
-            }
-
+            Future<void> _pickDate() async { final p = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365))); if (p != null) setState(() => _date = p); }
             Future<void> _save() async {
               if (_q.text.trim().isEmpty) return _toast('Please enter a question');
               for (int i = 0; i < 4; i++) { if (_opts[i].text.trim().isEmpty) return _toast('Option ${String.fromCharCode(65 + i)} is empty'); }
@@ -1618,183 +1482,98 @@ jobs:
               try {
                 final dateStr = _fmt(_date);
                 final existing = await FirebaseFirestore.instance.collection('games').where('date', isEqualTo: dateStr).limit(1).get();
-                final data = {
-                  'date': dateStr, 'question': _q.text.trim(),
-                  'options': _opts.map((c) => c.text.trim()).toList(),
-                  'correctIndex': _correct, 'postedBy': 'Admin', 'updatedAt': FieldValue.serverTimestamp(),
-                };
+                final data = {'date': dateStr, 'question': _q.text.trim(), 'options': _opts.map((c) => c.text.trim()).toList(), 'correctIndex': _correct, 'postedBy': 'Admin', 'updatedAt': FieldValue.serverTimestamp()};
                 if (existing.docs.isNotEmpty) { await existing.docs.first.reference.update(data); _toast('Game for $dateStr updated!'); }
                 else { data['time'] = FieldValue.serverTimestamp(); await FirebaseFirestore.instance.collection('games').add(data); _toast('Game for $dateStr posted!'); }
                 _q.clear(); for (var c in _opts) c.clear();
                 setState(() { _correct = 0; _saving = false; });
               } catch (e) { setState(() => _saving = false); _toast('Error: $e', red: true); }
             }
-
             void _toast(String msg, {bool red = false}) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: red ? Colors.red : Colors.green)); }
-
-            @override Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Manage Games')),
-                body: ListView(padding: const EdgeInsets.all(16), children: [
-                  const Text('Post / Edit Game of the Day', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFFD4AF37))),
-                  const SizedBox(height: 16),
-                  TextField(controller: _q, maxLines: 3, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Question', filled: true, fillColor: Color(0xFF131A26))),
-                  const SizedBox(height: 16),
-                  const Text('Options (tap radio = correct answer)', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  ...List.generate(4, (i) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(children: [
-                    Radio<int>(value: i, groupValue: _correct, activeColor: Colors.green, onChanged: (v) => setState(() => _correct = v!)),
-                    Expanded(child: TextField(controller: _opts[i], style: const TextStyle(color: Colors.white), decoration: InputDecoration(hintText: 'Option ${String.fromCharCode(65 + i)}', filled: true, fillColor: const Color(0xFF131A26)))),
-                  ]))),
-                  ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.calendar_today, color: Color(0xFFD4AF37)), title: Text('Date: ${_fmt(_date)}', style: const TextStyle(color: Colors.white)), trailing: TextButton(onPressed: _pickDate, child: const Text('Change'))),
-                  const SizedBox(height: 16),
-                  SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save), label: Text(_saving ? 'Saving...' : 'SAVE GAME'))),
-                  const Divider(height: 40),
-                  const Text('Posted Games', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFFD4AF37))),
-                  const SizedBox(height: 16),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('games').orderBy('date', descending: true).limit(30).snapshots(),
-                    builder: (c, s) {
-                      if (!s.hasData) return const Center(child: CircularProgressIndicator());
-                      if (s.data!.docs.isEmpty) return const Text('No games posted yet.', style: TextStyle(color: Colors.grey));
-                      return Column(children: s.data!.docs.map((doc) {
-                        final d = doc.data() as Map<String, dynamic>;
-                        final correct = d['correctIndex'] ?? 0;
-                        final opts = (d['options'] as List?) ?? [];
-                        return Card(color: const Color(0xFF131A26), margin: const EdgeInsets.only(bottom: 8), child: ListTile(
-                          leading: const Icon(Icons.videogame_asset, color: Color(0xFFD4AF37)),
-                          title: Text(d['question'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
-                          subtitle: Text('Date: ${d['date']} • Correct: ${correct < opts.length ? String.fromCharCode(65 + correct) : "?"}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await doc.reference.delete(); }),
-                        ));
-                      }).toList());
-                    },
-                  ),
-                ]),
-              );
-            }
+            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Manage Games')), body: ListView(padding: const EdgeInsets.all(16), children: [
+              const Text('Post / Edit Game of the Day', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFFD4AF37))),
+              const SizedBox(height: 16),
+              TextField(controller: _q, maxLines: 3, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Question', filled: true, fillColor: Color(0xFF131A26))),
+              const SizedBox(height: 16),
+              const Text('Options (tap radio = correct answer)', style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 8),
+              ...List.generate(4, (i) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(children: [
+                Radio<int>(value: i, groupValue: _correct, activeColor: Colors.green, onChanged: (v) => setState(() => _correct = v!)),
+                Expanded(child: TextField(controller: _opts[i], style: const TextStyle(color: Colors.white), decoration: InputDecoration(hintText: 'Option ${String.fromCharCode(65 + i)}', filled: true, fillColor: const Color(0xFF131A26)))),
+              ]))),
+              ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.calendar_today, color: Color(0xFFD4AF37)), title: Text('Date: ${_fmt(_date)}', style: const TextStyle(color: Colors.white)), trailing: TextButton(onPressed: _pickDate, child: const Text('Change'))),
+              const SizedBox(height: 16),
+              SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save), label: Text(_saving ? 'Saving...' : 'SAVE GAME'))),
+              const Divider(height: 40),
+              const Text('Posted Games', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFFD4AF37))),
+              const SizedBox(height: 16),
+              StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('games').orderBy('date', descending: true).limit(30).snapshots(), builder: (c, s) {
+                if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                if (s.data!.docs.isEmpty) return const Text('No games posted yet.', style: TextStyle(color: Colors.grey));
+                return Column(children: s.data!.docs.map((doc) {
+                  final d = doc.data() as Map<String, dynamic>;
+                  final correct = d['correctIndex'] ?? 0;
+                  final opts = (d['options'] as List?) ?? [];
+                  return Card(color: const Color(0xFF131A26), margin: const EdgeInsets.only(bottom: 8), child: ListTile(
+                    leading: const Icon(Icons.videogame_asset, color: Color(0xFFD4AF37)),
+                    title: Text(d['question'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    subtitle: Text('Date: ${d['date']} • Correct: ${correct < opts.length ? String.fromCharCode(65 + correct) : "?"}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await doc.reference.delete(); }),
+                  ));
+                }).toList());
+              }),
+            ]));
           }
           EOF
 
           cat > lib/screens/manage_students.dart << 'EOF'
           import 'package:flutter/material.dart'; import 'package:flutter/services.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
-          class ManageStudents extends StatefulWidget {
-            const ManageStudents({super.key});
-            @override State<ManageStudents> createState() => _ManageStudentsState();
-          }
+          class ManageStudents extends StatefulWidget { const ManageStudents({super.key}); @override State<ManageStudents> createState() => _ManageStudentsState(); }
           class _ManageStudentsState extends State<ManageStudents> {
-            final TextEditingController _searchCtrl = TextEditingController();
-            String _searchQuery = '';
-
-            void _exportCodes(BuildContext context, List<DocumentSnapshot> docs) {
-              String text = "PLATINUM DIGITAL APP - STUDENT CODES\n\n";
-              for (var doc in docs) { final d = doc.data() as Map<String, dynamic>; text += "${d['fullName']} | Class: ${d['classLevel']} | Code: ${d['unitCode']} | Role: ${d['role'] ?? 'Student'}\n"; }
-              Clipboard.setData(ClipboardData(text: text));
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied! Paste in notes to print.'), backgroundColor: Colors.green));
-            }
-
+            final TextEditingController _searchCtrl = TextEditingController(); String _searchQuery = '';
+            void _exportCodes(BuildContext context, List<DocumentSnapshot> docs) { String text = "PLATINUM DIGITAL APP - STUDENT CODES\n\n"; for (var doc in docs) { final d = doc.data() as Map<String, dynamic>; text += "${d['fullName']} | Class: ${d['classLevel']} | Code: ${d['unitCode']} | Role: ${d['role'] ?? 'Student'}\n"; } Clipboard.setData(ClipboardData(text: text)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied! Paste in notes to print.'), backgroundColor: Colors.green)); }
             void _showOptions(BuildContext context, String docId, Map<String, dynamic> data) {
               String role = data['role'] ?? 'Student';
               showModalBottomSheet(context: context, backgroundColor: const Color(0xFF131A26), builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                ListTile(
-                  leading: Icon(role == 'Prefect' ? Icons.remove_moderator : Icons.admin_panel_settings, color: Colors.orange),
-                  title: Text(role == 'Prefect' ? 'Demote to Student' : 'Promote to Prefect', style: const TextStyle(color: Colors.white)),
-                  onTap: () async { Navigator.pop(ctx); await FirebaseFirestore.instance.collection('students').doc(docId).update({'role': role == 'Prefect' ? 'Student' : 'Prefect'}); }
-                ),
-                ListTile(
-                  leading: const Icon(Icons.phonelink_erase, color: Colors.red),
-                  title: const Text('Reset Device (Unlock Phone)', style: TextStyle(color: Colors.white)),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    await FirebaseFirestore.instance.collection('students').doc(docId).update({'device_id': FieldValue.delete()});
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Device Reset! Student can log in on a new phone.'), backgroundColor: Colors.green));
-                  }
-                ),
-                ListTile(
-                  leading: const Icon(Icons.edit, color: Colors.blueAccent),
-                  title: const Text('Change Student Code', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    TextEditingController newCodeCtrl = TextEditingController();
-                    showDialog(context: context, builder: (dCtx) => AlertDialog(
-                      backgroundColor: const Color(0xFF131A26),
-                      title: const Text('Change Code', style: TextStyle(color: Colors.white)),
-                      content: TextField(controller: newCodeCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Enter New Code (e.g. PDT-9999)', hintStyle: TextStyle(color: Colors.grey))),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Cancel')),
-                        ElevatedButton(onPressed: () async {
-                          if (newCodeCtrl.text.isNotEmpty) {
-                            await FirebaseFirestore.instance.collection('students').doc(docId).update({'unitCode': newCodeCtrl.text.trim().toUpperCase()});
-                            if (dCtx.mounted) Navigator.pop(dCtx);
-                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code Changed Successfully!'), backgroundColor: Colors.green));
-                          }
-                        }, child: const Text('Save'))
-                      ]
-                    ));
-                  }
-                )
+                ListTile(leading: Icon(role == 'Prefect' ? Icons.remove_moderator : Icons.admin_panel_settings, color: Colors.orange), title: Text(role == 'Prefect' ? 'Demote to Student' : 'Promote to Prefect', style: const TextStyle(color: Colors.white)), onTap: () async { Navigator.pop(ctx); await FirebaseFirestore.instance.collection('students').doc(docId).update({'role': role == 'Prefect' ? 'Student' : 'Prefect'}); }),
+                ListTile(leading: const Icon(Icons.phonelink_erase, color: Colors.red), title: const Text('Reset Device (Unlock Phone)', style: TextStyle(color: Colors.white)), onTap: () async { Navigator.pop(ctx); await FirebaseFirestore.instance.collection('students').doc(docId).update({'device_id': FieldValue.delete()}); if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Device Reset! Student can log in on a new phone.'), backgroundColor: Colors.green)); }),
+                ListTile(leading: const Icon(Icons.edit, color: Colors.blueAccent), title: const Text('Change Student Code', style: TextStyle(color: Colors.white)), onTap: () {
+                  Navigator.pop(ctx);
+                  TextEditingController newCodeCtrl = TextEditingController();
+                  showDialog(context: context, builder: (dCtx) => AlertDialog(
+                    backgroundColor: const Color(0xFF131A26),
+                    title: const Text('Change Code', style: TextStyle(color: Colors.white)),
+                    content: TextField(controller: newCodeCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Enter New Code (e.g. PDT-9999)', hintStyle: TextStyle(color: Colors.grey))),
+                    actions: [TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Cancel')), ElevatedButton(onPressed: () async { if (newCodeCtrl.text.isNotEmpty) { await FirebaseFirestore.instance.collection('students').doc(docId).update({'unitCode': newCodeCtrl.text.trim().toUpperCase()}); if (dCtx.mounted) Navigator.pop(dCtx); if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code Changed Successfully!'), backgroundColor: Colors.green)); } }, child: const Text('Save'))]
+                  ));
+                }),
               ])));
             }
-
             @override Widget build(BuildContext context) => Scaffold(
-              appBar: AppBar(title: const Text('Manage Students & Prefects'), actions: [
-                StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('students').snapshots(), builder: (c, s) { if (!s.hasData) return const SizedBox(); return IconButton(icon: const Icon(Icons.copy, color: Color(0xFFD4AF37)), tooltip: 'Copy All Codes', onPressed: () => _exportCodes(context, s.data!.docs)); })
-              ]),
+              appBar: AppBar(title: const Text('Manage Students & Prefects'), actions: [StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('students').snapshots(), builder: (c, s) { if (!s.hasData) return const SizedBox(); return IconButton(icon: const Icon(Icons.copy, color: Color(0xFFD4AF37)), tooltip: 'Copy All Codes', onPressed: () => _exportCodes(context, s.data!.docs)); })]),
               body: Column(children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(hintText: 'Search by Name or Code...', hintStyle: const TextStyle(color: Colors.grey), prefixIcon: const Icon(Icons.search, color: Color(0xFFD4AF37)), filled: true, fillColor: const Color(0xFF131A26), border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)),
-                  ),
-                ),
+                Padding(padding: const EdgeInsets.all(16), child: TextField(controller: _searchCtrl, onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()), style: const TextStyle(color: Colors.white), decoration: InputDecoration(hintText: 'Search by Name or Code...', hintStyle: const TextStyle(color: Colors.grey), prefixIcon: const Icon(Icons.search, color: Color(0xFFD4AF37)), filled: true, fillColor: const Color(0xFF131A26), border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
                 Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('students').snapshots(), builder: (c, s) {
                   if (!s.hasData) return const Center(child: CircularProgressIndicator());
-                  final filteredDocs = s.data!.docs.where((doc) {
-                    final d = doc.data() as Map<String, dynamic>;
-                    final name = (d['fullName'] ?? '').toString().toLowerCase();
-                    final code = (d['unitCode'] ?? '').toString().toLowerCase();
-                    return name.contains(_searchQuery) || code.contains(_searchQuery);
-                  }).toList();
+                  final filteredDocs = s.data!.docs.where((doc) { final d = doc.data() as Map<String, dynamic>; final name = (d['fullName'] ?? '').toString().toLowerCase(); final code = (d['unitCode'] ?? '').toString().toLowerCase(); return name.contains(_searchQuery) || code.contains(_searchQuery); }).toList();
                   if (filteredDocs.isEmpty) return const Center(child: Text('No student found.', style: TextStyle(color: Colors.grey)));
                   return ListView.builder(itemCount: filteredDocs.length, itemBuilder: (c, i) {
-                    final doc = filteredDocs[i];
-                    final d = doc.data() as Map<String, dynamic>;
-                    final role = d['role'] ?? 'Student';
-                    final code = (d['unitCode'] ?? '').toString();
-                    final name = (d['fullName'] ?? 'Student').toString();
-                    final isPrefect = role == 'Prefect';
-                    final hasDevice = d['device_id'] != null;
-                    return Card(
-                      color: const Color(0xFF131A26),
-                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      child: InkWell(
-                        onTap: () => _showOptions(context, doc.id, d),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Row(children: [
-                            Icon(Icons.person, color: isPrefect ? Colors.orange : const Color(0xFFD4AF37)),
-                            const SizedBox(width: 8),
-                            Expanded(child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))),
-                            if (isPrefect) Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.orange.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: const Text('PREFECT', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold))),
-                            const SizedBox(width: 6),
-                            Icon(Icons.phone_android, size: 18, color: hasDevice ? Colors.green : Colors.grey),
-                          ]),
-                          const SizedBox(height: 8),
-                          Row(children: [
-                            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.2), borderRadius: BorderRadius.circular(6)), child: Text('Class ${d['classLevel'] ?? '?'}', style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 11, fontWeight: FontWeight.bold))),
-                            const SizedBox(width: 8),
-                            Expanded(child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: const Color(0xFFD4AF37).withOpacity(0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.5))), child: Text(code, style: const TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2, fontFamily: 'monospace')))),
-                            IconButton(icon: const Icon(Icons.copy, color: Colors.grey, size: 18), tooltip: 'Copy code', onPressed: () {
-                              Clipboard.setData(ClipboardData(text: code));
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied $code'), duration: const Duration(seconds: 1)));
-                            }),
-                          ]),
-                        ])),
-                      ),
-                    );
+                    final doc = filteredDocs[i]; final d = doc.data() as Map<String, dynamic>;
+                    final role = d['role'] ?? 'Student'; final code = (d['unitCode'] ?? '').toString(); final name = (d['fullName'] ?? 'Student').toString();
+                    final isPrefect = role == 'Prefect'; final hasDevice = d['device_id'] != null;
+                    return Card(color: const Color(0xFF131A26), margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: InkWell(
+                      onTap: () => _showOptions(context, doc.id, d), borderRadius: BorderRadius.circular(12),
+                      child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [Icon(Icons.person, color: isPrefect ? Colors.orange : const Color(0xFFD4AF37)), const SizedBox(width: 8), Expanded(child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))), if (isPrefect) Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.orange.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: const Text('PREFECT', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold))), const SizedBox(width: 6), Icon(Icons.phone_android, size: 18, color: hasDevice ? Colors.green : Colors.grey)]),
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.2), borderRadius: BorderRadius.circular(6)), child: Text('Class ${d['classLevel'] ?? '?'}', style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 11, fontWeight: FontWeight.bold))),
+                          const SizedBox(width: 8),
+                          Expanded(child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: const Color(0xFFD4AF37).withOpacity(0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.5))), child: Text(code, style: const TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2, fontFamily: 'monospace')))),
+                          IconButton(icon: const Icon(Icons.copy, color: Colors.grey, size: 18), tooltip: 'Copy code', onPressed: () { Clipboard.setData(ClipboardData(text: code)); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied $code'), duration: const Duration(seconds: 1))); }),
+                        ]),
+                      ])),
+                    ));
                   });
                 }))
               ])
@@ -1807,14 +1586,8 @@ jobs:
           class ManageStaff extends StatefulWidget { const ManageStaff({super.key}); @override State<ManageStaff> createState() => _ManageStaffState(); }
           class _ManageStaffState extends State<ManageStaff> { final _fn = TextEditingController(); final _ln = TextEditingController(); String _role = 'Teacher'; void _add() async { if (_fn.text.isEmpty) return; await FirebaseFirestore.instance.collection('staff').add({'firstName': _fn.text.trim(), 'lastName': _ln.text.trim(), 'fullName': '${_fn.text.trim()} ${_ln.text.trim()}', 'role': _role, 'isBanned': false, 'unitCode': 'STF-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'}); _fn.clear(); _ln.clear(); if (mounted) Navigator.pop(context); } void _toggleBan(String docId, bool currentStatus) async { await FirebaseFirestore.instance.collection('staff').doc(docId).update({'isBanned': !currentStatus}); } @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Manage Staff & Roles')), floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFD4AF37), onPressed: () => showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Add Staff Account'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: _fn, decoration: const InputDecoration(labelText: 'First Name')), TextField(controller: _ln, decoration: const InputDecoration(labelText: 'Last Name')), DropdownButtonFormField<String>(value: _role, items: ['Super Admin', 'Admin', 'Teacher'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _role = v!))]), actions: [ElevatedButton(onPressed: _add, child: const Text('Create Account'))])), child: const Icon(Icons.add, color: Colors.black)), body: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('staff').snapshots(), builder: (c, s) {
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
-            return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) {
-              final doc = s.data!.docs[i]; final d = doc.data() as Map<String, dynamic>;
-              final name = d['fullName'] ?? '${d['firstName']} ${d['lastName']}';
-              bool isBanned = d['isBanned'] ?? false;
-              return ListTile(leading: Icon(Icons.shield, color: isBanned ? Colors.red : Color(0xFFD4AF37)), title: Row(children: [Text(name, style: const TextStyle(fontWeight: FontWeight.bold)), if (isBanned) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.red.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: const Text('BANNED', style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)))]), subtitle: Text('Code: ${d['unitCode']} | Role: ${d['role']}'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                IconButton(icon: Icon(isBanned ? Icons.lock : Icons.lock_open, color: isBanned ? Colors.red : Colors.green), tooltip: isBanned ? 'Unban Staff' : 'Ban Staff', onPressed: () => _toggleBan(doc.id, isBanned)),
-                IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await doc.reference.delete(); })
-              ]));
+            return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final doc = s.data!.docs[i]; final d = doc.data() as Map<String, dynamic>; final name = d['fullName'] ?? '${d['firstName']} ${d['lastName']}'; bool isBanned = d['isBanned'] ?? false;
+              return ListTile(leading: Icon(Icons.shield, color: isBanned ? Colors.red : Color(0xFFD4AF37)), title: Row(children: [Text(name, style: const TextStyle(fontWeight: FontWeight.bold)), if (isBanned) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.red.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: const Text('BANNED', style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)))]), subtitle: Text('Code: ${d['unitCode']} | Role: ${d['role']}'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: Icon(isBanned ? Icons.lock : Icons.lock_open, color: isBanned ? Colors.red : Colors.green), onPressed: () => _toggleBan(doc.id, isBanned)), IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await doc.reference.delete(); })]));
             });
           }));
           }
@@ -1824,44 +1597,23 @@ jobs:
           import 'package:flutter/material.dart'; import 'package:cloud_firestore/cloud_firestore.dart';
           class ManageTimetableScreen extends StatefulWidget { const ManageTimetableScreen({super.key}); @override State<ManageTimetableScreen> createState() => _ManageTimetableScreenState(); }
           class _ManageTimetableScreenState extends State<ManageTimetableScreen> {
-            String _selectedClass = 'S1'; String _selectedDay = 'Monday';
-            final _timeCtrl = TextEditingController(); final _subjectCtrl = TextEditingController(); bool _loading = false;
-            void _addPeriod() async {
-              if (_timeCtrl.text.isEmpty || _subjectCtrl.text.isEmpty) return;
-              setState(() => _loading = true);
-              try {
-                final existing = await FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').where('day', isEqualTo: _selectedDay).where('time', isEqualTo: _timeCtrl.text.trim()).get();
-                if (existing.docs.isNotEmpty) throw "A period already exists at $_selectedDay ${_timeCtrl.text.trim()}!";
-                await FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').add({'day': _selectedDay, 'time': _timeCtrl.text.trim(), 'subject': _subjectCtrl.text.trim(), 'order': DateTime.now().millisecondsSinceEpoch});
-                _timeCtrl.clear(); _subjectCtrl.clear();
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Period Added!'), backgroundColor: Colors.green));
-              } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString(), style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red)); }
-              finally { setState(() => _loading = false); }
-            }
+            String _selectedClass = 'S1'; String _selectedDay = 'Monday'; final _timeCtrl = TextEditingController(); final _subjectCtrl = TextEditingController(); bool _loading = false;
+            void _addPeriod() async { if (_timeCtrl.text.isEmpty || _subjectCtrl.text.isEmpty) return; setState(() => _loading = true); try { final existing = await FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').where('day', isEqualTo: _selectedDay).where('time', isEqualTo: _timeCtrl.text.trim()).get(); if (existing.docs.isNotEmpty) throw "A period already exists at $_selectedDay ${_timeCtrl.text.trim()}!"; await FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').add({'day': _selectedDay, 'time': _timeCtrl.text.trim(), 'subject': _subjectCtrl.text.trim(), 'order': DateTime.now().millisecondsSinceEpoch}); _timeCtrl.clear(); _subjectCtrl.clear(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Period Added!'), backgroundColor: Colors.green)); } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString(), style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red)); } finally { setState(() => _loading = false); } }
             void _deletePeriod(String docId) async { await FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').doc(docId).delete(); }
-            @override Widget build(BuildContext context) {
-              return Scaffold(appBar: AppBar(title: const Text('Digital Timetable Editor')), body: Column(children: [
-                Padding(padding: const EdgeInsets.all(16), child: Column(children: [
-                  DropdownButtonFormField<String>(value: _selectedClass, decoration: const InputDecoration(labelText: 'Select Class'), items: ['S1','S2','S3','S4','S5','S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedClass = v!)), const SizedBox(height: 16),
-                  Row(children: [
-                    Expanded(flex: 2, child: DropdownButtonFormField<String>(value: _selectedDay, decoration: const InputDecoration(labelText: 'Day'), items: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedDay = v!))),
-                    const SizedBox(width: 10),
-                    Expanded(flex: 2, child: TextField(controller: _timeCtrl, decoration: const InputDecoration(labelText: 'Time (e.g. 8:00 - 9:00)'))),
-                  ]), const SizedBox(height: 16),
-                  TextField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: 'Subject & Teacher (e.g. Math - Mr. Okello)')), const SizedBox(height: 16),
-                  SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.green), onPressed: _loading ? null : _addPeriod, icon: const Icon(Icons.add), label: const Text('ADD PERIOD TO TIMETABLE'))),
-                ])),
-                const Divider(color: Colors.grey),
-                Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').orderBy('order').snapshots(), builder: (c, s) {
-                  if (!s.hasData) return const Center(child: CircularProgressIndicator());
-                  if (s.data!.docs.isEmpty) return const Center(child: Text('No periods added yet.', style: TextStyle(color: Colors.grey)));
-                  return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) {
-                    final doc = s.data!.docs[i]; final d = doc.data() as Map<String, dynamic>;
-                    return ListTile(leading: const Icon(Icons.schedule, color: Color(0xFFD4AF37)), title: Text('${d['subject']}', style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('${d['day']} | ${d['time']}'), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deletePeriod(doc.id)));
-                  });
-                })),
-              ]));
-            }
+            @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Digital Timetable Editor')), body: Column(children: [
+              Padding(padding: const EdgeInsets.all(16), child: Column(children: [
+                DropdownButtonFormField<String>(value: _selectedClass, decoration: const InputDecoration(labelText: 'Select Class'), items: ['S1','S2','S3','S4','S5','S6'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedClass = v!)), const SizedBox(height: 16),
+                Row(children: [Expanded(flex: 2, child: DropdownButtonFormField<String>(value: _selectedDay, decoration: const InputDecoration(labelText: 'Day'), items: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => setState(() => _selectedDay = v!))), const SizedBox(width: 10), Expanded(flex: 2, child: TextField(controller: _timeCtrl, decoration: const InputDecoration(labelText: 'Time (e.g. 8:00 - 9:00)')))]), const SizedBox(height: 16),
+                TextField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: 'Subject & Teacher (e.g. Math - Mr. Okello)')), const SizedBox(height: 16),
+                SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.green), onPressed: _loading ? null : _addPeriod, icon: const Icon(Icons.add), label: const Text('ADD PERIOD TO TIMETABLE'))),
+              ])),
+              const Divider(color: Colors.grey),
+              Expanded(child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('timetables').doc(_selectedClass).collection('periods').orderBy('order').snapshots(), builder: (c, s) {
+                if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                if (s.data!.docs.isEmpty) return const Center(child: Text('No periods added yet.', style: TextStyle(color: Colors.grey)));
+                return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) { final doc = s.data!.docs[i]; final d = doc.data() as Map<String, dynamic>; return ListTile(leading: const Icon(Icons.schedule, color: Color(0xFFD4AF37)), title: Text('${d['subject']}', style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('${d['day']} | ${d['time']}'), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deletePeriod(doc.id))); });
+              })),
+            ]));
           }
           EOF
 
@@ -1895,22 +1647,11 @@ jobs:
           class _ResetSystemScreenState extends State<ResetSystemScreen> {
             bool _loading = false;
             Future<void> _wipeCollection(String collectionName) async { final snap = await FirebaseFirestore.instance.collection(collectionName).get(); for (var doc in snap.docs) { await doc.reference.delete(); } }
-            Future<void> _resetAll() async {
-              setState(() => _loading = true);
-              try {
-                await _wipeCollection('feed_posts'); await _wipeCollection('anonymous_posts'); await _wipeCollection('notifications');
-                await _wipeCollection('live_classes'); await _wipeCollection('stories'); await _wipeCollection('announcements');
-                final chatSnap = await FirebaseFirestore.instance.collection('chats').get();
-                for (var chatDoc in chatSnap.docs) { final msgs = await chatDoc.reference.collection('msgs').get(); for (var msg in msgs.docs) { await msg.reference.delete(); } }
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All Posts, Chats, Stories, and Notifications Deleted!'), backgroundColor: Colors.green));
-              } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); }
-              finally { setState(() => _loading = false); }
-            }
+            Future<void> _resetAll() async { setState(() => _loading = true); try { await _wipeCollection('feed_posts'); await _wipeCollection('anonymous_posts'); await _wipeCollection('notifications'); await _wipeCollection('live_classes'); await _wipeCollection('stories'); await _wipeCollection('announcements'); final chatSnap = await FirebaseFirestore.instance.collection('chats').get(); for (var chatDoc in chatSnap.docs) { final msgs = await chatDoc.reference.collection('msgs').get(); for (var msg in msgs.docs) { await msg.reference.delete(); } } if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All Posts, Chats, Stories, and Notifications Deleted!'), backgroundColor: Colors.green)); } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); } finally { setState(() => _loading = false); } }
             @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Reset App Data')), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Icon(Icons.warning_amber_rounded, size: 80, color: Colors.red), const SizedBox(height: 16),
               const Text('Warning!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red)), const SizedBox(height: 8),
-              const Text('This will delete ALL feed posts, stories, announcements, anonymous confessions, and chat messages. This action cannot be undone.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 32),
+              const Text('This will delete ALL feed posts, stories, announcements, anonymous confessions, and chat messages. This action cannot be undone.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)), const SizedBox(height: 32),
               if (_loading) const CircularProgressIndicator(),
               if (!_loading) SizedBox(width: double.infinity, height: 50, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: _resetAll, child: const Text('DELETE ALL POSTS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)))),
             ]))));
@@ -1932,28 +1673,21 @@ jobs:
             @override void dispose() { _tc.dispose(); super.dispose(); }
             @override Widget build(BuildContext context) => Scaffold(
               appBar: AppBar(title: const Text('Moderation'), bottom: TabBar(controller: _tc, tabs: const [Tab(text: 'Pulse Posts'), Tab(text: 'Notice Board'), Tab(text: 'Anonymous')])),
-              body: TabBarView(controller: _tc, children: [
-                _buildList('feed_posts'),
-                _buildList('announcements'),
-                _buildList('anonymous_posts'),
-              ]),
+              body: TabBarView(controller: _tc, children: [_buildList('feed_posts'), _buildList('announcements'), _buildList('anonymous_posts')]),
             );
-            Widget _buildList(String coll) => StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection(coll).orderBy('time', descending: true).limit(100).snapshots(),
-              builder: (c, s) {
-                if (!s.hasData) return const Center(child: CircularProgressIndicator());
-                if (s.data!.docs.isEmpty) return const Center(child: Text('No posts to moderate.', style: TextStyle(color: Colors.grey)));
-                return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) {
-                  final doc = s.data!.docs[i]; final d = doc.data() as Map<String, dynamic>;
-                  return Card(color: const Color(0xFF131A26), margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: ListTile(
-                    leading: const Icon(Icons.article, color: Color(0xFFD4AF37)),
-                    title: Text(d['text'] ?? d['question'] ?? '[Media post]', style: const TextStyle(color: Colors.white), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    subtitle: Text('By ${d['author'] ?? 'Anonymous'} • ${d['time'] != null ? timeago.format((d['time'] as Timestamp).toDate()) : ''}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                    trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Delete?'), content: const Text('This cannot be undone.'), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete'))])); if (ok == true) await doc.reference.delete(); }),
-                  ));
-                });
-              },
-            );
+            Widget _buildList(String coll) => StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection(coll).orderBy('time', descending: true).limit(100).snapshots(), builder: (c, s) {
+              if (!s.hasData) return const Center(child: CircularProgressIndicator());
+              if (s.data!.docs.isEmpty) return const Center(child: Text('No posts to moderate.', style: TextStyle(color: Colors.grey)));
+              return ListView.builder(itemCount: s.data!.docs.length, itemBuilder: (c, i) {
+                final doc = s.data!.docs[i]; final d = doc.data() as Map<String, dynamic>;
+                return Card(color: const Color(0xFF131A26), margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: ListTile(
+                  leading: const Icon(Icons.article, color: Color(0xFFD4AF37)),
+                  title: Text(d['text'] ?? d['question'] ?? '[Media post]', style: const TextStyle(color: Colors.white), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  subtitle: Text('By ${d['author'] ?? 'Anonymous'} • ${d['time'] != null ? timeago.format((d['time'] as Timestamp).toDate()) : ''}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                  trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Delete?'), content: const Text('This cannot be undone.'), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete'))])); if (ok == true) await doc.reference.delete(); }),
+                ));
+              });
+            });
           }
           EOF
 
